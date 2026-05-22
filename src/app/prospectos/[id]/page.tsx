@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useApp, Prospect, Simulation, DocumentItem } from "@/utils/context/AppContext";
-import { getFile } from "@/utils/db";
 import {
   ArrowLeft,
   FileText,
@@ -26,7 +25,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { prospects, saveSimulation, updateProspectStatus, triggerPushNotification } = useApp();
+  const { prospects, saveSimulation, updateProspectStatus, triggerPushNotification, getFileContent } = useApp();
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
 
@@ -86,20 +85,20 @@ export default function ProspectoDetalle() {
   useEffect(() => {
     if (selectedDoc) {
       setLoadingFile(true);
-      getFile(selectedDoc.id)
+      getFileContent(selectedDoc)
         .then((data) => {
           setRealFileData(data);
           setLoadingFile(false);
         })
         .catch((err) => {
-          console.error("Error al cargar archivo IndexedDB:", err);
+          console.error("Error al cargar archivo:", err);
           setRealFileData(null);
           setLoadingFile(false);
         });
     } else {
       setRealFileData(null);
     }
-  }, [selectedDoc]);
+  }, [selectedDoc, getFileContent]);
 
   if (!prospect) {
     return (

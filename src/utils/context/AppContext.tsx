@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { saveFile } from "@/utils/db";
-
+import { saveFile, getFile } from "@/utils/db";
+import { createClient } from "@/utils/supabase/client";
 
 export type UserRole = "aliado" | "director";
 
@@ -22,6 +22,7 @@ export interface DocumentItem {
   file_name: string;
   file_url: string;
   file_type: "AFORE" | "IMSS" | "OTROS";
+  storage_path?: string;
   uploaded_at: string;
 }
 
@@ -97,7 +98,7 @@ interface AppContextType {
   toast: ToastMessage | null;
   isDemoMode: boolean;
   isLoading: boolean;
-  login: (email: string, role: UserRole) => Promise<boolean>;
+  login: (email: string, role: UserRole, password?: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   addProspect: (
@@ -121,6 +122,7 @@ interface AppContextType {
   markAllNotificationsRead: () => void;
   clearToast: () => void;
   triggerPushNotification: (message: string, type: "whatsapp" | "email", recipient: string) => void;
+  getFileContent: (doc: DocumentItem) => Promise<string | null>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -364,115 +366,335 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [supabase, setSupabase] = useState<any>(null);
 
-  // Load state from localStorage on mount
+  // Helper to transform prospect from DB format to Frontend format
+  const transformProspectFromDB = (dbProspect: any): Prospect => {
+    const hasSimulation = dbProspect.semanas_imss !== null || dbProspect.pension_actual !== null;
+    return {
+      id: dbProspect.id,
+      aliado_id: dbProspect.aliado_id,
+      aliado_name: dbProspect.aliado_name,
+      full_name: dbProspect.full_name,
+      nss: dbProspect.nss || "",
+      curp: dbProspect.curp || "",
+      email: dbProspect.email || "",
+      phone: dbProspect.phone || "",
+      status: dbProspect.status,
+      notes_aliado: dbProspect.notes_aliado || "",
+      notes_director: dbProspect.notes_director || "",
+      simulation: hasSimulation ? {
+        semanas: dbProspect.semanas_imss || 0,
+        pensionActual: Number(dbProspect.pension_actual) || 0,
+        pensionMejorada: Number(dbProspect.pension_mejorada) || 0,
+        financiamiento: Number(dbProspect.monto_financiamiento) || 0,
+        costoGestion: Number(dbProspect.costo_gestion) || 0,
+        totalCredito: Number(dbProspect.total_credito) || 0,
+        roiMonths: dbProspect.roi_months || 0,
+        comments: dbProspect.simulation_comments || "",
+      } : undefined,
+      documents: (dbProspect.documents || []).map((doc: any) => ({
+        id: doc.id,
+        prospect_id: doc.prospect_id,
+        file_name: doc.file_name,
+        file_url: doc.file_url,
+        file_type: doc.file_type,
+        storage_path: doc.storage_path,
+        uploaded_at: doc.uploaded_at,
+      })),
+      created_at: dbProspect.created_at,
+      updated_at: dbProspect.updated_at,
+    };
+  };
+
+  // Helper to convert base64 to Blob
+  const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "";
+    const bstr = atob(arr[arr.length - 1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
+  // Load state from localStorage/Supabase on mount
   useEffect(() => {
-    // Check if Supabase keys exist (Mocking check or reading env)
     const hasKeys =
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_URL !== "tu_supabase_url_aqui" &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "tu_supabase_anon_key_aqui";
 
-    setIsDemoMode(!hasKeys);
+    const demo = !hasKeys;
+    setIsDemoMode(demo);
 
-    // Read localStorage fallbacks
-    const storedUser = localStorage.getItem("pensionflow_user");
-    const storedRole = localStorage.getItem("pensionflow_active_role");
-    const storedProspects = localStorage.getItem("pensionflow_prospects");
-    const storedCodes = localStorage.getItem("pensionflow_invitation_codes");
-    const storedNotifs = localStorage.getItem("pensionflow_notifications");
-    const storedProfiles = localStorage.getItem("pensionflow_profiles");
+    if (demo) {
+      // Read localStorage fallbacks
+      const storedUser = localStorage.getItem("pensionflow_user");
+      const storedRole = localStorage.getItem("pensionflow_active_role");
+      const storedProspects = localStorage.getItem("pensionflow_prospects");
+      const storedCodes = localStorage.getItem("pensionflow_invitation_codes");
+      const storedNotifs = localStorage.getItem("pensionflow_notifications");
+      const storedProfiles = localStorage.getItem("pensionflow_profiles");
 
-    if (storedProfiles) {
-      setProfiles(JSON.parse(storedProfiles));
+      if (storedProfiles) {
+        setProfiles(JSON.parse(storedProfiles));
+      } else {
+        setProfiles(INITIAL_PROFILES);
+        localStorage.setItem("pensionflow_profiles", JSON.stringify(INITIAL_PROFILES));
+      }
+
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        setUser(INITIAL_PROFILES[0]);
+        localStorage.setItem("pensionflow_user", JSON.stringify(INITIAL_PROFILES[0]));
+      }
+
+      if (storedRole) {
+        setActiveRole(storedRole as UserRole);
+      } else {
+        setActiveRole("aliado");
+        localStorage.setItem("pensionflow_active_role", "aliado");
+      }
+
+      if (storedProspects) {
+        setProspects(JSON.parse(storedProspects));
+      } else {
+        setProspects(INITIAL_PROSPECTS);
+        localStorage.setItem("pensionflow_prospects", JSON.stringify(INITIAL_PROSPECTS));
+      }
+
+      if (storedCodes) {
+        setInvitationCodes(JSON.parse(storedCodes));
+      } else {
+        setInvitationCodes(INITIAL_CODES);
+        localStorage.setItem("pensionflow_invitation_codes", JSON.stringify(INITIAL_CODES));
+      }
+
+      if (storedNotifs) {
+        setNotifications(JSON.parse(storedNotifs));
+      } else {
+        setNotifications(INITIAL_NOTIFICATIONS);
+        localStorage.setItem("pensionflow_notifications", JSON.stringify(INITIAL_NOTIFICATIONS));
+      }
+      setIsLoading(false);
     } else {
-      setProfiles(INITIAL_PROFILES);
-      localStorage.setItem("pensionflow_profiles", JSON.stringify(INITIAL_PROFILES));
-    }
+      // Production mode with Supabase
+      const client = createClient();
+      setSupabase(client);
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      // Pre-set ally as default user for first time visitors
-      setUser(INITIAL_PROFILES[0]);
-      localStorage.setItem("pensionflow_user", JSON.stringify(INITIAL_PROFILES[0]));
-    }
+      const loadSupabaseData = async () => {
+        try {
+          // Check if there is an active session
+          const { data: { session } } = await client.auth.getSession();
+          let currentUser: UserProfile | null = null;
 
-    if (storedRole) {
-      setActiveRole(storedRole as UserRole);
-    } else {
-      setActiveRole("aliado");
-      localStorage.setItem("pensionflow_active_role", "aliado");
-    }
+          if (session?.user) {
+            const { data: profile } = await client
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+            if (profile) {
+              currentUser = profile;
+              setUser(profile);
+              setActiveRole(profile.role);
+            }
+          }
 
-    if (storedProspects) {
-      setProspects(JSON.parse(storedProspects));
-    } else {
-      setProspects(INITIAL_PROSPECTS);
-      localStorage.setItem("pensionflow_prospects", JSON.stringify(INITIAL_PROSPECTS));
-    }
+          // Fetch fallback logged in user from localStorage if not signed in via auth
+          if (!currentUser) {
+            const storedUser = localStorage.getItem("pensionflow_user");
+            if (storedUser) {
+              const parsed = JSON.parse(storedUser);
+              const { data: profile } = await client
+                .from("profiles")
+                .select("*")
+                .eq("email", parsed.email)
+                .single();
+              if (profile) {
+                currentUser = profile;
+                setUser(profile);
+                setActiveRole(profile.role);
+              }
+            }
+          }
 
-    if (storedCodes) {
-      setInvitationCodes(JSON.parse(storedCodes));
-    } else {
-      setInvitationCodes(INITIAL_CODES);
-      localStorage.setItem("pensionflow_invitation_codes", JSON.stringify(INITIAL_CODES));
-    }
+          // Default fallback if absolutely no user logged in
+          if (!currentUser) {
+            const { data: profile } = await client
+              .from("profiles")
+              .select("*")
+              .eq("role", "aliado")
+              .limit(1)
+              .maybeSingle();
+            if (profile) {
+              currentUser = profile;
+              setUser(profile);
+              setActiveRole(profile.role);
+            }
+          }
 
-    if (storedNotifs) {
-      setNotifications(JSON.parse(storedNotifs));
-    } else {
-      setNotifications(INITIAL_NOTIFICATIONS);
-      localStorage.setItem("pensionflow_notifications", JSON.stringify(INITIAL_NOTIFICATIONS));
-    }
+          // Fetch all profiles
+          const { data: dbProfiles } = await client.from("profiles").select("*");
+          if (dbProfiles) setProfiles(dbProfiles);
 
-    setIsLoading(false);
+          // Fetch prospects (filtered by role if user is aliado)
+          let prospectsQuery = client.from("prospects").select("*, documents(*)");
+          if (currentUser && currentUser.role === "aliado") {
+            prospectsQuery = prospectsQuery.eq("aliado_id", currentUser.id);
+          }
+          const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
+          if (dbProspects) {
+            setProspects(dbProspects.map(transformProspectFromDB));
+          }
+
+          // Fetch invitation codes
+          const { data: dbCodes } = await client.from("invitation_codes").select("*");
+          if (dbCodes) {
+            setInvitationCodes(dbCodes.map((c: any) => ({
+              id: c.id,
+              code: c.code,
+              created_by: c.created_by,
+              is_used: c.is_used,
+              used_by: c.used_by,
+              created_at: c.created_at
+            })));
+          }
+
+          // Fetch notifications for the user
+          if (currentUser) {
+            const { data: dbNotifs } = await client
+              .from("notifications")
+              .select("*")
+              .eq("user_id", currentUser.id)
+              .order("created_at", { ascending: false });
+            if (dbNotifs) {
+              setNotifications(dbNotifs.map((n: any) => ({
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                type: n.type as any,
+                read: n.read,
+                created_at: n.created_at
+              })));
+            }
+          }
+        } catch (error) {
+          console.error("Error loading Supabase data:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadSupabaseData();
+    }
   }, []);
 
-  // Sync state to localStorage when it changes
   const saveToStorage = (key: string, value: any) => {
     localStorage.setItem(key, JSON.stringify(value));
   };
 
-  const login = async (email: string, role: UserRole): Promise<boolean> => {
+  const login = async (email: string, role: UserRole, password?: string): Promise<boolean> => {
     setIsLoading(true);
-    // Demo login simulator from dynamic profiles
-    const storedProfiles = localStorage.getItem("pensionflow_profiles");
-    const parsedProfiles: UserProfile[] = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
-    
-    const profile = parsedProfiles.find((p) => p.email === email && p.role === role) || {
-      id: `user-${Math.random().toString(36).substr(2, 9)}`,
-      full_name: role === "aliado" ? "Aliado Comercial" : "Director Operaciones",
-      email,
-      phone: "5500000000",
-      role,
-      created_at: new Date().toISOString(),
-    };
+    if (isDemoMode || !supabase) {
+      const storedProfiles = localStorage.getItem("pensionflow_profiles");
+      const parsedProfiles: UserProfile[] = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
+      
+      const profile = parsedProfiles.find((p) => p.email === email && p.role === role) || {
+        id: `user-${Math.random().toString(36).substr(2, 9)}`,
+        full_name: role === "aliado" ? "Aliado Comercial" : "Director Operaciones",
+        email,
+        phone: "5500000000",
+        role,
+        created_at: new Date().toISOString(),
+      };
 
-    setUser(profile);
-    setActiveRole(role);
-    saveToStorage("pensionflow_user", profile);
-    saveToStorage("pensionflow_active_role", role);
-    setIsLoading(false);
-    return true;
+      setUser(profile);
+      setActiveRole(role);
+      saveToStorage("pensionflow_user", profile);
+      saveToStorage("pensionflow_active_role", role);
+      setIsLoading(false);
+      return true;
+    } else {
+      try {
+        let profile: UserProfile | null = null;
+        if (password) {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user?.id).single();
+          if (prof) profile = prof;
+        } else {
+          const { data: prof, error } = await supabase.from("profiles").select("*").eq("email", email).maybeSingle();
+          if (error) throw error;
+          if (!prof) throw new Error("No se encontró el perfil de usuario en Supabase.");
+          profile = prof;
+        }
+
+        if (profile) {
+          setUser(profile);
+          setActiveRole(profile.role);
+          saveToStorage("pensionflow_user", profile);
+          saveToStorage("pensionflow_active_role", profile.role);
+          
+          // Reload prospects and notifications for this specific user
+          let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
+          if (profile.role === "aliado") {
+            prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
+          }
+          const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
+          if (dbProspects) {
+            setProspects(dbProspects.map(transformProspectFromDB));
+          }
+
+          const { data: dbNotifs } = await supabase
+            .from("notifications")
+            .select("*")
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false });
+          if (dbNotifs) {
+            setNotifications(dbNotifs.map((n: any) => ({
+              id: n.id,
+              title: n.title,
+              message: n.message,
+              type: n.type as any,
+              read: n.read,
+              created_at: n.created_at
+            })));
+          }
+        }
+        setIsLoading(false);
+        return true;
+      } catch (error: any) {
+        console.error("Supabase login error:", error);
+        setIsLoading(false);
+        throw error;
+      }
+    }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("pensionflow_user");
+    if (supabase) {
+      supabase.auth.signOut();
+    }
   };
 
   const switchRole = (role: UserRole) => {
     setActiveRole(role);
     localStorage.setItem("pensionflow_active_role", role);
-    // Synchronize default profile if switching in demo mode from dynamic list
-    const storedProfiles = localStorage.getItem("pensionflow_profiles");
-    const parsedProfiles: UserProfile[] = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
-    const defaultProfile = parsedProfiles.find((p) => p.role === role);
-    if (defaultProfile) {
-      setUser(defaultProfile);
-      saveToStorage("pensionflow_user", defaultProfile);
+    if (isDemoMode) {
+      const storedProfiles = localStorage.getItem("pensionflow_profiles");
+      const parsedProfiles: UserProfile[] = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
+      const defaultProfile = parsedProfiles.find((p) => p.role === role);
+      if (defaultProfile) {
+        setUser(defaultProfile);
+        saveToStorage("pensionflow_user", defaultProfile);
+      }
     }
   };
 
@@ -484,101 +706,233 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ): Promise<Prospect> => {
-    const newId = `prospect-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const docs: DocumentItem[] = [];
-    
-    const aforeName = typeof aforeFile === "string" ? aforeFile : aforeFile?.name;
-    const aforeDataUrl = typeof aforeFile === "string" ? undefined : aforeFile?.dataUrl;
-    
-    const imssName = typeof imssFile === "string" ? imssFile : imssFile?.name;
-    const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
+    if (isDemoMode || !supabase) {
+      const newId = `prospect-${Math.random().toString(36).substr(2, 9)}`;
+      const docs: DocumentItem[] = [];
+      const aforeName = typeof aforeFile === "string" ? aforeFile : aforeFile?.name;
+      const aforeDataUrl = typeof aforeFile === "string" ? undefined : aforeFile?.dataUrl;
+      const imssName = typeof imssFile === "string" ? imssFile : imssFile?.name;
+      const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
 
-    if (aforeName) {
-      const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
-      docs.push({
-        id: docId,
-        prospect_id: newId,
-        file_name: aforeName,
-        file_url: "#",
-        file_type: "AFORE",
-        uploaded_at: new Date().toISOString(),
-      });
-      if (aforeDataUrl) {
-        await saveFile(docId, aforeDataUrl);
+      if (aforeName) {
+        const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+        docs.push({
+          id: docId,
+          prospect_id: newId,
+          file_name: aforeName,
+          file_url: "#",
+          file_type: "AFORE",
+          uploaded_at: new Date().toISOString(),
+        });
+        if (aforeDataUrl) await saveFile(docId, aforeDataUrl);
+      }
+      if (imssName) {
+        const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+        docs.push({
+          id: docId,
+          prospect_id: newId,
+          file_name: imssName,
+          file_url: "#",
+          file_type: "IMSS",
+          uploaded_at: new Date().toISOString(),
+        });
+        if (imssDataUrl) await saveFile(docId, imssDataUrl);
+      }
+
+      const newProspect: Prospect = {
+        ...prospectData,
+        id: newId,
+        aliado_id: user?.id || "aliado-123",
+        aliado_name: user?.full_name || "Roberto Asesor",
+        status: "evaluacion_pendiente",
+        documents: docs,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const updated = [newProspect, ...prospects];
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Nuevo Prospecto Capturado",
+        message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} para evaluación Ley 73.`,
+        type: "info",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+
+      triggerPushNotification(
+        `🔔 Nuevo prospecto: ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
+        "whatsapp",
+        "Eduardo Director"
+      );
+
+      return newProspect;
+    } else {
+      try {
+        // Insert prospect into DB
+        const { data: dbProspect, error: prospectError } = await supabase
+          .from("prospects")
+          .insert({
+            aliado_id: user?.id || "aliado-123",
+            aliado_name: user?.full_name || "Roberto Asesor",
+            full_name: prospectData.full_name,
+            nss: prospectData.nss,
+            curp: prospectData.curp,
+            phone: prospectData.phone,
+            email: prospectData.email,
+            notes_aliado: prospectData.notes_aliado,
+            status: "evaluacion_pendiente",
+          })
+          .select()
+          .single();
+
+        if (prospectError) throw prospectError;
+
+        const docsList: any[] = [];
+        const aforeName = typeof aforeFile === "string" ? aforeFile : aforeFile?.name;
+        const aforeDataUrl = typeof aforeFile === "string" ? undefined : aforeFile?.dataUrl;
+        const imssName = typeof imssFile === "string" ? imssFile : imssFile?.name;
+        const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
+
+        // Upload and insert AFORE
+        if (aforeName && aforeDataUrl) {
+          const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+          const storagePath = `${dbProspect.id}/${docId}_${aforeName}`;
+          const blob = dataURLtoBlob(aforeDataUrl);
+          
+          await supabase.storage
+            .from("documents")
+            .upload(storagePath, blob, { contentType: blob.type, upsert: true });
+
+          const { data: dbDoc } = await supabase
+            .from("documents")
+            .insert({
+              id: docId,
+              prospect_id: dbProspect.id,
+              file_name: aforeName,
+              file_url: "#",
+              file_type: "AFORE",
+              storage_path: storagePath,
+            })
+            .select()
+            .single();
+
+          if (dbDoc) docsList.push(dbDoc);
+        }
+
+        // Upload and insert IMSS
+        if (imssName && imssDataUrl) {
+          const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+          const storagePath = `${dbProspect.id}/${docId}_${imssName}`;
+          const blob = dataURLtoBlob(imssDataUrl);
+          
+          await supabase.storage
+            .from("documents")
+            .upload(storagePath, blob, { contentType: blob.type, upsert: true });
+
+          const { data: dbDoc } = await supabase
+            .from("documents")
+            .insert({
+              id: docId,
+              prospect_id: dbProspect.id,
+              file_name: imssName,
+              file_url: "#",
+              file_type: "IMSS",
+              storage_path: storagePath,
+            })
+            .select()
+            .single();
+
+          if (dbDoc) docsList.push(dbDoc);
+        }
+
+        const newProspect = transformProspectFromDB({
+          ...dbProspect,
+          documents: docsList,
+        });
+
+        setProspects((prev) => [newProspect, ...prev]);
+
+        // Insert notification in DB for Directors
+        const directors = profiles.filter(p => p.role === "director");
+        for (const dir of directors) {
+          await supabase.from("notifications").insert({
+            user_id: dir.id,
+            title: "Nuevo Prospecto Capturado",
+            message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} para evaluación Ley 73.`,
+            type: "info",
+            read: false,
+          });
+        }
+
+        triggerPushNotification(
+          `🔔 Nuevo prospecto: ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
+          "whatsapp",
+          "Eduardo Director"
+        );
+
+        return newProspect;
+      } catch (error) {
+        console.error("Error adding prospect to Supabase:", error);
+        throw error;
       }
     }
-    if (imssName) {
-      const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
-      docs.push({
-        id: docId,
-        prospect_id: newId,
-        file_name: imssName,
-        file_url: "#",
-        file_type: "IMSS",
-        uploaded_at: new Date().toISOString(),
-      });
-      if (imssDataUrl) {
-        await saveFile(docId, imssDataUrl);
-      }
-    }
-
-    const newProspect: Prospect = {
-      ...prospectData,
-      id: newId,
-      aliado_id: user?.id || "aliado-123",
-      aliado_name: user?.full_name || "Roberto Asesor",
-      status: "evaluacion_pendiente",
-      documents: docs,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const updated = [newProspect, ...prospects];
-    setProspects(updated);
-    saveToStorage("pensionflow_prospects", updated);
-
-    // Create system notification
-    const newNotif: NotificationItem = {
-      id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-      title: "Nuevo Prospecto Capturado",
-      message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} para evaluación Ley 73.`,
-      type: "info",
-      read: false,
-      created_at: new Date().toISOString(),
-    };
-    const updatedNotifs = [newNotif, ...notifications];
-    setNotifications(updatedNotifs);
-    saveToStorage("pensionflow_notifications", updatedNotifs);
-
-    // Push Notification (Director gets WhatsApp alert in simulation)
-    triggerPushNotification(
-      `🔔 Nuevo prospecto: ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
-      "whatsapp",
-      "Eduardo Director"
-    );
-
-    return newProspect;
   };
 
   const deleteProspect = async (id: string): Promise<void> => {
     const target = prospects.find((p) => p.id === id);
-    const updated = prospects.filter((p) => p.id !== id);
-    setProspects(updated);
-    saveToStorage("pensionflow_prospects", updated);
+    if (isDemoMode || !supabase) {
+      const updated = prospects.filter((p) => p.id !== id);
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
 
-    if (target) {
-      const newNotif: NotificationItem = {
-        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-        title: "Prospecto Eliminado",
-        message: `El expediente de ${target.full_name} (NSS: ${target.nss}) fue eliminado permanentemente del pipeline.`,
-        type: "warning",
-        read: false,
-        created_at: new Date().toISOString(),
-      };
-      const updatedNotifs = [newNotif, ...notifications];
-      setNotifications(updatedNotifs);
-      saveToStorage("pensionflow_notifications", updatedNotifs);
+      if (target) {
+        const newNotif: NotificationItem = {
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Prospecto Eliminado",
+          message: `El expediente de ${target.full_name} (NSS: ${target.nss}) fue eliminado permanentemente del pipeline.`,
+          type: "warning",
+          read: false,
+          created_at: new Date().toISOString(),
+        };
+        setNotifications([newNotif, ...notifications]);
+        saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+      }
+    } else {
+      try {
+        // Clean up files in Supabase Storage first
+        if (target && target.documents) {
+          for (const doc of target.documents) {
+            if (doc.storage_path) {
+              await supabase.storage.from("documents").remove([doc.storage_path]);
+            }
+          }
+        }
+
+        // Delete from prospects (cascade will handle document table entries)
+        await supabase.from("prospects").delete().eq("id", id);
+        
+        setProspects((prev) => prev.filter((p) => p.id !== id));
+
+        // Notify user about deletion
+        if (target) {
+          await supabase.from("notifications").insert({
+            user_id: user?.id,
+            title: "Prospecto Eliminado",
+            message: `El expediente de ${target.full_name} (NSS: ${target.nss}) fue eliminado permanentemente.`,
+            type: "warning",
+            read: false,
+          });
+        }
+      } catch (error) {
+        console.error("Error deleting prospect from Supabase:", error);
+        throw error;
+      }
     }
   };
 
@@ -587,59 +941,106 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     newStatus: Prospect["status"],
     comments?: string
   ) => {
-    const updated = prospects.map((p) => {
-      if (p.id === id) {
-        const notesDir = comments ? comments : p.notes_director;
-        return {
-          ...p,
-          status: newStatus,
-          notes_director: notesDir,
-          updated_at: new Date().toISOString(),
-        };
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          const notesDir = comments ? comments : p.notes_director;
+          return {
+            ...p,
+            status: newStatus,
+            notes_director: notesDir,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const target = prospects.find((p) => p.id === id);
+      if (target) {
+        let notifTitle = "Actualización de Estatus";
+        let notifMsg = `El caso de ${target.full_name} cambió al estado: ${newStatus}`;
+        let toastMsg = "";
+
+        if (newStatus === "rechazado") {
+          notifTitle = "Expediente Rechazado ❌";
+          notifMsg = `El director rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
+          toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
+        } else if (newStatus === "pagado_comision") {
+          notifTitle = "¡Comisión Liberada! 💰✨";
+          notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
+          toastMsg = `🎉 ¡Felicidades! Se ha liberado y transferido la comisión correspondiente al caso de ${target.full_name}. Ya puedes revisarla en tus estados financieros.`;
+        } else if (newStatus === "firma_programada") {
+          notifTitle = "Firma Programada ✍️";
+          notifMsg = `La firma del financiamiento para ${target.full_name} ha sido programada.`;
+          toastMsg = `📅 Notificación Oficial: Se programó la firma del convenio de financiamiento de ${target.full_name} para la siguiente semana. Mantente al pendiente del canal comercial.`;
+        }
+
+        if (notifTitle) {
+          const newNotif: NotificationItem = {
+            id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+            title: notifTitle,
+            message: notifMsg,
+            type: newStatus === "rechazado" ? "alert" : newStatus === "pagado_comision" ? "success" : "info",
+            read: false,
+            created_at: new Date().toISOString(),
+          };
+          setNotifications([newNotif, ...notifications]);
+          saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+        }
+
+        if (toastMsg) {
+          triggerPushNotification(toastMsg, "whatsapp", target.phone);
+        }
       }
-      return p;
-    });
+    } else {
+      try {
+        const updateData: any = { status: newStatus };
+        if (comments) updateData.notes_director = comments;
 
-    setProspects(updated);
-    saveToStorage("pensionflow_prospects", updated);
+        await supabase.from("prospects").update(updateData).eq("id", id);
 
-    const target = prospects.find((p) => p.id === id);
-    if (target) {
-      // Trigger Notification
-      let notifTitle = "Actualización de Estatus";
-      let notifMsg = `El caso de ${target.full_name} cambió al estado: ${newStatus}`;
-      let toastMsg = "";
+        setProspects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: newStatus, notes_director: comments || p.notes_director } : p))
+        );
 
-      if (newStatus === "rechazado") {
-        notifTitle = "Expediente Rechazado ❌";
-        notifMsg = `El director rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
-        toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
-      } else if (newStatus === "pagado_comision") {
-        notifTitle = "¡Comisión Liberada! 💰✨";
-        notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
-        toastMsg = `🎉 ¡Felicidades! Se ha liberado y transferido la comisión correspondiente al caso de ${target.full_name}. Ya puedes revisarla en tus estados financieros.`;
-      } else if (newStatus === "firma_programada") {
-        notifTitle = "Firma Programada ✍️";
-        notifMsg = `La firma del financiamiento para ${target.full_name} ha sido programada.`;
-        toastMsg = `📅 Notificación Oficial: Se programó la firma del convenio de financiamiento de ${target.full_name} para la siguiente semana. Mantente al pendiente del canal comercial.`;
-      }
+        const target = prospects.find((p) => p.id === id);
+        if (target) {
+          let notifTitle = "Actualización de Estatus";
+          let notifMsg = `El caso de ${target.full_name} cambió al estado: ${newStatus}`;
+          let toastMsg = "";
 
-      if (notifTitle) {
-        const newNotif: NotificationItem = {
-          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-          title: notifTitle,
-          message: notifMsg,
-          type: newStatus === "rechazado" ? "alert" : newStatus === "pagado_comision" ? "success" : "info",
-          read: false,
-          created_at: new Date().toISOString(),
-        };
-        const updatedNotifs = [newNotif, ...notifications];
-        setNotifications(updatedNotifs);
-        saveToStorage("pensionflow_notifications", updatedNotifs);
-      }
+          if (newStatus === "rechazado") {
+            notifTitle = "Expediente Rechazado ❌";
+            notifMsg = `El director rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
+            toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
+          } else if (newStatus === "pagado_comision") {
+            notifTitle = "¡Comisión Liberada! 💰✨";
+            notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
+            toastMsg = `🎉 ¡Felicidades! Se ha liberado y transferido la comisión correspondiente al caso de ${target.full_name}. Ya puedes revisarla en tus estados financieros.`;
+          } else if (newStatus === "firma_programada") {
+            notifTitle = "Firma Programada ✍️";
+            notifMsg = `La firma del financiamiento para ${target.full_name} ha sido programada.`;
+            toastMsg = `📅 Notificación Oficial: Se programó la firma del convenio de financiamiento de ${target.full_name} para la siguiente semana. Mantente al pendiente del canal comercial.`;
+          }
 
-      if (toastMsg) {
-        triggerPushNotification(toastMsg, "whatsapp", target.phone);
+          // Insert notification in DB for Ally
+          await supabase.from("notifications").insert({
+            user_id: target.aliado_id,
+            title: notifTitle,
+            message: notifMsg,
+            type: newStatus === "rechazado" ? "error" : newStatus === "pagado_comision" ? "success" : "info",
+            read: false,
+          });
+
+          if (toastMsg) {
+            triggerPushNotification(toastMsg, "whatsapp", target.phone);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating prospect status in Supabase:", error);
       }
     }
   };
@@ -658,149 +1059,361 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       roiMonths,
     };
 
-    const updated = prospects.map((p) => {
-      if (p.id === id) {
-        return {
-          ...p,
-          status: "aprobado_listo" as const,
-          simulation: fullSimulation,
-          notes_director: simulationData.comments,
-          updated_at: new Date().toISOString(),
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            status: "aprobado_listo" as const,
+            simulation: fullSimulation,
+            notes_director: simulationData.comments,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const target = prospects.find((p) => p.id === id);
+      if (target) {
+        const newNotif: NotificationItem = {
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Dictamen Emitido (Aprobado) ✅",
+          message: `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`,
+          type: "success",
+          read: false,
+          created_at: new Date().toISOString(),
         };
+        setNotifications([newNotif, ...notifications]);
+        saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+
+        triggerPushNotification(
+          `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`,
+          "whatsapp",
+          "Roberto Asesor"
+        );
       }
-      return p;
-    });
+    } else {
+      try {
+        await supabase
+          .from("prospects")
+          .update({
+            status: "aprobado_listo",
+            semanas_imss: simulationData.semanas,
+            pension_actual: simulationData.pensionActual,
+            pension_mejorada: simulationData.pensionMejorada,
+            monto_financiamiento: simulationData.financiamiento,
+            costo_gestion: simulationData.costoGestion,
+            roi_months: roiMonths,
+            simulation_comments: simulationData.comments,
+            notes_director: simulationData.comments,
+          })
+          .eq("id", id);
 
-    setProspects(updated);
-    saveToStorage("pensionflow_prospects", updated);
+        setProspects((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              return {
+                ...p,
+                status: "aprobado_listo" as const,
+                simulation: fullSimulation,
+                notes_director: simulationData.comments,
+              };
+            }
+            return p;
+          })
+        );
 
-    const target = prospects.find((p) => p.id === id);
-    if (target) {
-      const newNotif: NotificationItem = {
-        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-        title: "Dictamen Emitido (Aprobado) ✅",
-        message: `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`,
-        type: "success",
-        read: false,
-        created_at: new Date().toISOString(),
-      };
-      const updatedNotifs = [newNotif, ...notifications];
-      setNotifications(updatedNotifs);
-      saveToStorage("pensionflow_notifications", updatedNotifs);
+        const target = prospects.find((p) => p.id === id);
+        if (target) {
+          // Notify Ally
+          await supabase.from("notifications").insert({
+            user_id: target.aliado_id,
+            title: "Dictamen Emitido (Aprobado) ✅",
+            message: `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`,
+            type: "success",
+            read: false,
+          });
 
-      // Notify Ally via simulated WhatsApp
-      triggerPushNotification(
-        `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`,
-        "whatsapp",
-        "Roberto Asesor"
-      );
+          triggerPushNotification(
+            `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`,
+            "whatsapp",
+            "Roberto Asesor"
+          );
+        }
+      } catch (error) {
+        console.error("Error saving simulation in Supabase:", error);
+      }
     }
   };
 
   const scheduleAssessment = async (id: string, date: string, time: string) => {
-    const updated = prospects.map((p) => {
-      if (p.id === id) {
-        return {
-          ...p,
-          status: "asesoria_agendada" as const,
-          updated_at: new Date().toISOString(),
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            status: "asesoria_agendada" as const,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const target = prospects.find((p) => p.id === id);
+      if (target) {
+        const newNotif: NotificationItem = {
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Asesoría Agendada 📅",
+          message: `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+          type: "info",
+          read: false,
+          created_at: new Date().toISOString(),
         };
+        setNotifications([newNotif, ...notifications]);
+        saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+
+        triggerPushNotification(
+          `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
+          "email",
+          target.full_name
+        );
       }
-      return p;
-    });
+    } else {
+      try {
+        await supabase
+          .from("prospects")
+          .update({
+            status: "asesoria_agendada",
+            notes_aliado: `Asesoría agendada para el día ${date} a las ${time} hrs.`,
+          })
+          .eq("id", id);
 
-    setProspects(updated);
-    saveToStorage("pensionflow_prospects", updated);
+        setProspects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "asesoria_agendada" as const } : p))
+        );
 
-    const target = prospects.find((p) => p.id === id);
-    if (target) {
-      const newNotif: NotificationItem = {
-        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-        title: "Asesoría Agendada 📅",
-        message: `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
-        type: "info",
-        read: false,
-        created_at: new Date().toISOString(),
-      };
-      const updatedNotifs = [newNotif, ...notifications];
-      setNotifications(updatedNotifs);
-      saveToStorage("pensionflow_notifications", updatedNotifs);
+        const target = prospects.find((p) => p.id === id);
+        if (target) {
+          // Notify Director
+          const directors = profiles.filter(p => p.role === "director");
+          for (const dir of directors) {
+            await supabase.from("notifications").insert({
+              user_id: dir.id,
+              title: "Asesoría Agendada 📅",
+              message: `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+              type: "info",
+              read: false,
+            });
+          }
 
-      // Toast Notification
-      triggerPushNotification(
-        `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
-        "email",
-        target.full_name
-      );
+          triggerPushNotification(
+            `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
+            "email",
+            target.full_name
+          );
+        }
+      } catch (error) {
+        console.error("Error scheduling assessment in Supabase:", error);
+      }
     }
   };
 
   const generateInvitationCode = async (): Promise<InvitationCode> => {
-    const randomHex = Math.random().toString(16).substr(2, 4).toUpperCase();
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const newCodeString = `AL-2026-${randomHex}${randomDigits}`;
+    if (isDemoMode || !supabase) {
+      const randomHex = Math.random().toString(16).substr(2, 4).toUpperCase();
+      const randomDigits = Math.floor(1000 + Math.random() * 9000);
+      const newCodeString = `AL-2026-${randomHex}${randomDigits}`;
 
-    const newCode: InvitationCode = {
-      id: `code-${Math.random().toString(36).substr(2, 9)}`,
-      code: newCodeString,
-      created_by: user?.id || "director-456",
-      is_used: false,
-      created_at: new Date().toISOString(),
-    };
+      const newCode: InvitationCode = {
+        id: `code-${Math.random().toString(36).substr(2, 9)}`,
+        code: newCodeString,
+        created_by: user?.id || "director-456",
+        is_used: false,
+        created_at: new Date().toISOString(),
+      };
 
-    const updated = [newCode, ...invitationCodes];
-    setInvitationCodes(updated);
-    saveToStorage("pensionflow_invitation_codes", updated);
+      const updated = [newCode, ...invitationCodes];
+      setInvitationCodes(updated);
+      saveToStorage("pensionflow_invitation_codes", updated);
 
-    return newCode;
+      return newCode;
+    } else {
+      try {
+        const randomHex = Math.random().toString(16).substr(2, 4).toUpperCase();
+        const randomDigits = Math.floor(1000 + Math.random() * 9000);
+        const newCodeString = `AL-2026-${randomHex}${randomDigits}`;
+
+        const { data: dbCode, error } = await supabase
+          .from("invitation_codes")
+          .insert({
+            code: newCodeString,
+            created_by: user?.id || null,
+            is_used: false,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const newCode: InvitationCode = {
+          id: dbCode.id,
+          code: dbCode.code,
+          created_by: dbCode.created_by,
+          is_used: dbCode.is_used,
+          used_by: dbCode.used_by,
+          created_at: dbCode.created_at,
+        };
+
+        setInvitationCodes((prev) => [newCode, ...prev]);
+        return newCode;
+      } catch (error) {
+        console.error("Error generating invitation code in Supabase:", error);
+        throw error;
+      }
+    }
   };
 
   const createProfile = async (
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
-    const newProfile: UserProfile = {
-      ...profileData,
-      id: `user-${Math.random().toString(36).substr(2, 9)}`,
-      created_at: new Date().toISOString(),
-    };
+    const newId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'db0a33fb-df8d-4f1b-ba76-' + Math.random().toString(16).substr(2, 12);
+    if (isDemoMode || !supabase) {
+      const newProfile: UserProfile = {
+        ...profileData,
+        id: `user-${Math.random().toString(36).substr(2, 9)}`,
+        created_at: new Date().toISOString(),
+      };
 
-    const updated = [...profiles, newProfile];
-    setProfiles(updated);
-    saveToStorage("pensionflow_profiles", updated);
+      const updated = [...profiles, newProfile];
+      setProfiles(updated);
+      saveToStorage("pensionflow_profiles", updated);
 
-    // Create system notification
-    const newNotif: NotificationItem = {
-      id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-      title: "Nuevo Usuario Registrado 👤",
-      message: `Se ha registrado exitosamente a ${newProfile.full_name} con el rol de ${newProfile.role === "director" ? "Director de Operaciones" : "Aliado Comercial"}.`,
-      type: "success",
-      read: false,
-      created_at: new Date().toISOString(),
-    };
-    const updatedNotifs = [newNotif, ...notifications];
-    setNotifications(updatedNotifs);
-    saveToStorage("pensionflow_notifications", updatedNotifs);
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Nuevo Usuario Registrado 👤",
+        message: `Se ha registrado exitosamente a ${newProfile.full_name} con el rol de ${newProfile.role === "director" ? "Director de Operaciones" : "Aliado Comercial"}.`,
+        type: "success",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
 
-    // Simulated email push
-    triggerPushNotification(
-      `👤 Registro Completo: Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Puede iniciar sesión con su correo: ${newProfile.email}`,
-      "email",
-      "Eduardo Director"
-    );
+      triggerPushNotification(
+        `👤 Registro Completo: Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Puede iniciar sesión con su correo: ${newProfile.email}`,
+        "email",
+        "Eduardo Director"
+      );
 
-    return newProfile;
+      return newProfile;
+    } else {
+      try {
+        const { data: dbProfile, error } = await supabase
+          .from("profiles")
+          .insert({
+            id: newId,
+            full_name: profileData.full_name,
+            email: profileData.email,
+            phone: profileData.phone,
+            role: profileData.role,
+            invitation_code_used: profileData.invitation_code_used || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const newProfile: UserProfile = {
+          id: dbProfile.id,
+          full_name: dbProfile.full_name,
+          email: dbProfile.email,
+          phone: dbProfile.phone,
+          role: dbProfile.role as any,
+          invitation_code_used: dbProfile.invitation_code_used,
+          created_at: dbProfile.created_at,
+        };
+
+        setProfiles((prev) => [...prev, newProfile]);
+
+        // Notify Directors in DB
+        const directors = profiles.filter(p => p.role === "director");
+        for (const dir of directors) {
+          await supabase.from("notifications").insert({
+            user_id: dir.id,
+            title: "Nuevo Usuario Registrado 👤",
+            message: `Se ha registrado exitosamente a ${newProfile.full_name} con el rol de ${newProfile.role === "director" ? "Director" : "Aliado"}.`,
+            type: "success",
+            read: false,
+          });
+        }
+
+        triggerPushNotification(
+          `👤 Registro Completo: Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Puede iniciar sesión con su correo: ${newProfile.email}`,
+          "email",
+          "Eduardo Director"
+        );
+
+        return newProfile;
+      } catch (error) {
+        console.error("Error creating profile in Supabase:", error);
+        throw error;
+      }
+    }
+  };
+
+  const getFileContent = async (doc: DocumentItem): Promise<string | null> => {
+    if (isDemoMode || !supabase) {
+      return getFile(doc.id);
+    } else {
+      try {
+        if (!doc.storage_path) {
+          return doc.file_url;
+        }
+
+        const { data, error } = await supabase.storage
+          .from("documents")
+          .download(doc.storage_path);
+
+        if (error || !data) {
+          console.error("Error downloading from storage:", error);
+          return null;
+        }
+
+        return new Promise<string | null>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => reject(null);
+          reader.readAsDataURL(data);
+        });
+      } catch (error) {
+        console.error("Error in getFileContent:", error);
+        return null;
+      }
+    }
   };
 
   const markNotificationRead = (id: string) => {
     const updated = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
     setNotifications(updated);
     saveToStorage("pensionflow_notifications", updated);
+    if (!isDemoMode && supabase) {
+      supabase.from("notifications").update({ read: true }).eq("id", id).then();
+    }
   };
 
   const markAllNotificationsRead = () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
     setNotifications(updated);
     saveToStorage("pensionflow_notifications", updated);
+    if (!isDemoMode && supabase && user) {
+      supabase.from("notifications").update({ read: true }).eq("user_id", user.id).then();
+    }
   };
 
   const clearToast = () => {
@@ -842,6 +1455,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         markAllNotificationsRead,
         clearToast,
         triggerPushNotification,
+        getFileContent,
       }}
     >
       {children}

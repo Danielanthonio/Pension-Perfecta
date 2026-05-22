@@ -44,7 +44,7 @@ export default function RoleSelectionPage() {
     const role: UserRole = isDirectorEmail ? "director" : "aliado";
 
     try {
-      await login(emailInput, role);
+      await login(emailInput, role, passwordInput);
       if (role === "director") {
         router.push("/admin");
       } else {
