@@ -1218,7 +1218,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const roiMonths = incremento > 0 ? Math.ceil(totalCredito / incremento) : 0;
 
     const aforePensionarse = simulationData.aforePensionarse || 0;
-    const aportacion = Math.max(0, totalCredito - aforePensionarse);
+    const aportacion = simulationData.aportacion !== undefined ? simulationData.aportacion : Math.max(0, totalCredito - aforePensionarse);
 
     const fullSimulation: Simulation = {
       ...simulationData,
