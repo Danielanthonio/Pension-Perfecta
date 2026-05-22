@@ -110,6 +110,18 @@ export default function ProspectoDetalle() {
     }
   }, [selectedDoc, getFileContent]);
 
+  // Reactive simulation calculations
+  const totalCredito = financiamiento + costoGestion;
+  const incrementoMensual = pensionMejorada - pensionActual;
+  const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
+  const suggestedAportacion = Math.max(0, totalCredito - aforePensionarse);
+
+  useEffect(() => {
+    if (!isAportacionManual) {
+      setAportacion(suggestedAportacion);
+    }
+  }, [totalCredito, aforePensionarse, isAportacionManual, suggestedAportacion]);
+
   if (!prospect) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 select-none">
@@ -132,18 +144,6 @@ export default function ProspectoDetalle() {
       </div>
     );
   }
-
-  // Reactive simulation calculations
-  const totalCredito = financiamiento + costoGestion;
-  const incrementoMensual = pensionMejorada - pensionActual;
-  const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
-  const suggestedAportacion = Math.max(0, totalCredito - aforePensionarse);
-
-  useEffect(() => {
-    if (!isAportacionManual) {
-      setAportacion(suggestedAportacion);
-    }
-  }, [totalCredito, aforePensionarse, isAportacionManual, suggestedAportacion]);
 
   const handleEmitSimulation = async () => {
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
