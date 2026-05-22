@@ -47,6 +47,27 @@ export default function SubirProspecto() {
   const [errorMsg, setErrorMsg] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // OCR AI Simulation
+  const [ocrSuccessMsg, setOcrSuccessMsg] = useState("");
+  const [highlightFields, setHighlightFields] = useState(false);
+
+  const runSimulatedOCR = () => {
+    if (fullName) return; // Prevent overwriting if already populated
+    
+    setTimeout(() => {
+      setFullName("GONZALEZ VENTURA NORBERTO JAVIER");
+      setNss("68876602886");
+      setCurp("GOVN660606HDFNNR00");
+      setPhone("9876544444");
+      setEmail("nolberto@gmail.com");
+      
+      setHighlightFields(true);
+      setOcrSuccessMsg("Extracción Inteligente: Documento analizado y resumen generado con éxito.");
+      setTimeout(() => setHighlightFields(false), 3000);
+      setTimeout(() => setOcrSuccessMsg(""), 6000);
+    }, 800);
+  };
+
   // Real-time Validations
   const nssValid = nss.length === 11 && /^\d+$/.test(nss);
   const curpValid = curp.length === 18 && /^[A-Z0-9]+$/i.test(curp);
@@ -86,6 +107,7 @@ export default function SubirProspecto() {
           if (prev >= 100) {
             clearInterval(interval);
             setAforeUploading(false);
+            runSimulatedOCR();
             return 100;
           }
           return prev + 10;
@@ -101,6 +123,7 @@ export default function SubirProspecto() {
           if (prev >= 100) {
             clearInterval(interval);
             setImssUploading(false);
+            runSimulatedOCR();
             return 100;
           }
           return prev + 10;
@@ -158,6 +181,13 @@ export default function SubirProspecto() {
         <div className="bg-red-500/10 border border-red-500/20 text-red-700 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3">
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {ocrSuccessMsg && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-fade-in shadow-sm">
+          <FileCheck className="h-5 w-5 flex-shrink-0" />
+          <span>{ocrSuccessMsg}</span>
         </div>
       )}
 
