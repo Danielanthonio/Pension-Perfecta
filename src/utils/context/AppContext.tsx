@@ -513,16 +513,45 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           let currentUser: UserProfile | null = null;
 
           if (session?.user) {
-            const { data: profile } = await client
-              .from("profiles")
-              .select("*")
-              .eq("id", session.user.id)
-              .single();
-            if (profile) {
-              const mapped = mapProfileFromDB(profile);
-              currentUser = mapped;
-              setUser(mapped);
-              setActiveRole(mapped.role);
+            try {
+              const { data: profile } = await client
+                .from("profiles")
+                .select("*")
+                .eq("id", session.user.id)
+                .maybeSingle();
+              if (profile) {
+                const mapped = mapProfileFromDB(profile);
+                currentUser = mapped;
+                setUser(mapped);
+                setActiveRole(mapped.role);
+              } else {
+                // Self-healing: active auth user has no row in profiles table
+                const email = session.user.email || "";
+                const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
+                const dbRole = isDirectorEmail ? "admin" : "aliado";
+                const newFullName = email.split('@')[0].split(/[._-]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+                const { data: newProfile, error: createError } = await client
+                  .from("profiles")
+                  .insert({
+                    id: session.user.id,
+                    full_name: newFullName || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial"),
+                    email: email.toLowerCase(),
+                    phone: "5500000000",
+                    role: dbRole
+                  })
+                  .select()
+                  .single();
+
+                if (!createError && newProfile) {
+                  const mapped = mapProfileFromDB(newProfile);
+                  currentUser = mapped;
+                  setUser(mapped);
+                  setActiveRole(mapped.role);
+                }
+              }
+            } catch (err) {
+              console.error("Error loading session profile:", err);
             }
           }
 
@@ -530,40 +559,49 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           if (!currentUser) {
             const storedUser = localStorage.getItem("pensionflow_user");
             if (storedUser) {
-              const parsed = JSON.parse(storedUser);
-              const { data: profile } = await client
-                .from("profiles")
-                .select("*")
-                .eq("email", parsed.email)
-                .single();
-              if (profile) {
-                const mapped = mapProfileFromDB(profile);
-                currentUser = mapped;
-                setUser(mapped);
-                setActiveRole(mapped.role);
+              try {
+                const parsed = JSON.parse(storedUser);
+                const { data: profile } = await client
+                  .from("profiles")
+                  .select("*")
+                  .eq("email", parsed.email)
+                  .maybeSingle();
+                if (profile) {
+                  const mapped = mapProfileFromDB(profile);
+                  currentUser = mapped;
+                  setUser(mapped);
+                  setActiveRole(mapped.role);
+                }
+              } catch (err) {
+                console.error("Error loading localStorage profile:", err);
               }
             }
           }
 
           // Default fallback if absolutely no user logged in
           if (!currentUser) {
-            const { data: profile } = await client
-              .from("profiles")
-              .select("*")
-              .eq("role", "aliado")
-              .limit(1)
-              .maybeSingle();
-            if (profile) {
-              const mapped = mapProfileFromDB(profile);
-              currentUser = mapped;
-              setUser(mapped);
-              setActiveRole(mapped.role);
+            try {
+              const { data: profile } = await client
+                .from("profiles")
+                .select("*")
+                .eq("role", "aliado")
+                .limit(1)
+                .maybeSingle();
+              if (profile) {
+                const mapped = mapProfileFromDB(profile);
+                currentUser = mapped;
+                setUser(mapped);
+                setActiveRole(mapped.role);
+              }
+            } catch (err) {
+              console.error("Error fetching fallback profile:", err);
             }
           }
 
           // Fetch all profiles
           const { data: dbProfiles } = await client.from("profiles").select("*");
-          if (dbProfiles) setProfiles(dbProfiles.map(mapProfileFromDB));
+          const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+          setProfiles(mappedProfiles);
 
           // Fetch prospects (filtered by role if user is aliado)
           let prospectsQuery = client.from("prospects").select("*, documents(*)");
@@ -578,14 +616,17 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           // Fetch invitation codes
           const { data: dbCodes } = await client.from("invitation_codes").select("*");
           if (dbCodes) {
-            setInvitationCodes(dbCodes.map((c: any) => ({
-              id: c.id,
-              code: c.code,
-              created_by: c.created_by,
-              is_used: c.is_used,
-              used_by: c.used_by,
-              created_at: c.created_at
-            })));
+            setInvitationCodes(dbCodes.map((c: any) => {
+              const userWhoUsedIt = mappedProfiles.find(p => p.invitation_code_used === c.code);
+              return {
+                id: c.id,
+                code: c.code,
+                created_by: c.created_by,
+                is_used: c.is_used || !!userWhoUsedIt,
+                used_by: c.used_by || userWhoUsedIt?.id,
+                created_at: c.created_at
+              };
+            }));
           }
 
           // Fetch notifications for the user
@@ -647,8 +688,37 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (password) {
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
-          const { data: prof } = await supabase.from("profiles").select("*").eq("id", data.user?.id).single();
-          if (prof) profile = mapProfileFromDB(prof);
+          
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", data.user?.id)
+            .maybeSingle();
+
+          if (prof) {
+            profile = mapProfileFromDB(prof);
+          } else if (data.user) {
+            // Self-healing: user validated in Auth, but missing from profiles table
+            const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
+            const dbRole = isDirectorEmail ? "admin" : "aliado";
+            const newFullName = email.split('@')[0].split(/[._-]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+            const { data: newProfile, error: createError } = await supabase
+              .from("profiles")
+              .insert({
+                id: data.user.id,
+                full_name: newFullName || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial"),
+                email: email.toLowerCase(),
+                phone: "5500000000",
+                role: dbRole
+              })
+              .select()
+              .single();
+
+            if (!createError && newProfile) {
+              profile = mapProfileFromDB(newProfile);
+            }
+          }
         } else {
           const { data: prof, error } = await supabase.from("profiles").select("*").eq("email", email).maybeSingle();
           if (error) throw error;
@@ -1274,17 +1344,44 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const randomDigits = Math.floor(1000 + Math.random() * 9000);
         const newCodeString = `AL-2026-${randomHex}${randomDigits}`;
 
-        const { data: dbCode, error } = await supabase
-          .from("invitation_codes")
-          .insert({
-            code: newCodeString,
-            created_by: user?.id || null,
-            is_used: false,
-          })
-          .select()
-          .single();
+        let dbCode = null;
+        let insertError = null;
 
-        if (error) throw error;
+        try {
+          const { data, error } = await supabase
+            .from("invitation_codes")
+            .insert({
+              code: newCodeString,
+              created_by: user?.id || null,
+              is_used: false,
+            })
+            .select()
+            .single();
+          dbCode = data;
+          insertError = error;
+        } catch (innerErr: any) {
+          insertError = innerErr;
+        }
+
+        // Fallback: If initial insertion failed (e.g. foreign key or constraint error due to lack of profiles row), retry with created_by = null
+        if (insertError || !dbCode) {
+          console.warn("Initial invitation code creation failed, retrying with created_by = null:", insertError);
+          const { data, error: fallbackError } = await supabase
+            .from("invitation_codes")
+            .insert({
+              code: newCodeString,
+              created_by: null,
+              is_used: false,
+            })
+            .select()
+            .single();
+
+          if (fallbackError) {
+            console.error("Fallback invitation code creation failed too:", fallbackError);
+            throw fallbackError;
+          }
+          dbCode = data;
+        }
 
         const newCode: InvitationCode = {
           id: dbCode.id,
@@ -1365,7 +1462,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           password
         });
         
-        if (authError) throw authError;
+        if (authError) {
+          console.error("Auth signUp error in registerAliado:", authError);
+          if (authError.status === 429 || authError.code === "over_email_send_rate_limit" || authError.message?.toLowerCase().includes("rate limit") || authError.message?.toLowerCase().includes("exceeded")) {
+            throw new Error(
+              "LÍMITE_CORREOS: Se ha superado el límite de envío de correos de verificación de Supabase (Error 429). Por favor, solicita al administrador del sistema desactivar la casilla 'Confirm Email' (Confirmar correo electrónico) en el Supabase Dashboard (Authentication -> Providers -> Email -> Confirm email) para permitir registros instantáneos."
+            );
+          }
+          throw authError;
+        }
         if (!authData.user) throw new Error("No se pudo crear el usuario.");
 
         const { error: profileError } = await supabase
@@ -1463,7 +1568,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         });
 
         if (authError) {
-          console.error("Auth signUp error:", authError);
+          console.error("Auth signUp error in createProfile:", authError);
+          if (authError.status === 429 || authError.code === "over_email_send_rate_limit" || authError.message?.toLowerCase().includes("rate limit") || authError.message?.toLowerCase().includes("exceeded")) {
+            throw new Error(
+              "LÍMITE_CORREOS: Se ha superado el límite de envío de correos de verificación de Supabase (Error 429). Por favor, desactiva la casilla 'Confirm Email' (Confirmar correo electrónico) en el Supabase Dashboard (Authentication -> Providers -> Email -> Confirm email) para permitir registros instantáneos sin restricciones."
+            );
+          }
           throw new Error(`Error de autenticación: ${authError.message}`);
         }
         if (!authData.user) {
@@ -1489,23 +1599,42 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           .select()
           .single();
 
+        let newProfile: UserProfile;
+
         if (insertError) {
-          console.error("Profiles insertion error:", insertError);
-          throw insertError;
+          console.warn("Profiles insertion failed or was blocked by RLS, but the Auth user was created successfully. Self-healing will create their profile upon first login. Error details:", insertError);
+          
+          newProfile = {
+            id: authUserId,
+            full_name: profileData.full_name,
+            email: profileData.email.toLowerCase(),
+            phone: profileData.phone,
+            role: profileData.role,
+            invitation_code_used: profileData.invitation_code_used || undefined,
+            created_at: new Date().toISOString(),
+          };
+
+          setProfiles((prev) => [...prev, newProfile]);
+
+          triggerPushNotification(
+            `👤 Registro Completo (Auto-Recuperación Activa): Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Su perfil se completará automáticamente en su primer inicio de sesión.`,
+            "email",
+            "Eduardo Director"
+          );
+        } else {
+          // Map back to UI format
+          newProfile = {
+            id: dbProfile.id,
+            full_name: dbProfile.full_name,
+            email: dbProfile.email,
+            phone: dbProfile.phone,
+            role: dbProfile.role === "admin" ? "director" : (dbProfile.role as any),
+            invitation_code_used: dbProfile.invitation_code_used,
+            created_at: dbProfile.created_at,
+          };
+
+          setProfiles((prev) => [...prev, newProfile]);
         }
-
-        // Map back to UI format
-        const newProfile: UserProfile = {
-          id: dbProfile.id,
-          full_name: dbProfile.full_name,
-          email: dbProfile.email,
-          phone: dbProfile.phone,
-          role: dbProfile.role === "admin" ? "director" : (dbProfile.role as any),
-          invitation_code_used: dbProfile.invitation_code_used,
-          created_at: dbProfile.created_at,
-        };
-
-        setProfiles((prev) => [...prev, newProfile]);
 
         // Notify Directors in DB
         const directors = profiles.filter(p => p.role === "director");

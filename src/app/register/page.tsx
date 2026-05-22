@@ -38,6 +38,11 @@ export default function RegisterAliadoPage() {
       setErrorMsg("Todos los campos son obligatorios.");
       return;
     }
+
+    if (cleanPhone.length !== 10) {
+      setErrorMsg("El número de teléfono móvil debe contener exactamente 10 dígitos.");
+      return;
+    }
     
     setLoading(true);
     setErrorMsg("");
@@ -75,9 +80,28 @@ export default function RegisterAliadoPage() {
         </div>
 
         {errorMsg && (
-          <div className="mb-5 bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs font-semibold flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 flex-shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="mb-5 bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-xs font-semibold flex flex-col gap-2 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 flex-shrink-0 text-red-400" />
+              <span className="font-extrabold text-white">Error al Registrar Aliado</span>
+            </div>
+            <p className="leading-relaxed text-red-300 font-medium">
+              {errorMsg.replace("LÍMITE_CORREOS: ", "")}
+            </p>
+            {errorMsg.includes("LÍMITE_CORREOS") && (
+              <div className="bg-red-950/40 p-3 rounded-xl border border-red-500/20 mt-1.5 space-y-2 text-[10px] text-left">
+                <div className="font-extrabold text-white uppercase tracking-wider">Pasos para el Administrador del Sistema:</div>
+                <ol className="list-decimal list-inside space-y-1 text-red-200 font-medium leading-normal">
+                  <li>Ingresar al <strong>Supabase Dashboard</strong>.</li>
+                  <li>Ir a <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; <strong>Email</strong>.</li>
+                  <li>Desmarcar la casilla <strong>"Confirm email"</strong> (o "Confirmar correo electrónico").</li>
+                  <li>Hacer clic en <strong>Save</strong> (Guardar).</li>
+                </ol>
+                <p className="text-[9px] font-semibold text-red-400 mt-1">
+                  Esto resolverá definitivamente el error 429 de envío de correos SMTP y habilitará el registro instantáneo de aliados.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

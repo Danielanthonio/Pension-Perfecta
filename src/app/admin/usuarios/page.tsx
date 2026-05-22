@@ -47,6 +47,7 @@ export default function GestionUsuarios() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedUserEmail, setCopiedUserEmail] = useState<string | null>(null);
   const [createdUser, setCreatedUser] = useState<{ name: string; email: string } | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Validations
   const isNameValid = fullName.trim().length >= 3;
@@ -58,6 +59,7 @@ export default function GestionUsuarios() {
     e.preventDefault();
     setFormSubmitted(true);
     setCreatedUser(null);
+    setErrorMsg("");
 
     if (!isFormValid) {
       return;
@@ -81,8 +83,9 @@ export default function GestionUsuarios() {
       setPhone("");
       setRole("aliado");
       setFormSubmitted(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      setErrorMsg(error.message || "Ocurrió un error al registrar el colaborador.");
     } finally {
       setIsSubmitting(false);
     }
@@ -185,6 +188,39 @@ export default function GestionUsuarios() {
                 Registra un perfil para emitir una cuenta operativa. Se inyectará en la base de datos local de inmediato.
               </p>
             </div>
+
+            {errorMsg && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl text-xs space-y-2 animate-fade-in relative">
+                <button 
+                  type="button" 
+                  onClick={() => setErrorMsg("")} 
+                  className="absolute top-2 right-2 text-rose-500 hover:text-rose-700 font-bold text-sm"
+                >
+                  ✕
+                </button>
+                <div className="font-extrabold flex items-center gap-1.5 text-rose-950">
+                  <AlertCircle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                  No se pudo registrar el colaborador
+                </div>
+                <p className="leading-relaxed whitespace-pre-line">
+                  {errorMsg.replace("LÍMITE_CORREOS: ", "")}
+                </p>
+                {errorMsg.includes("LÍMITE_CORREOS") && (
+                  <div className="bg-rose-100/50 p-3 rounded-xl border border-rose-200/50 mt-2 space-y-2 text-[10px]">
+                    <div className="font-extrabold text-rose-950 uppercase tracking-wider">Pasos para Resolver esto en Supabase:</div>
+                    <ol className="list-decimal list-inside space-y-1 text-rose-900 leading-normal font-medium">
+                      <li>Ingresa a tu <strong>Supabase Dashboard</strong>.</li>
+                      <li>Ve a <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; <strong>Email</strong>.</li>
+                      <li>Desmarca la casilla <strong>"Confirm email"</strong> (o "Confirmar correo electrónico").</li>
+                      <li>Haz clic en <strong>Save</strong> (Guardar).</li>
+                    </ol>
+                    <p className="text-[9px] font-semibold text-rose-700 mt-1">
+                      Esto desactivará el envío obligatorio de correos de verificación, resolviendo definitivamente el límite SMTP gratuito de Supabase.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {createdUser && (
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs space-y-2 animate-fade-in relative">
