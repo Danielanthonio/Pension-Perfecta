@@ -405,7 +405,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       // Profile does not exist, let's create it from metadata
       const meta = authUser.user_metadata || {};
       const email = authUser.email || "";
-      const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
+      const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin") || email.toLowerCase() === "villoutaschellr@gmail.com";
       
       const fullName = meta.full_name || email.split('@')[0].split(/[._-]/).map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial");
       const phone = meta.phone || "5500000000";
