@@ -36,6 +36,7 @@ export default function ProspectoDetalle() {
   const [pensionMejorada, setPensionMejorada] = useState<number>(0);
   const [financiamiento, setFinanciamiento] = useState<number>(0);
   const [costoGestion, setCostoGestion] = useState<number>(0);
+  const [aforePensionarse, setAforePensionarse] = useState<number>(0);
   const [comments, setComments] = useState<string>("");
 
   // Document preview state
@@ -62,6 +63,7 @@ export default function ProspectoDetalle() {
           setPensionMejorada(found.simulation.pensionMejorada);
           setFinanciamiento(found.simulation.financiamiento);
           setCostoGestion(found.simulation.costoGestion);
+          setAforePensionarse(found.simulation.aforePensionarse || 0);
           setComments(found.simulation.comments || "");
         } else {
           // Defaults based on client CURP or general profile
@@ -70,6 +72,7 @@ export default function ProspectoDetalle() {
           setPensionMejorada(38000);
           setFinanciamiento(420000);
           setCostoGestion(42000);
+          setAforePensionarse(0);
           setComments("Viabilidad financiera aprobada. Se proyecta un crecimiento sustancial bajo Ley 73.");
         }
 
@@ -128,6 +131,7 @@ export default function ProspectoDetalle() {
   const totalCredito = financiamiento + costoGestion;
   const incrementoMensual = pensionMejorada - pensionActual;
   const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
+  const aportacion = Math.max(0, totalCredito - aforePensionarse);
 
   const handleEmitSimulation = async () => {
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
@@ -141,6 +145,7 @@ export default function ProspectoDetalle() {
       pensionMejorada,
       financiamiento,
       costoGestion,
+      aforePensionarse,
       comments,
     });
 
@@ -169,8 +174,24 @@ export default function ProspectoDetalle() {
         return "bg-emerald-50 text-emerald-600 border-emerald-100";
       case "asesoria_agendada":
         return "bg-purple-50 text-purple-600 border-purple-100";
+      case "doc_proceso":
+        return "bg-amber-50 text-amber-600 border-amber-100";
+      case "analisis_riesgo":
+        return "bg-cyan-50 text-cyan-600 border-cyan-100";
+      case "firma_programada":
+        return "bg-indigo-50 text-indigo-600 border-indigo-100";
       case "pagado_comision":
-        return "bg-amber-50 text-amber-700 border-amber-100";
+        return "bg-amber-500/10 text-amber-700 border-amber-500/20 shadow-sm";
+      case "aportacion":
+        return "bg-teal-50 text-teal-700 border-teal-100 shadow-sm";
+      case "falta_reporte":
+        return "bg-rose-50 text-rose-600 border-rose-100";
+      case "falta_afore":
+        return "bg-orange-50 text-orange-600 border-orange-100";
+      case "pendiente_documentos":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "cerrado_perdido":
+        return "bg-slate-100 text-slate-600 border-slate-200";
       default:
         return "bg-slate-50 text-slate-600 border-slate-200";
     }
@@ -179,15 +200,31 @@ export default function ProspectoDetalle() {
   const getStageLabel = (status: Prospect["status"]) => {
     switch (status) {
       case "evaluacion_pendiente":
-        return "En Evaluación Técnica";
+        return "Evaluación Pendiente";
       case "rechazado":
-        return "Dossier Rechazado";
+        return "Rechazado";
       case "aprobado_listo":
-        return "Listo para Presentar";
+        return "Aprobado / Listo";
       case "asesoria_agendada":
         return "Asesoría Agendada";
+      case "doc_proceso":
+        return "Expediente en Trámite";
+      case "analisis_riesgo":
+        return "Análisis de Riesgo";
+      case "firma_programada":
+        return "Firma Programada";
       case "pagado_comision":
-        return "Comisión Pagada";
+        return "Comisión Liberada";
+      case "aportacion":
+        return "Aportación";
+      case "falta_reporte":
+        return "Falta Reporte";
+      case "falta_afore":
+        return "Falta Afore";
+      case "pendiente_documentos":
+        return "Pendiente Documentos";
+      case "cerrado_perdido":
+        return "No acepta propuesta / Cerrado Perdido";
       default:
         return "Proceso Interno Activo";
     }
@@ -723,6 +760,24 @@ export default function ProspectoDetalle() {
                   </div>
                 </div>
 
+                {/* Afore al Pensionarse */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    Afore al Pensionarse
+                  </label>
+                  <div className="relative rounded-xl shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                      $
+                    </div>
+                    <input
+                      type="number"
+                      value={aforePensionarse}
+                      onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
+                      className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                    />
+                  </div>
+                </div>
+
                 {/* Dictamen comments */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
@@ -755,6 +810,18 @@ export default function ProspectoDetalle() {
                     <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Incremento Mensual</span>
                     <span className="text-sm font-black text-indigo-600 block mt-0.5">
                       ${incrementoMensual > 0 ? incrementoMensual.toLocaleString() : 0}
+                    </span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Afore al Pensionarse</span>
+                    <span className="text-sm font-black text-amber-600 block mt-0.5">
+                      ${aforePensionarse.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Aportación</span>
+                    <span className={`text-sm font-black block mt-0.5 ${aportacion > 0 ? "text-teal-600" : "text-slate-500"}`}>
+                      ${aportacion.toLocaleString()}
                     </span>
                   </div>
                 </div>

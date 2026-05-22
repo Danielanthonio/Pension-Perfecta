@@ -36,6 +36,8 @@ export interface Simulation {
   totalCredito: number;
   roiMonths: number;
   comments?: string;
+  aforePensionarse?: number;
+  aportacion?: number;
 }
 
 export interface Prospect {
@@ -55,7 +57,12 @@ export interface Prospect {
     | "doc_proceso"
     | "analisis_riesgo"
     | "firma_programada"
-    | "pagado_comision";
+    | "pagado_comision"
+    | "aportacion"
+    | "falta_reporte"
+    | "falta_afore"
+    | "pendiente_documentos"
+    | "cerrado_perdido";
   notes_aliado?: string;
   notes_director?: string;
   simulation?: Simulation;
@@ -475,6 +482,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         totalCredito: Number(dbProspect.total_credito) || 0,
         roiMonths: dbProspect.roi_months || 0,
         comments: dbProspect.simulation_comments || "",
+        aforePensionarse: Number(dbProspect.afore_pensionarse) || 0,
+        aportacion: Number(dbProspect.aportacion) || 0,
       } : undefined,
       documents: (dbProspect.documents || []).map((doc: any) => ({
         id: doc.id,
@@ -1208,18 +1217,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const incremento = simulationData.pensionMejorada - simulationData.pensionActual;
     const roiMonths = incremento > 0 ? Math.ceil(totalCredito / incremento) : 0;
 
+    const aforePensionarse = simulationData.aforePensionarse || 0;
+    const aportacion = Math.max(0, totalCredito - aforePensionarse);
+
     const fullSimulation: Simulation = {
       ...simulationData,
       totalCredito,
       roiMonths,
+      aforePensionarse,
+      aportacion,
     };
+
+    const newStatus = aportacion > 0 ? ("aportacion" as const) : ("aprobado_listo" as const);
 
     if (isDemoMode || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
             ...p,
-            status: "aprobado_listo" as const,
+            status: newStatus,
             simulation: fullSimulation,
             notes_director: simulationData.comments,
             updated_at: new Date().toISOString(),
@@ -1233,10 +1249,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
       const target = prospects.find((p) => p.id === id);
       if (target) {
+        const notifTitle = newStatus === "aportacion" ? "Dictamen Emitido (Aportación) 💰" : "Dictamen Emitido (Aprobado) ✅";
+        const notifMsg = newStatus === "aportacion"
+          ? `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Aportación Requerida: $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}).`
+          : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
+
         const newNotif: NotificationItem = {
           id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-          title: "Dictamen Emitido (Aprobado) ✅",
-          message: `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`,
+          title: notifTitle,
+          message: notifMsg,
           type: "success",
           read: false,
           created_at: new Date().toISOString(),
@@ -1244,8 +1265,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         setNotifications([newNotif, ...notifications]);
         saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
 
+        const whatsappMsg = newStatus === "aportacion"
+          ? `📈 ¡Simulación lista, Roberto! El director Eduardo aprobó la simulación para ${target.full_name} con Aportación Requerida de $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}). ¡Ingresa ya para presentar la propuesta!`
+          : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
+
         triggerPushNotification(
-          `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`,
+          whatsappMsg,
           "whatsapp",
           "Roberto Asesor"
         );
@@ -1255,7 +1280,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         await supabase
           .from("prospects")
           .update({
-            status: "aprobado_listo",
+            status: newStatus,
             semanas_imss: simulationData.semanas,
             pension_actual: simulationData.pensionActual,
             pension_mejorada: simulationData.pensionMejorada,
@@ -1264,6 +1289,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             roi_months: roiMonths,
             simulation_comments: simulationData.comments,
             notes_director: simulationData.comments,
+            afore_pensionarse: aforePensionarse,
+            aportacion: aportacion,
           })
           .eq("id", id);
 
@@ -1272,7 +1299,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             if (p.id === id) {
               return {
                 ...p,
-                status: "aprobado_listo" as const,
+                status: newStatus,
                 simulation: fullSimulation,
                 notes_director: simulationData.comments,
               };
@@ -1283,17 +1310,26 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         const target = prospects.find((p) => p.id === id);
         if (target) {
+          const notifTitle = newStatus === "aportacion" ? "Dictamen Emitido (Aportación) 💰" : "Dictamen Emitido (Aprobado) ✅";
+          const notifMsg = newStatus === "aportacion"
+            ? `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Aportación Requerida: $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}).`
+            : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
+
           // Notify Ally
           await supabase.from("notifications").insert({
             user_id: target.aliado_id,
-            title: "Dictamen Emitido (Aprobado) ✅",
-            message: `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`,
+            title: notifTitle,
+            message: notifMsg,
             type: "success",
             read: false,
           });
 
+          const whatsappMsg = newStatus === "aportacion"
+            ? `📈 ¡Simulación lista, Roberto! El director Eduardo aprobó la simulación para ${target.full_name} con Aportación Requerida de $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}). ¡Ingresa ya para presentar la propuesta!`
+            : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
+
           triggerPushNotification(
-            `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`,
+            whatsappMsg,
             "whatsapp",
             "Roberto Asesor"
           );

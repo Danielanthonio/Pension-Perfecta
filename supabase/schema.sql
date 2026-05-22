@@ -53,7 +53,12 @@ CREATE TABLE prospects (
       'doc_proceso',
       'analisis_riesgo',
       'firma_programada',
-      'pagado_comision'
+      'pagado_comision',
+      'aportacion',
+      'falta_reporte',
+      'falta_afore',
+      'pendiente_documentos',
+      'cerrado_perdido'
     )),
   notes_aliado text,
   notes_director text,
@@ -67,6 +72,8 @@ CREATE TABLE prospects (
   total_credito numeric GENERATED ALWAYS AS (COALESCE(monto_financiamiento, 0) + COALESCE(costo_gestion, 0)) STORED,
   roi_months integer,
   simulation_comments text,
+  afore_pensionarse numeric DEFAULT 0,
+  aportacion numeric DEFAULT 0,
   
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())

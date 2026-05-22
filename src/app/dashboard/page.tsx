@@ -30,8 +30,12 @@ export default function DashboardAliado() {
   const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
 
   // Dynamic calculations based on global state
-  const enEvaluacion = prospects.filter((p) => p.status === "evaluacion_pendiente");
-  const listoPresentar = prospects.filter((p) => p.status === "aprobado_listo");
+  const enEvaluacion = prospects.filter((p) =>
+    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+  );
+  const listoPresentar = prospects.filter((p) =>
+    ["aprobado_listo", "aportacion"].includes(p.status)
+  );
   
   const activeStatuses = [
     "asesoria_agendada",
@@ -47,10 +51,23 @@ export default function DashboardAliado() {
     (p) => p.status === "evaluacion_pendiente" && p.documents.length < 2
   );
 
-  // Total Commissions Earned (Sum of cost_gestion for prospects in pagado_comision status)
-  const comisionesGanadas = prospects
-    .filter((p) => p.status === "pagado_comision")
-    .reduce((sum, p) => sum + (p.simulation?.costoGestion || 0), 0);
+  // Total Financing amount pending to be financed (sum of Approved Ley 73 projects that are active/approved but not paid)
+  const pendingFinancingStatuses = [
+    "aprobado_listo",
+    "aportacion",
+    "asesoria_agendada",
+    "doc_proceso",
+    "analisis_riesgo",
+    "firma_programada",
+  ];
+  const totalPorFinanciar = prospects
+    .filter((p) => pendingFinancingStatuses.includes(p.status) && p.simulation)
+    .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
+
+  // Total Financing amount executed (sum of paid/closed M40 projects in pagado_comision status)
+  const totalEjecutados = prospects
+    .filter((p) => p.status === "pagado_comision" && p.simulation)
+    .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
 
   const getActiveStageIndex = (status: Prospect["status"]) => {
     switch (status) {
@@ -109,7 +126,7 @@ export default function DashboardAliado() {
       </div>
 
       {/* Metrics Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Card 1 */}
         <div
           onClick={() => setActiveTab("activos")}
@@ -117,7 +134,7 @@ export default function DashboardAliado() {
         >
           <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-blue-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
           <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Proyectos Activos</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Proyectos Activos</span>
             <Folder className="text-blue-500 h-5 w-5 bg-blue-50 p-1 rounded" />
           </div>
           <div className="mt-4">
@@ -133,7 +150,7 @@ export default function DashboardAliado() {
         >
           <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-amber-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
           <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">En Evaluación</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">En Evaluación</span>
             <Hourglass className="text-amber-500 h-5 w-5 bg-amber-50 p-1 rounded" />
           </div>
           <div className="mt-4">
@@ -149,25 +166,38 @@ export default function DashboardAliado() {
         >
           <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
           <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Listos para Presentar</span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Listos para Presentar</span>
             <CheckSquare className="text-emerald-500 h-5 w-5 bg-emerald-50 p-1 rounded" />
           </div>
           <div className="mt-4">
             <div className="text-3xl font-black text-emerald-600">{listoPresentar.length}</div>
-            <span className="text-[10px] text-emerald-500 font-semibold mt-1 block">Simulaciones listas para agendar</span>
+            <span className="text-[10px] text-emerald-500 font-semibold mt-1 block">Simulaciones listas</span>
           </div>
         </div>
 
         {/* Card 4 */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between h-36 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
+          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
           <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Comisiones Cobradas</span>
-            <DollarSign className="text-emerald-600 h-5 w-5 bg-emerald-50 p-1 rounded" />
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total por Financiar</span>
+            <DollarSign className="text-blue-500 h-5 w-5 bg-blue-50 p-1 rounded" />
           </div>
           <div className="mt-4">
-            <div className="text-2xl font-black text-emerald-600">${comisionesGanadas.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Liberadas de proyectos activos</span>
+            <div className="text-2xl font-black text-blue-600">${totalPorFinanciar.toLocaleString()}</div>
+            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Proyectos aprobados</span>
+          </div>
+        </div>
+
+        {/* Card 5 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between h-36 relative overflow-hidden group">
+          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
+          <div className="flex justify-between items-start">
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Monto Ejecutado</span>
+            <CheckCircle2 className="text-emerald-600 h-5 w-5 bg-emerald-50 p-1 rounded" />
+          </div>
+          <div className="mt-4">
+            <div className="text-2xl font-black text-emerald-600">${totalEjecutados.toLocaleString()}</div>
+            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Financiamientos pagados</span>
           </div>
         </div>
       </div>
@@ -307,9 +337,15 @@ export default function DashboardAliado() {
                         <h4 className="text-sm font-extrabold text-slate-800 leading-tight">{p.full_name}</h4>
                         <p className="text-[10px] text-slate-500 mt-0.5">NSS: {p.nss} • Semanas IMSS: {p.simulation.semanas}</p>
                       </div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                        Dictamen Emitido
-                      </span>
+                      {p.status === "aportacion" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-600 border border-teal-100 shadow-sm">
+                          Requiere Aportación
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                          Dictamen Emitido
+                        </span>
+                      )}
                     </div>
 
                     {/* Simulation Metrics Visualizer */}
@@ -322,7 +358,7 @@ export default function DashboardAliado() {
                         </div>
                         <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20 flex flex-col justify-between relative overflow-hidden">
                           <TrendingUp className="absolute top-2 right-2 h-4 w-4 text-emerald-500" />
-                          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Mejora Ley 73</span>
+                          <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Mejora Ley 73</span>
                           <div className="flex items-baseline gap-1 mt-1.5">
                             <span className="text-base font-extrabold text-emerald-600">${p.simulation.pensionMejorada.toLocaleString()}</span>
                             <span className="text-[9px] font-bold text-emerald-500">+{gainPercent}%</span>
@@ -341,9 +377,23 @@ export default function DashboardAliado() {
                           <span className="text-slate-800">${p.simulation.costoGestion.toLocaleString()}</span>
                         </div>
                         <div className="border-t border-slate-200/60 my-2 pt-2 flex justify-between font-bold">
-                          <span className="text-slate-500">Total a Retornar:</span>
+                          <span className="text-slate-500">Total Crédito (M40 + Gestión):</span>
                           <span className="text-slate-900">${p.simulation.totalCredito.toLocaleString()}</span>
                         </div>
+                        
+                        {p.simulation.aforePensionarse !== undefined && p.simulation.aforePensionarse > 0 && (
+                          <div className="flex justify-between text-amber-600 font-semibold bg-amber-500/5 p-1.5 px-2 rounded-lg">
+                            <span>(-) Afore al Pensionarse:</span>
+                            <span>-${p.simulation.aforePensionarse.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {p.simulation.aportacion !== undefined && p.simulation.aportacion > 0 && (
+                          <div className="flex justify-between text-teal-600 font-bold bg-teal-500/5 p-1.5 px-2 rounded-lg">
+                            <span>(=) Aportación Requerida:</span>
+                            <span>${p.simulation.aportacion.toLocaleString()}</span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between text-emerald-600 font-bold bg-emerald-500/5 p-1 px-2 rounded-lg mt-2">
                           <span>Retorno ROI Estimado:</span>
                           <span>{p.simulation.roiMonths} Meses</span>

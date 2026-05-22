@@ -49,6 +49,16 @@ export default function PipelineManager() {
         return "Firma Programada";
       case "pagado_comision":
         return "Comisión Liberada";
+      case "aportacion":
+        return "Aportación";
+      case "falta_reporte":
+        return "Falta Reporte";
+      case "falta_afore":
+        return "Falta Afore";
+      case "pendiente_documentos":
+        return "Pendiente Documentos";
+      case "cerrado_perdido":
+        return "No acepta propuesta / Cerrado Perdido";
       default:
         return "";
     }
@@ -71,7 +81,17 @@ export default function PipelineManager() {
       case "firma_programada":
         return "bg-indigo-50 text-indigo-600 border-indigo-100";
       case "pagado_comision":
-        return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+        return "bg-amber-500/10 text-amber-700 border-amber-500/20 shadow-sm";
+      case "aportacion":
+        return "bg-teal-50 text-teal-700 border-teal-100 shadow-sm";
+      case "falta_reporte":
+        return "bg-rose-50 text-rose-600 border-rose-100";
+      case "falta_afore":
+        return "bg-orange-50 text-orange-600 border-orange-100";
+      case "pendiente_documentos":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "cerrado_perdido":
+        return "bg-slate-100 text-slate-600 border-slate-200";
       default:
         return "";
     }
@@ -219,13 +239,18 @@ export default function PipelineManager() {
           >
             <option value="all">Todas las Etapas</option>
             <option value="evaluacion_pendiente">1. Evaluación Pendiente</option>
+            <option value="falta_reporte">Falta Reporte</option>
+            <option value="falta_afore">Falta Afore</option>
+            <option value="pendiente_documentos">Pendiente Documentos</option>
             <option value="rechazado">2. Rechazado</option>
             <option value="aprobado_listo">3. Aprobado / Listo</option>
+            <option value="aportacion">Aportación</option>
             <option value="asesoria_agendada">4. Asesoría Agendada</option>
             <option value="doc_proceso">5. Expediente en Trámite</option>
             <option value="analisis_riesgo">6. Análisis de Riesgo</option>
             <option value="firma_programada">7. Firma Programada</option>
             <option value="pagado_comision">8. Comisión Liberada</option>
+            <option value="cerrado_perdido">No acepta propuesta / Cerrado Perdido</option>
           </select>
         </div>
 
@@ -347,13 +372,18 @@ export default function PipelineManager() {
                             className={`py-1.5 px-3.5 border rounded-xl text-xs font-extrabold outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${getStageColor(p.status)}`}
                           >
                             <option value="evaluacion_pendiente">1. Evaluación Pendiente</option>
+                            <option value="falta_reporte">Falta Reporte</option>
+                            <option value="falta_afore">Falta Afore</option>
+                            <option value="pendiente_documentos">Pendiente Documentos</option>
                             <option value="rechazado">2. Rechazado</option>
                             <option value="aprobado_listo">3. Aprobado / Listo</option>
+                            <option value="aportacion">Aportación</option>
                             <option value="asesoria_agendada">4. Asesoría Agendada</option>
                             <option value="doc_proceso">5. Expediente en Trámite</option>
                             <option value="analisis_riesgo">6. Análisis de Riesgo</option>
                             <option value="firma_programada">7. Firma Programada</option>
                             <option value="pagado_comision">8. Comisión Liberada</option>
+                            <option value="cerrado_perdido">No acepta propuesta / Cerrado Perdido</option>
                           </select>
                         </div>
                       </td>
