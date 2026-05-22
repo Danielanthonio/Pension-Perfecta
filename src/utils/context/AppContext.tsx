@@ -101,6 +101,7 @@ interface AppContextType {
   isLoading: boolean;
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
+  initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   addProspect: (
@@ -370,12 +371,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [supabase, setSupabase] = useState<any>(null);
 
-  // Helper to map profiles between Supabase role ('admin') and Frontend role ('director')
+  // Helper to map profiles between Supabase role ('director') and Frontend role ('director')
   const mapProfileFromDB = (dbProfile: any): UserProfile => {
     if (!dbProfile) return dbProfile;
     return {
       ...dbProfile,
-      role: dbProfile.role === "admin" ? "director" : dbProfile.role,
+      role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : dbProfile.role,
     };
   };
 
@@ -383,8 +384,69 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     if (!profileData) return profileData;
     return {
       ...profileData,
-      role: profileData.role === "director" ? "admin" : profileData.role,
+      role: profileData.role === "director" ? "director" : profileData.role,
     };
+  };
+
+  const ensureProfileExists = async (client: any, authUser: any): Promise<UserProfile | null> => {
+    if (!authUser) return null;
+    
+    try {
+      const { data: prof, error: fetchError } = await client
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+        
+      if (prof) {
+        return mapProfileFromDB(prof);
+      }
+      
+      // Profile does not exist, let's create it from metadata
+      const meta = authUser.user_metadata || {};
+      const email = authUser.email || "";
+      const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
+      
+      const fullName = meta.full_name || email.split('@')[0].split(/[._-]/).map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial");
+      const phone = meta.phone || "5500000000";
+      const dbRole = meta.role || (isDirectorEmail ? "director" : "aliado");
+      const invitationCode = meta.invitation_code_used || null;
+      
+      const { data: newProfile, error: createError } = await client
+        .from("profiles")
+        .insert({
+          id: authUser.id,
+          full_name: fullName,
+          email: email.toLowerCase(),
+          phone: phone,
+          role: dbRole,
+          invitation_code_used: invitationCode
+        })
+        .select()
+        .single();
+        
+      if (createError) {
+        console.error("Error creating profile in self-healing:", createError);
+        return null;
+      }
+      
+      // Also try to update the invitation code to used
+      if (invitationCode) {
+        try {
+          await client
+            .from("invitation_codes")
+            .update({ is_used: true, used_by: authUser.id })
+            .eq("code", invitationCode);
+        } catch (updateErr) {
+          console.warn("Could not mark invitation code as used in self-healing:", updateErr);
+        }
+      }
+      
+      return mapProfileFromDB(newProfile);
+    } catch (err) {
+      console.error("Critical error in ensureProfileExists:", err);
+      return null;
+    }
   };
 
   // Helper to transform prospect from DB format to Frontend format
@@ -514,40 +576,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
           if (session?.user) {
             try {
-              const { data: profile } = await client
-                .from("profiles")
-                .select("*")
-                .eq("id", session.user.id)
-                .maybeSingle();
-              if (profile) {
-                const mapped = mapProfileFromDB(profile);
-                currentUser = mapped;
-                setUser(mapped);
-                setActiveRole(mapped.role);
+              // Enforce email confirmed check
+              if (!session.user.email_confirmed_at) {
+                console.warn("User has active session but email is not confirmed, signing out");
+                await client.auth.signOut();
               } else {
-                // Self-healing: active auth user has no row in profiles table
-                const email = session.user.email || "";
-                const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
-                const dbRole = isDirectorEmail ? "admin" : "aliado";
-                const newFullName = email.split('@')[0].split(/[._-]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-                const { data: newProfile, error: createError } = await client
-                  .from("profiles")
-                  .insert({
-                    id: session.user.id,
-                    full_name: newFullName || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial"),
-                    email: email.toLowerCase(),
-                    phone: "5500000000",
-                    role: dbRole
-                  })
-                  .select()
-                  .single();
-
-                if (!createError && newProfile) {
-                  const mapped = mapProfileFromDB(newProfile);
-                  currentUser = mapped;
-                  setUser(mapped);
-                  setActiveRole(mapped.role);
+                const profile = await ensureProfileExists(client, session.user);
+                if (profile) {
+                  currentUser = profile;
+                  setUser(profile);
+                  setActiveRole(profile.role);
                 }
               }
             } catch (err) {
@@ -689,36 +727,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
           
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", data.user?.id)
-            .maybeSingle();
-
-          if (prof) {
-            profile = mapProfileFromDB(prof);
-          } else if (data.user) {
-            // Self-healing: user validated in Auth, but missing from profiles table
-            const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin");
-            const dbRole = isDirectorEmail ? "admin" : "aliado";
-            const newFullName = email.split('@')[0].split(/[._-]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-            const { data: newProfile, error: createError } = await supabase
-              .from("profiles")
-              .insert({
-                id: data.user.id,
-                full_name: newFullName || (isDirectorEmail ? "Director Operativo" : "Aliado Comercial"),
-                email: email.toLowerCase(),
-                phone: "5500000000",
-                role: dbRole
-              })
-              .select()
-              .single();
-
-            if (!createError && newProfile) {
-              profile = mapProfileFromDB(newProfile);
-            }
+          if (data.user && !data.user.email_confirmed_at) {
+            await supabase.auth.signOut();
+            throw new Error("PENDING_CONFIRMATION: Debes confirmar tu correo electrónico antes de poder acceder.");
           }
+          
+          profile = await ensureProfileExists(supabase, data.user);
         } else {
           const { data: prof, error } = await supabase.from("profiles").select("*").eq("email", email).maybeSingle();
           if (error) throw error;
@@ -727,6 +741,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         }
 
         if (profile) {
+          // Strict role matching check
+          if (profile.role !== role) {
+            await supabase.auth.signOut();
+            throw new Error("Acceso Inválido: Tu cuenta no tiene permisos para acceder con este rol.");
+          }
+
           setUser(profile);
           setActiveRole(profile.role);
           saveToStorage("pensionflow_user", profile);
@@ -1428,38 +1448,28 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         return true;
       } else {
         // Attempt to check invitation code in DB
-        let validCodeId: string | null = null;
-        let isCodeValid = false;
-        
-        try {
-          const { data: dbCode, error: codeError } = await supabase
-            .from("invitation_codes")
-            .select("*")
-            .eq("code", code)
-            .eq("is_used", false)
-            .maybeSingle();
-            
-          if (!codeError && dbCode) {
-            validCodeId = dbCode.id;
-            isCodeValid = true;
-          }
-        } catch (err) {
-          console.warn("Could not verify invitation code in DB due to RLS or network, falling back to format check:", err);
-        }
-
-        // Fallback: If DB query returned nothing or failed, we validate the format of the code
-        if (!isCodeValid) {
-          const cleanCode = code.trim().toUpperCase();
-          const matchesFormat = cleanCode.startsWith("AL-2026-") && cleanCode.length >= 12;
-          if (!matchesFormat) {
-            throw new Error("Código de invitación inválido. Debe tener un formato correcto (ej: AL-2026-XXXX).");
-          }
-          console.log("Invitation code format is valid, proceeding with registration.");
+        const { data: dbCode, error: codeError } = await supabase
+          .from("invitation_codes")
+          .select("*")
+          .eq("code", code.trim().toUpperCase())
+          .eq("is_used", false)
+          .maybeSingle();
+          
+        if (codeError || !dbCode) {
+          throw new Error("El código de invitación no es válido, ya fue utilizado o no existe.");
         }
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
-          password
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              phone: phone,
+              role: "aliado",
+              invitation_code_used: code.trim().toUpperCase()
+            }
+          }
         });
         
         if (authError) {
@@ -1473,39 +1483,115 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         }
         if (!authData.user) throw new Error("No se pudo crear el usuario.");
 
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            id: authData.user.id,
-            full_name: fullName,
-            email: email.toLowerCase(),
-            phone,
-            role: "aliado",
-            invitation_code_used: code
-          });
-          
-        if (profileError) throw profileError;
-
-        // Try to update invitation_codes to mark it used, but don't fail if RLS prevents it
-        if (validCodeId) {
+        // Try to insert profile immediately, but catch error since it might fail due to RLS when email confirmation is pending
+        try {
+          await supabase
+            .from("profiles")
+            .insert({
+              id: authData.user.id,
+              full_name: fullName,
+              email: email.toLowerCase(),
+              phone,
+              role: "aliado",
+              invitation_code_used: code.trim().toUpperCase()
+            });
+            
+          // If successful, try to mark invitation code as used
           try {
             await supabase
               .from("invitation_codes")
               .update({ is_used: true, used_by: authData.user.id })
-              .eq("id", validCodeId);
+              .eq("id", dbCode.id);
           } catch (updateErr) {
-            console.warn("Could not update invitation_code status due to RLS, profile is linked via invitation_code_used:", updateErr);
+            console.warn("Could not update invitation_code status due to RLS:", updateErr);
           }
-        } else {
-          try {
-            await supabase
-              .from("invitation_codes")
-              .update({ is_used: true, used_by: authData.user.id })
-              .eq("code", code);
-          } catch (updateErr) {
-            // Safe to ignore
-          }
+        } catch (profileError) {
+          console.warn("Could not insert profile immediately (expected if email confirmation is enabled and session is not yet active). Will self-heal on first login:", profileError);
         }
+
+        return true;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const initializeDirector = async (fullName: string, email: string, phone: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      if (isDemoMode || !supabase) {
+        const newProfile: UserProfile = {
+          id: `director-${Math.random().toString(36).substr(2, 9)}`,
+          full_name: fullName,
+          email,
+          phone,
+          role: "director",
+          created_at: new Date().toISOString()
+        };
+        const updated = [...profiles, newProfile];
+        setProfiles(updated);
+        saveToStorage("pensionflow_profiles", updated);
+        setUser(newProfile);
+        setActiveRole("director");
+        saveToStorage("pensionflow_user", newProfile);
+        saveToStorage("pensionflow_active_role", "director");
+        return true;
+      } else {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              phone: phone,
+              role: "director"
+            }
+          }
+        });
+        
+        if (authError) {
+          console.error("Auth signUp error in initializeDirector:", authError);
+          if (authError.status === 429 || authError.code === "over_email_send_rate_limit" || authError.message?.toLowerCase().includes("rate limit") || authError.message?.toLowerCase().includes("exceeded")) {
+            throw new Error(
+              "LÍMITE_CORREOS: Se ha superado el límite de envío de correos de verificación de Supabase (Error 429). Por favor, solicita al administrador del sistema desactivar la casilla 'Confirm Email' (Confirmar correo electrónico) en el Supabase Dashboard (Authentication -> Providers -> Email -> Confirm email) para permitir registros instantáneos."
+            );
+          }
+          throw authError;
+        }
+        if (!authData.user) throw new Error("No se pudo crear el usuario.");
+
+        try {
+          await supabase
+            .from("profiles")
+            .insert({
+              id: authData.user.id,
+              full_name: fullName,
+              email: email.toLowerCase(),
+              phone,
+              role: "director",
+            });
+        } catch (profileError) {
+          console.warn("Could not insert director profile immediately, self-healing will fix this upon first login:", profileError);
+        }
+
+        const newProfile: UserProfile = {
+          id: authData.user.id,
+          full_name: fullName,
+          email: email.toLowerCase(),
+          phone,
+          role: "director",
+          created_at: new Date().toISOString()
+        };
+        
+        setUser(newProfile);
+        setActiveRole("director");
+        saveToStorage("pensionflow_user", newProfile);
+        saveToStorage("pensionflow_active_role", "director");
+        
+        // Refresh profiles list
+        const { data: dbProfiles } = await supabase.from("profiles").select("*");
+        const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+        setProfiles(mappedProfiles);
 
         return true;
       }
@@ -1582,8 +1668,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         const authUserId = authData.user.id;
 
-        // Map role for Database check constraint (director -> admin)
-        const dbRole = profileData.role === "director" ? "admin" : profileData.role;
+        // Map role for Database check constraint (director -> director)
+        const dbRole = profileData.role === "director" ? "director" : profileData.role;
 
         // Insert profile into the profiles table
         const { data: dbProfile, error: insertError } = await supabase
@@ -1628,7 +1714,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             full_name: dbProfile.full_name,
             email: dbProfile.email,
             phone: dbProfile.phone,
-            role: dbProfile.role === "admin" ? "director" : (dbProfile.role as any),
+            role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : (dbProfile.role as any),
             invitation_code_used: dbProfile.invitation_code_used,
             created_at: dbProfile.created_at,
           };
@@ -1746,6 +1832,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         scheduleAssessment,
         generateInvitationCode,
         registerAliado,
+        initializeDirector,
         createProfile,
         markNotificationRead,
         markAllNotificationsRead,
