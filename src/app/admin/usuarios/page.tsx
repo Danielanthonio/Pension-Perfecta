@@ -20,6 +20,17 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+const COUNTRIES = [
+  { code: "+52", flag: "🇲🇽", label: "México (+52)" },
+  { code: "+1", flag: "🇺🇸", label: "EE.UU. (+1)" },
+  { code: "+57", flag: "🇨🇴", label: "Colombia (+57)" },
+  { code: "+34", flag: "🇪🇸", label: "España (+34)" },
+  { code: "+54", flag: "🇦🇷", label: "Argentina (+54)" },
+  { code: "+56", flag: "🇨🇱", label: "Chile (+56)" },
+  { code: "+51", flag: "🇵🇪", label: "Perú (+51)" },
+  { code: "+1", flag: "🇨🇦", label: "Canadá (+1)" },
+];
+
 export default function GestionUsuarios() {
   const { profiles, createProfile, triggerPushNotification } = useApp();
 
@@ -28,12 +39,14 @@ export default function GestionUsuarios() {
   // Registration Form States
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+52");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"aliado" | "director">("aliado");
   
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedUserEmail, setCopiedUserEmail] = useState<string | null>(null);
+  const [createdUser, setCreatedUser] = useState<{ name: string; email: string } | null>(null);
 
   // Validations
   const isNameValid = fullName.trim().length >= 3;
@@ -44,6 +57,7 @@ export default function GestionUsuarios() {
   const handleRegisterUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormSubmitted(true);
+    setCreatedUser(null);
 
     if (!isFormValid) {
       return;
@@ -51,12 +65,15 @@ export default function GestionUsuarios() {
 
     setIsSubmitting(true);
     try {
+      const fullPhoneNumber = `${countryCode} ${phone.replace(/\D/g, "")}`;
       await createProfile({
         full_name: fullName,
         email: email.toLowerCase(),
-        phone: phone.replace(/\D/g, ""),
+        phone: fullPhoneNumber,
         role,
       });
+
+      setCreatedUser({ name: fullName, email: email.toLowerCase() });
 
       // Clear Form State
       setFullName("");
@@ -169,6 +186,32 @@ export default function GestionUsuarios() {
               </p>
             </div>
 
+            {createdUser && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs space-y-2 animate-fade-in relative">
+                <button 
+                  type="button" 
+                  onClick={() => setCreatedUser(null)} 
+                  className="absolute top-2 right-2 text-emerald-500 hover:text-emerald-700 font-bold text-sm"
+                >
+                  ✕
+                </button>
+                <div className="font-extrabold flex items-center gap-1.5 text-emerald-950">
+                  <Check className="h-4 w-4 text-emerald-600" />
+                  ¡Colaborador Creado Exitosamente!
+                </div>
+                <div className="leading-relaxed">
+                  Se ha creado el usuario para <strong>{createdUser.name}</strong> ({createdUser.email}).
+                </div>
+                <div className="bg-emerald-100/50 p-2.5 rounded-xl border border-emerald-200/50 mt-1 space-y-1">
+                  <div className="text-[10px] text-emerald-900 font-bold uppercase tracking-wider">Acceso de Autenticación Supabase:</div>
+                  <div>Contraseña Temporal: <code className="bg-white px-1.5 py-0.5 rounded font-black select-all text-emerald-900">PensionPerfecta2026!</code></div>
+                </div>
+                <p className="text-[10px] text-emerald-700 leading-normal">
+                  Comparte esta contraseña temporal con el colaborador para que pueda iniciar sesión y configurarla a su gusto.
+                </p>
+              </div>
+            )}
+
             <form onSubmit={handleRegisterUser} className="space-y-4">
               {/* Full Name */}
               <div>
@@ -220,22 +263,40 @@ export default function GestionUsuarios() {
               {/* Phone */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Teléfono Móvil (10 dígitos)
+                  Teléfono Móvil
                 </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Phone className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                    placeholder="ej: 5512345678"
-                    className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors ${
-                      formSubmitted && !isPhoneValid ? "border-red-400" : "border-slate-200"
-                    }`}
-                  />
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      className="appearance-none h-full pl-2 pr-7 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 transition-colors cursor-pointer text-slate-700"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={`${c.flag}-${c.code}`} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-slate-400">
+                      <span className="text-[8px]">▼</span>
+                    </div>
+                  </div>
+                  <div className="relative flex-1">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                      placeholder="10 dígitos"
+                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors ${
+                        formSubmitted && !isPhoneValid ? "border-red-400" : "border-slate-200"
+                      }`}
+                    />
+                  </div>
                 </div>
                 {formSubmitted && !isPhoneValid && (
                   <span className="text-[9px] text-red-500 font-bold mt-1 block flex items-center gap-1">
@@ -357,7 +418,7 @@ export default function GestionUsuarios() {
 
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-xs font-semibold text-slate-600">
-                              {p.phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3") || "N/A"}
+                              {p.phone ? (p.phone.startsWith("+") ? p.phone : p.phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3")) : "N/A"}
                             </span>
                           </td>
 

@@ -6,11 +6,23 @@ import { useApp } from "@/utils/context/AppContext";
 import { ArrowRight, Lock, Mail, ShieldAlert, User, Phone, KeyRound, Heart } from "lucide-react";
 import Link from "next/link";
 
+const COUNTRIES = [
+  { code: "+52", flag: "🇲🇽", label: "México (+52)" },
+  { code: "+1", flag: "🇺🇸", label: "EE.UU. (+1)" },
+  { code: "+57", flag: "🇨🇴", label: "Colombia (+57)" },
+  { code: "+34", flag: "🇪🇸", label: "España (+34)" },
+  { code: "+54", flag: "🇦🇷", label: "Argentina (+54)" },
+  { code: "+56", flag: "🇨🇱", label: "Chile (+56)" },
+  { code: "+51", flag: "🇵🇪", label: "Perú (+51)" },
+  { code: "+1", flag: "🇨🇦", label: "Canadá (+1)" },
+];
+
 export default function RegisterAliadoPage() {
   const router = useRouter();
   const { registerAliado, isDemoMode } = useApp();
   
   const [fullName, setFullName] = useState("");
+  const [countryCode, setCountryCode] = useState("+52");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +33,8 @@ export default function RegisterAliadoPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email || !phone || !password || !code) {
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (!fullName || !email || !cleanPhone || !password || !code) {
       setErrorMsg("Todos los campos son obligatorios.");
       return;
     }
@@ -29,8 +42,10 @@ export default function RegisterAliadoPage() {
     setLoading(true);
     setErrorMsg("");
 
+    const fullPhoneNumber = `${countryCode} ${cleanPhone}`;
+
     try {
-      await registerAliado(fullName, email, phone, password, code);
+      await registerAliado(fullName, email, fullPhoneNumber, password, code);
       // Tras un registro exitoso, redirigimos al dashboard porque ya inicia sesión
       router.push("/dashboard");
     } catch (err: any) {
@@ -112,18 +127,37 @@ export default function RegisterAliadoPage() {
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                 Teléfono
               </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Phone className="h-4 w-4" />
-                </span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="10 dígitos"
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
-                />
+              <div className="flex gap-2">
+                <div className="relative">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    disabled={loading}
+                    className="appearance-none h-full pl-3 pr-8 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500 font-semibold cursor-pointer"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={`${c.flag}-${c.code}`} value={c.code} className="bg-slate-900 text-white font-semibold">
+                        {c.flag} {c.code}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-slate-400">
+                    <span className="text-[10px]">▼</span>
+                  </div>
+                </div>
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <Phone className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    placeholder="10 dígitos"
+                    disabled={loading}
+                    className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
