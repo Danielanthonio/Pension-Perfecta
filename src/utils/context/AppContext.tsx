@@ -99,6 +99,7 @@ interface AppContextType {
   isDemoMode: boolean;
   isLoading: boolean;
   login: (email: string, role: UserRole, password?: string) => Promise<boolean>;
+  registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   addProspect: (
@@ -1279,6 +1280,73 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const registerAliado = async (fullName: string, email: string, phone: string, password: string, code: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      if (isDemoMode || !supabase) {
+        const validCode = invitationCodes.find(c => c.code === code && !c.is_used);
+        if (!validCode) throw new Error("Código de invitación inválido o ya usado.");
+        
+        const newProfile: UserProfile = {
+          id: `aliado-${Math.random().toString(36).substr(2, 9)}`,
+          full_name: fullName,
+          email,
+          phone,
+          role: "aliado",
+          created_at: new Date().toISOString()
+        };
+        
+        const storedProfiles = localStorage.getItem("pensionflow_profiles");
+        const parsedProfiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
+        saveToStorage("pensionflow_profiles", [...parsedProfiles, newProfile]);
+        
+        const updatedCodes = invitationCodes.map(c => c.code === code ? { ...c, is_used: true, used_by: newProfile.id } : c);
+        setInvitationCodes(updatedCodes);
+        saveToStorage("pensionflow_invitation_codes", updatedCodes);
+        
+        return true;
+      } else {
+        const { data: dbCode, error: codeError } = await supabase
+          .from("invitation_codes")
+          .select("*")
+          .eq("code", code)
+          .eq("is_used", false)
+          .maybeSingle();
+          
+        if (codeError || !dbCode) throw new Error("Código de invitación inválido o ya usado.");
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password
+        });
+        
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("No se pudo crear el usuario.");
+
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: authData.user.id,
+            full_name: fullName,
+            email,
+            phone,
+            role: "aliado"
+          });
+          
+        if (profileError) throw profileError;
+
+        await supabase
+          .from("invitation_codes")
+          .update({ is_used: true, used_by: authData.user.id })
+          .eq("id", dbCode.id);
+
+        return true;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const createProfile = async (
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
@@ -1450,6 +1518,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         saveSimulation,
         scheduleAssessment,
         generateInvitationCode,
+        registerAliado,
         createProfile,
         markNotificationRead,
         markAllNotificationsRead,
