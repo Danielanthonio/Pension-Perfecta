@@ -29,11 +29,11 @@ const COUNTRIES = [
   { code: "+51", flag: "🇵🇪", label: "Perú (+51)" },
 ];
 
-type ViewState = "ROLE_SELECTION" | "LOGIN" | "REGISTER" | "CONFIRMATION_PENDING";
+type ViewState = "ROLE_SELECTION" | "LOGIN" | "REGISTER" | "CONFIRMATION_PENDING" | "FORGOT_PASSWORD";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, registerAliado, isDemoMode, initializeDirector, profiles, isLoading } = useApp();
+  const { login, registerAliado, isDemoMode, initializeDirector, profiles, isLoading, sendPasswordReset } = useApp();
   
   // State Machine for SPA
   const [viewState, setViewState] = useState<ViewState>("ROLE_SELECTION");
@@ -45,6 +45,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Forgot Password State
+  const [forgotEmail, setForgotEmail] = useState("");
 
   // Register Form States
   const [regName, setRegName] = useState("");
@@ -197,6 +200,28 @@ export default function LoginPage() {
     setErrorMsg("");
     setSuccessMsg("");
     setViewState("ROLE_SELECTION");
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      setErrorMsg("Por favor, ingresa tu correo electrónico.");
+      return;
+    }
+    setLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      await sendPasswordReset(forgotEmail.trim());
+      setSuccessMsg("Si el correo existe, te hemos enviado un enlace para recuperar tu contraseña.");
+      setForgotEmail(""); // clear
+    } catch (err: any) {
+      console.error("Forgot password error:", err);
+      setErrorMsg("Ocurrió un error al intentar enviar el correo. Por favor intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -386,6 +411,19 @@ export default function LoginPage() {
                     {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
                   </button>
                 </form>
+
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => {
+                      setErrorMsg("");
+                      setSuccessMsg("");
+                      setViewState("FORGOT_PASSWORD");
+                    }}
+                    className="text-xs text-slate-400 hover:text-emerald-400 font-medium transition-colors"
+                  >
+                    ¿Olvidaste tu contraseña? Recupérala aquí
+                  </button>
+                </div>
 
                 {selectedRole === "aliado" && (
                   <div className="mt-5 text-center">
@@ -619,6 +657,76 @@ export default function LoginPage() {
                 >
                   Entendido, volver al inicio
                 </motion.button>
+              </motion.div>
+            )}
+
+            {viewState === "FORGOT_PASSWORD" && (
+              /* VIEW 5: FORGOT PASSWORD */
+              <motion.div
+                key="forgot_password"
+                variants={formVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="flex flex-col flex-1"
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <button
+                    onClick={() => setViewState("LOGIN")}
+                    className="p-1.5 rounded-full hover:bg-white/5 transition-colors text-slate-400 hover:text-white"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">Recuperar Acceso</h3>
+                    <p className="text-xs text-emerald-400 font-semibold tracking-wider uppercase mt-1">Restablece tu contraseña</p>
+                  </div>
+                </div>
+
+                {errorMsg && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-5 bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-xl text-xs font-semibold flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+                    <p>{errorMsg}</p>
+                  </motion.div>
+                )}
+                {successMsg && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-xl text-xs font-semibold flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                      <span>{successMsg}</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Correo Electrónico
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                        <Mail className="h-4 w-4" />
+                      </span>
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="tu@correo.com"
+                        required
+                        disabled={loading}
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-emerald-500/10 flex items-center justify-center gap-2 text-sm"
+                  >
+                    {loading ? "Enviando enlace..." : "Enviar enlace de recuperación"}
+                  </button>
+                </form>
               </motion.div>
             )}
           </AnimatePresence>

@@ -100,6 +100,8 @@ interface AppContextType {
   isDemoMode: boolean;
   isLoading: boolean;
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  updateUserPassword: (newPassword: string) => Promise<void>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -697,6 +699,32 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   const saveToStorage = (key: string, value: any) => {
     localStorage.setItem(key, JSON.stringify(value));
+  };
+
+  const sendPasswordReset = async (email: string): Promise<void> => {
+    if (isDemoMode || !supabase) {
+      setToast({ id: Date.now().toString(), type: "email", recipient: email, message: "Simulación de correo de recuperación enviada." });
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+    if (error) {
+      console.error("Error sending reset password email:", error);
+      throw error;
+    }
+  };
+
+  const updateUserPassword = async (newPassword: string): Promise<void> => {
+    if (isDemoMode || !supabase) {
+      setToast({ id: Date.now().toString(), type: "email", recipient: "Sistema", message: "Simulación de cambio de contraseña exitosa." });
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      console.error("Error updating password:", error);
+      throw error;
+    }
   };
 
   const login = async (email: string, role: UserRole, password?: string): Promise<UserRole | null> => {
@@ -1823,6 +1851,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         isDemoMode,
         isLoading,
         login,
+        sendPasswordReset,
+        updateUserPassword,
         logout,
         switchRole,
         addProspect,
