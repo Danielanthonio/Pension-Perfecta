@@ -220,10 +220,10 @@ export default function LoginPage() {
             <Heart className="h-12 w-12 text-emerald-400 fill-emerald-400/20 mb-3 cursor-pointer" strokeWidth={1.5} />
           </motion.div>
           <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-            {!isDemoMode && !isLoading && profiles.length === 0 ? "Activar Sistema" : "Pensión Perfecta"}
+            Pensión Perfecta
           </h2>
           <p className="mt-1 text-[10px] text-slate-400 font-bold tracking-widest uppercase">
-            {!isDemoMode && !isLoading && profiles.length === 0 ? "Registro Inicial de Director" : "Portal Operativo Ley 73"}
+            Portal Operativo Ley 73
           </p>
         </div>
 
@@ -247,134 +247,6 @@ export default function LoginPage() {
           <div className="flex flex-col items-center justify-center py-12 my-auto">
             <div className="w-10 h-10 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin mb-4" />
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Cargando Plataforma...</p>
-          </div>
-        ) : !isDemoMode && profiles.length === 0 ? (
-          /* INITIAL SETUP OF FIRST SYSTEM DIRECTOR */
-          <div className="my-auto">
-            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-2xl text-[11px] font-semibold mb-5 flex flex-col gap-1.5 leading-relaxed">
-              <div className="flex items-center gap-2 mb-0.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                <span className="font-extrabold text-white text-xs uppercase tracking-wider">Conexión Supabase Exitosa ⚡</span>
-              </div>
-              <p className="text-emerald-300 font-medium">
-                Hemos detectado que tu base de datos está vacía. Crea el perfil principal del <strong>Director de Operaciones</strong> para activar la plataforma.
-              </p>
-            </div>
-
-            <form onSubmit={handleInitialize} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Nombre Completo
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                    <User className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={initName}
-                    onChange={(e) => setInitName(e.target.value)}
-                    placeholder="Ej. Eduardo Director"
-                    required
-                    disabled={loading}
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Correo de Director
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                    <Mail className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="email"
-                    value={initEmail}
-                    onChange={(e) => setInitEmail(e.target.value)}
-                    placeholder="ej: eduardo@pensionflow.com"
-                    required
-                    disabled={loading}
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-1">
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Lada
-                  </label>
-                  <div className="relative h-[46px]">
-                    <select
-                      value={initCountryCode}
-                      onChange={(e) => setInitCountryCode(e.target.value)}
-                      disabled={loading}
-                      className="w-full h-full pl-2 pr-6 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-xs font-semibold cursor-pointer appearance-none animate-none"
-                    >
-                      {COUNTRIES.map((c) => (
-                        <option key={c.code} value={c.code} className="bg-slate-900 text-white text-xs">
-                          {c.flag} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-slate-400">
-                      <span className="text-[9px]">▼</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Móvil (10 dígs)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                      <Phone className="h-4 w-4" />
-                    </span>
-                    <input
-                      type="tel"
-                      value={initPhone}
-                      onChange={(e) => setInitPhone(e.target.value.replace(/\D/g, ""))}
-                      placeholder="5512345678"
-                      required
-                      disabled={loading}
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Contraseña de Director
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                    <Lock className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="password"
-                    value={initPassword}
-                    onChange={(e) => setInitPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    disabled={loading}
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-emerald-500/10 flex items-center justify-center gap-2 text-sm"
-              >
-                {loading ? "Inicializando Director..." : "Inicializar Cuenta de Director"}
-              </button>
-            </form>
           </div>
         ) : (
           /* PREMIUM STATE MACHINE VIEWS */
