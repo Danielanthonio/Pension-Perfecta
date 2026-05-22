@@ -1,0 +1,443 @@
+"use client";
+
+import React, { useState } from "react";
+import { useApp } from "@/utils/context/AppContext";
+import {
+  Users,
+  UserPlus,
+  Search,
+  Mail,
+  Phone,
+  Calendar,
+  Sparkles,
+  Check,
+  Copy,
+  Send,
+  ShieldCheck,
+  UserCheck,
+  User,
+  Activity,
+  AlertCircle,
+} from "lucide-react";
+
+export default function GestionUsuarios() {
+  const { profiles, createProfile, triggerPushNotification } = useApp();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Registration Form States
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"aliado" | "director">("aliado");
+  
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedUserEmail, setCopiedUserEmail] = useState<string | null>(null);
+
+  // Validations
+  const isNameValid = fullName.trim().length >= 3;
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isPhoneValid = /^\d{10}$/.test(phone.replace(/\D/g, ""));
+  const isFormValid = isNameValid && isEmailValid && isPhoneValid;
+
+  const handleRegisterUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormSubmitted(true);
+
+    if (!isFormValid) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createProfile({
+        full_name: fullName,
+        email: email.toLowerCase(),
+        phone: phone.replace(/\D/g, ""),
+        role,
+      });
+
+      // Clear Form State
+      setFullName("");
+      setEmail("");
+      setPhone("");
+      setRole("aliado");
+      setFormSubmitted(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyEmail = (userEmail: string) => {
+    navigator.clipboard.writeText(userEmail);
+    setCopiedUserEmail(userEmail);
+    setTimeout(() => setCopiedUserEmail(null), 2000);
+  };
+
+  const handleSimulateActivation = (userName: string, userEmail: string) => {
+    triggerPushNotification(
+      `✉️ Activación de Cuenta: Se ha enviado un enlace seguro de configuración de contraseña al correo comercial: ${userEmail}. Asegurado por SSL.`,
+      "email",
+      userName
+    );
+  };
+
+  // Filter profiles by search query
+  const filteredProfiles = profiles.filter(
+    (p) =>
+      p.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Statistics
+  const totalUsers = profiles.length;
+  const totalDirectors = profiles.filter((p) => p.role === "director").length;
+  const totalAllies = profiles.filter((p) => p.role === "aliado").length;
+  
+  // Sort profiles to show the newest first
+  const sortedProfilesForLog = [...profiles].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const latestRegisteredUser = sortedProfilesForLog[0]?.full_name || "N/A";
+
+  return (
+    <div className="space-y-8 select-none max-w-6xl mx-auto animate-fade-in pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Administración de Accesos</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Registra nuevos directores de operaciones y asesores comerciales, y administra las llaves del sistema.
+          </p>
+        </div>
+      </div>
+
+      {/* Statistics Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+          <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Usuarios Totales</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-slate-800">{totalUsers}</span>
+            <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">Activos</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+          <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Directores</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-indigo-600">{totalDirectors}</span>
+            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">Auditoría Técnica</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aliados Comerciales</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-emerald-600">{totalAllies}</span>
+            <span className="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold">Prospección Activa</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Último Registro</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-sm font-black text-slate-800 truncate max-w-[150px] block">{latestRegisteredUser}</span>
+            <span className="text-[9px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-bold">Reciente</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Form Left vs Directory Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+        {/* Left Side: Create User Form (2/5) */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-6">
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <UserPlus className="h-4.5 w-4.5 text-indigo-500" />
+                Registrar Nuevo Colaborador
+              </h3>
+              <p className="text-slate-500 text-xs leading-normal">
+                Registra un perfil para emitir una cuenta operativa. Se inyectará en la base de datos local de inmediato.
+              </p>
+            </div>
+
+            <form onSubmit={handleRegisterUser} className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="ej: Laura Martínez"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors ${
+                    formSubmitted && !isNameValid ? "border-red-400" : "border-slate-200"
+                  }`}
+                />
+                {formSubmitted && !isNameValid && (
+                  <span className="text-[9px] text-red-500 font-bold mt-1 block flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> El nombre debe ser más largo.
+                  </span>
+                )}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Correo Electrónico
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Mail className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ej: laura@prevision.com"
+                    className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors ${
+                      formSubmitted && !isEmailValid ? "border-red-400" : "border-slate-200"
+                    }`}
+                  />
+                </div>
+                {formSubmitted && !isEmailValid && (
+                  <span className="text-[9px] text-red-500 font-bold mt-1 block flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Ingresa un correo electrónico válido.
+                  </span>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Teléfono Móvil (10 dígitos)
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Phone className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="tel"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    placeholder="ej: 5512345678"
+                    className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors ${
+                      formSubmitted && !isPhoneValid ? "border-red-400" : "border-slate-200"
+                    }`}
+                  />
+                </div>
+                {formSubmitted && !isPhoneValid && (
+                  <span className="text-[9px] text-red-500 font-bold mt-1 block flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> El teléfono debe contener 10 dígitos exactos.
+                  </span>
+                )}
+              </div>
+
+              {/* Role Selection */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Rol Asignado
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole("aliado")}
+                    className={`py-2 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                      role === "aliado"
+                        ? "bg-emerald-50 border-emerald-500 text-emerald-600"
+                        : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100/40"
+                    }`}
+                  >
+                    <UserCheck className="h-4 w-4" /> Aliado Comercial
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole("director")}
+                    className={`py-2 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                      role === "director"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-600"
+                        : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100/40"
+                    }`}
+                  >
+                    <ShieldCheck className="h-4 w-4" /> Director Operativo
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-2 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <PlusIcon className="h-4.5 w-4.5" />
+                {isSubmitting ? "Registrando..." : "Registrar Colaborador"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Side: Users List Directory (3/5) */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            {/* Header / Search bar */}
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Directorio Interno</span>
+                <span className="text-xs font-bold text-slate-600 mt-1 block">Visualiza las cuentas de asesores y auditores del sistema.</span>
+              </div>
+              
+              <div className="relative max-w-xs w-full sm:w-60">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Search className="h-4 w-4" />
+                </span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar usuario por nombre o correo..."
+                  className="pl-10 pr-4 py-2 w-full bg-white hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* List Table */}
+            {filteredProfiles.length === 0 ? (
+              <div className="py-20 text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                  <User className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700">Sin usuarios encontrados</h4>
+                  <p className="text-xs text-slate-400 mt-1">Prueba refinando los criterios de búsqueda.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4">Usuario</th>
+                      <th className="px-6 py-4">Teléfono</th>
+                      <th className="px-6 py-4 text-center">Rol del Sistema</th>
+                      <th className="px-6 py-4 text-center">Registro</th>
+                      <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-150">
+                    {filteredProfiles.map((p) => {
+                      const isDirector = p.role === "director";
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border transition-all ${
+                                isDirector
+                                  ? "bg-indigo-500/10 text-indigo-600 border-indigo-200"
+                                  : "bg-emerald-500/10 text-emerald-600 border-emerald-200"
+                              }`}>
+                                {p.full_name.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="text-xs font-extrabold text-slate-800 block leading-tight">{p.full_name}</span>
+                                <span className="text-[10px] text-slate-400 block mt-0.5 font-medium leading-none">{p.email}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-slate-600">
+                              {p.phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3") || "N/A"}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                                isDirector
+                                  ? "bg-indigo-50 text-indigo-600 border-indigo-150"
+                                  : "bg-emerald-50 text-emerald-600 border-emerald-150"
+                              }`}
+                            >
+                              {isDirector ? "Director Operaciones" : "Aliado Comercial"}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap text-center text-[10px] font-bold text-slate-400">
+                            {new Date(p.created_at).toLocaleDateString("es-MX", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                            <div className="flex items-center justify-end gap-2.5">
+                              {/* Copy details */}
+                              <button
+                                onClick={() => handleCopyEmail(p.email)}
+                                className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-colors border border-slate-200"
+                                title="Copiar Correo"
+                              >
+                                {copiedUserEmail === p.email ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+
+                              {/* Simulate Activation Email */}
+                              <button
+                                onClick={() => handleSimulateActivation(p.full_name, p.email)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-transparent hover:bg-slate-100 text-[10px] font-bold text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
+                                title="Enviar Acceso"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Acceso
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Inline mini Plus icon component to resolve any missing Lucide export issues
+function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      stroke="currentColor"
+      strokeWidth="3"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={props.className}
+      {...props}
+    >
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  );
+}

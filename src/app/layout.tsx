@@ -1,0 +1,29 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AppContextProvider } from "@/utils/context/AppContext";
+import ToastSimulator from "@/components/ToastSimulator";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "PensiónFlow - Asesoría y Financiamiento Ley 73",
+  description: "Gestión comercial y operativa de pensiones para aliados y directores",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="es" className="scroll-smooth">
+      <body className={`${inter.className} antialiased text-slate-900 bg-slate-50`}>
+        <AppContextProvider>
+          {children}
+          <ToastSimulator />
+        </AppContextProvider>
+      </body>
+    </html>
+  );
+}
