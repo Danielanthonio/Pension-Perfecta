@@ -1,9 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, TrendingUp, ShieldAlert, Award, FileSpreadsheet, Users, Heart } from "lucide-react";
 
 export default function Home() {
+  const router = useRouter();
+
+  // Interceptar la redirección de Supabase para recuperación de contraseña o confirmación
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      // Supabase manda un 'code' al resetear clave.
+      if (params.get("code") || window.location.hash.includes("type=recovery")) {
+        router.push("/update-password");
+      }
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-teal-950 to-teal-900 text-white overflow-hidden relative selection:bg-emerald-500 selection:text-white">
       {/* Dynamic Background Glows */}
