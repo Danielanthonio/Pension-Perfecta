@@ -188,7 +188,7 @@ export default function SubirProspecto() {
                     placeholder="ej: Juan Pérez García"
                     className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all ${
                       formSubmitted && !nameValid ? "border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-200 focus:border-blue-500"
-                    }`}
+                    } ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
                   />
                 </div>
                 {formSubmitted && !nameValid && (
@@ -218,7 +218,7 @@ export default function SubirProspecto() {
                       placeholder="11 dígitos"
                       className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all ${
                         formSubmitted && !nssValid ? "border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-200 focus:border-blue-500"
-                      }`}
+                      } ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
                     />
                     {nss.length > 0 && (
                       <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center">
@@ -255,7 +255,7 @@ export default function SubirProspecto() {
                       placeholder="18 caracteres alfanuméricos"
                       className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all ${
                         formSubmitted && !curpValid ? "border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-200 focus:border-blue-500"
-                      }`}
+                      } ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
                     />
                     {curp.length > 0 && (
                       <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center">
@@ -289,7 +289,7 @@ export default function SubirProspecto() {
                       placeholder="ej: 5512345678"
                       className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all ${
                         formSubmitted && !phoneValid ? "border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-200 focus:border-blue-500"
-                      }`}
+                      } ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
                     />
                   </div>
                   {formSubmitted && !phoneValid && (
@@ -311,7 +311,7 @@ export default function SubirProspecto() {
                       placeholder="ej: pedro@gmail.com"
                       className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all ${
                         formSubmitted && !emailValid ? "border-red-400 focus:ring-1 focus:ring-red-400" : "border-slate-200 focus:border-blue-500"
-                      }`}
+                      } ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
                     />
                   </div>
                   {formSubmitted && !emailValid && (
