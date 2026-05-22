@@ -34,10 +34,12 @@ export default function SubirProspecto() {
   const [aforeFileName, setAforeFileName] = useState("");
   const [aforeProgress, setAforeProgress] = useState(0);
   const [aforeUploading, setAforeUploading] = useState(false);
+  const [aforeOcrStatus, setAforeOcrStatus] = useState<"idle" | "uploading" | "analyzing" | "completed">("idle");
 
   const [imssFileName, setImssFileName] = useState("");
   const [imssProgress, setImssProgress] = useState(0);
   const [imssUploading, setImssUploading] = useState(false);
+  const [imssOcrStatus, setImssOcrStatus] = useState<"idle" | "uploading" | "analyzing" | "completed">("idle");
 
   const [aforeFileDataUrl, setAforeFileDataUrl] = useState("");
   const [imssFileDataUrl, setImssFileDataUrl] = useState("");
@@ -54,18 +56,16 @@ export default function SubirProspecto() {
   const runSimulatedOCR = () => {
     if (fullName) return; // Prevent overwriting if already populated
     
-    setTimeout(() => {
-      setFullName("GONZALEZ VENTURA NORBERTO JAVIER");
-      setNss("68876602886");
-      setCurp("GOVN660606HDFNNR00");
-      setPhone("9876544444");
-      setEmail("nolberto@gmail.com");
-      
-      setHighlightFields(true);
-      setOcrSuccessMsg("Extracción Inteligente: Documento analizado y resumen generado con éxito.");
-      setTimeout(() => setHighlightFields(false), 3000);
-      setTimeout(() => setOcrSuccessMsg(""), 6000);
-    }, 800);
+    setFullName("GONZALEZ VENTURA NORBERTO JAVIER");
+    setNss("68876602886");
+    setCurp("GOVN660606HDFNNR00");
+    setPhone("9876544444");
+    setEmail("nolberto@gmail.com");
+    
+    setHighlightFields(true);
+    setOcrSuccessMsg("Extracción Inteligente: Documento analizado y resumen generado con éxito.");
+    setTimeout(() => setHighlightFields(false), 3000);
+    setTimeout(() => setOcrSuccessMsg(""), 6000);
   };
 
   // Real-time Validations
@@ -99,6 +99,7 @@ export default function SubirProspecto() {
 
     if (type === "afore") {
       setAforeUploading(true);
+      setAforeOcrStatus("uploading");
       setAforeProgress(0);
       setAforeFileName(file.name);
 
@@ -106,8 +107,14 @@ export default function SubirProspecto() {
         setAforeProgress((prev) => {
           if (prev >= 100) {
             clearInterval(interval);
-            setAforeUploading(false);
-            runSimulatedOCR();
+            setAforeOcrStatus("analyzing");
+            
+            setTimeout(() => {
+              runSimulatedOCR();
+              setAforeOcrStatus("completed");
+              setAforeUploading(false);
+            }, 1500); // 1.5s visual AI analysis delay
+            
             return 100;
           }
           return prev + 10;
@@ -115,6 +122,7 @@ export default function SubirProspecto() {
       }, 100);
     } else {
       setImssUploading(true);
+      setImssOcrStatus("uploading");
       setImssProgress(0);
       setImssFileName(file.name);
 
@@ -122,8 +130,14 @@ export default function SubirProspecto() {
         setImssProgress((prev) => {
           if (prev >= 100) {
             clearInterval(interval);
-            setImssUploading(false);
-            runSimulatedOCR();
+            setImssOcrStatus("analyzing");
+            
+            setTimeout(() => {
+              runSimulatedOCR();
+              setImssOcrStatus("completed");
+              setImssUploading(false);
+            }, 1500); // 1.5s visual AI analysis delay
+            
             return 100;
           }
           return prev + 10;
@@ -162,8 +176,10 @@ export default function SubirProspecto() {
 
       // Successful redirect to evaluation list
       router.push("/dashboard");
-    } catch (err) {
-      setErrorMsg("Ocurrió un error al registrar el prospecto.");
+    } catch (err: any) {
+      console.error("Error al registrar el prospecto:", err);
+      const detail = err?.message || err?.details || JSON.stringify(err);
+      setErrorMsg(`Ocurrió un error al registrar el prospecto: ${detail}`);
       setSaving(false);
     }
   };
@@ -392,13 +408,29 @@ export default function SubirProspecto() {
                   />
                   {aforeFileName ? (
                     <div className="w-full flex flex-col items-center animate-scale-in">
-                      <FileCheck className={`h-8 w-8 ${aforeUploading ? "text-blue-400" : "text-emerald-500"}`} />
+                      <FileCheck className={`h-8 w-8 ${aforeOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
                       <span className="text-[11px] font-bold text-slate-700 mt-2 truncate w-full max-w-[150px]">{aforeFileName}</span>
-                      {aforeUploading ? (
-                        <div className="w-full mt-3 bg-slate-200 rounded-full h-1.5">
-                          <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
+                      
+                      {aforeOcrStatus === "uploading" && (
+                        <div className="w-full mt-3">
+                          <div className="w-full bg-slate-200 rounded-full h-1.5">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
+                          </div>
+                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo... {aforeProgress}%</span>
                         </div>
-                      ) : (
+                      )}
+
+                      {aforeOcrStatus === "analyzing" && (
+                        <div className="w-full mt-3 flex flex-col items-center gap-1">
+                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
+                          <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                            Analizando con IA...
+                          </span>
+                        </div>
+                      )}
+
+                      {aforeOcrStatus === "completed" && (
                         <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Cargado con éxito ✅</span>
                       )}
                     </div>
@@ -424,13 +456,29 @@ export default function SubirProspecto() {
                   />
                   {imssFileName ? (
                     <div className="w-full flex flex-col items-center animate-scale-in">
-                      <FileCheck className={`h-8 w-8 ${imssUploading ? "text-blue-400" : "text-emerald-500"}`} />
+                      <FileCheck className={`h-8 w-8 ${imssOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
                       <span className="text-[11px] font-bold text-slate-700 mt-2 truncate w-full max-w-[150px]">{imssFileName}</span>
-                      {imssUploading ? (
-                        <div className="w-full mt-3 bg-slate-200 rounded-full h-1.5">
-                          <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${imssProgress}%` }} />
+                      
+                      {imssOcrStatus === "uploading" && (
+                        <div className="w-full mt-3">
+                          <div className="w-full bg-slate-200 rounded-full h-1.5">
+                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${imssProgress}%` }} />
+                          </div>
+                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo... {imssProgress}%</span>
                         </div>
-                      ) : (
+                      )}
+
+                      {imssOcrStatus === "analyzing" && (
+                        <div className="w-full mt-3 flex flex-col items-center gap-1">
+                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
+                          <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                            Analizando con IA...
+                          </span>
+                        </div>
+                      )}
+
+                      {imssOcrStatus === "completed" && (
                         <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Cargado con éxito ✅</span>
                       )}
                     </div>

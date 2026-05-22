@@ -490,6 +490,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     };
   };
 
+  // Helper to generate a valid RFC4122 v4 UUID
+  const generateUUID = (): string => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
   // Helper to convert base64 to Blob
   const dataURLtoBlob = (dataurl: string) => {
     const arr = dataurl.split(',');
@@ -858,7 +870,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
 
       if (aforeName) {
-        const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+        const docId = generateUUID();
         docs.push({
           id: docId,
           prospect_id: newId,
@@ -870,7 +882,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (aforeDataUrl) await saveFile(docId, aforeDataUrl);
       }
       if (imssName) {
-        const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+        const docId = generateUUID();
         docs.push({
           id: docId,
           prospect_id: newId,
@@ -944,7 +956,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         // Upload and insert AFORE
         if (aforeName && aforeDataUrl) {
-          const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+          const docId = generateUUID();
           const storagePath = `${dbProspect.id}/${docId}_${aforeName}`;
           const blob = dataURLtoBlob(aforeDataUrl);
           
@@ -970,7 +982,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         // Upload and insert IMSS
         if (imssName && imssDataUrl) {
-          const docId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+          const docId = generateUUID();
           const storagePath = `${dbProspect.id}/${docId}_${imssName}`;
           const blob = dataURLtoBlob(imssDataUrl);
           

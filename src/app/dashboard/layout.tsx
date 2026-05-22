@@ -46,17 +46,23 @@ export default function DashboardLayout({
 
   // Protect client side routes
   useEffect(() => {
-    if (mounted && !user) {
-      router.push("/login");
+    if (mounted) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role === "director") {
+        router.push("/admin");
+      }
     }
   }, [user, mounted, router]);
 
-  if (!mounted || !user) {
+  if (!mounted || !user || user.role === "director") {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-slate-400">Cargando Portal...</span>
+          <span className="text-sm font-semibold text-slate-400">
+            {user?.role === "director" ? "Redireccionando..." : "Cargando Portal..."}
+          </span>
         </div>
       </div>
     );

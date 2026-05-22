@@ -25,7 +25,8 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { prospects, saveSimulation, updateProspectStatus, triggerPushNotification, getFileContent } = useApp();
+  const { user, prospects, saveSimulation, updateProspectStatus, triggerPushNotification, getFileContent } = useApp();
+  const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
 
@@ -112,7 +113,7 @@ export default function ProspectoDetalle() {
             <p className="text-xs text-slate-400 mt-1">El identificador de este prospecto no coincide con los registros activos en la base de datos.</p>
           </div>
           <button
-            onClick={() => router.push("/admin")}
+            onClick={() => router.push(backPath)}
             className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -144,7 +145,7 @@ export default function ProspectoDetalle() {
     });
 
     // Back to pipeline
-    router.push("/admin");
+    router.push(backPath);
   };
 
   const handleRejectProspect = async () => {
@@ -155,7 +156,7 @@ export default function ProspectoDetalle() {
 
     await updateProspectStatus(prospect.id, "rechazado", rejectionReason);
     setShowRejectionModal(false);
-    router.push("/admin");
+    router.push(backPath);
   };
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -197,7 +198,7 @@ export default function ProspectoDetalle() {
       {/* Return button header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <button
-          onClick={() => router.push("/admin")}
+          onClick={() => router.push(backPath)}
           className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm active:scale-95"
         >
           <ArrowLeft className="h-4 w-4" />

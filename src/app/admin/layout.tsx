@@ -47,17 +47,23 @@ export default function AdminLayout({
 
   // Protect client side routes
   useEffect(() => {
-    if (mounted && !user) {
-      router.push("/login");
+    if (mounted) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role === "aliado") {
+        router.push("/dashboard");
+      }
     }
   }, [user, mounted, router]);
 
-  if (!mounted || !user) {
+  if (!mounted || !user || user.role === "aliado") {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-slate-400">Cargando Consola Director...</span>
+          <span className="text-sm font-semibold text-slate-400">
+            {user?.role === "aliado" ? "Redireccionando..." : "Cargando Consola Director..."}
+          </span>
         </div>
       </div>
     );
