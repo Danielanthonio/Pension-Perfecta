@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Info,
   Clock,
+  Heart,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -83,14 +84,14 @@ export default function DashboardLayout({
       {isDemoMode && (
         <div className="w-full bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold relative z-45">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>
-              💡 MODO EVALUACIÓN • Vista Comercial: <span className="text-blue-400">{user.full_name} (Aliado)</span>
+              💡 MODO EVALUACIÓN • Vista Comercial: <span className="text-emerald-400">{user.full_name} (Aliado)</span>
             </span>
           </div>
           <button
             onClick={handleRoleSwitch}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm"
+            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm"
           >
             Switch to Director View ⚙️
           </button>
@@ -104,10 +105,10 @@ export default function DashboardLayout({
           {/* Logo Brand */}
           <div className="h-20 flex flex-col justify-center px-6 border-b border-slate-800 bg-[#0b0f19]">
             <Link href="/dashboard" className="flex items-center gap-2.5">
-              <span className="text-2xl">🏦</span>
+              <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20" strokeWidth={2.5} />
               <div>
-                <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
-                  PensiónFlow
+                <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                  Pensión Perfecta
                 </span>
                 <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">
                   Portal Aliados
@@ -127,7 +128,7 @@ export default function DashboardLayout({
                   href="/dashboard"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isDashboard
-                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/10"
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
                       : "hover:bg-slate-800 hover:text-white"
                   }`}
                 >
@@ -141,7 +142,7 @@ export default function DashboardLayout({
                   href="/dashboard/clientes"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isClientes
-                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/10"
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
                       : "hover:bg-slate-800 hover:text-white"
                   }`}
                 >
@@ -155,7 +156,7 @@ export default function DashboardLayout({
                   href="/dashboard/nuevo"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isNuevo
-                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/10"
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
                       : "hover:bg-slate-800 hover:text-white"
                   }`}
                 >
@@ -171,7 +172,7 @@ export default function DashboardLayout({
           {/* User Section / Logout */}
           <div className="p-4 border-t border-slate-800 bg-[#0b0f19]">
             <div className="flex items-center gap-3 px-2 py-3">
-              <div className="h-9 w-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black">
+              <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black">
                 {user.full_name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
@@ -208,7 +209,7 @@ export default function DashboardLayout({
                     ? "Gestión de Expedientes"
                     : isNuevo
                       ? "Registrar Ley 73"
-                      : "PensiónFlow"}
+                      : "Pensión Perfecta"}
               </h2>
             </div>
 
@@ -220,7 +221,7 @@ export default function DashboardLayout({
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotifsCount > 0 && (
-                  <span className="absolute top-[-2px] right-[-2px] h-5 min-w-[20px] px-1 rounded-full bg-blue-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-bounce border-2 border-white shadow-sm">
+                  <span className="absolute top-[-2px] right-[-2px] h-5 min-w-[20px] px-1 rounded-full bg-emerald-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-bounce border-2 border-white shadow-sm">
                     {unreadNotifsCount}
                   </span>
                 )}
@@ -249,10 +250,10 @@ export default function DashboardLayout({
             {/* Drawer Header */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-blue-600" />
+                <Bell className="h-5 w-5 text-emerald-600" />
                 <h3 className="text-base font-bold text-slate-800">Notificaciones</h3>
                 {unreadNotifsCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-xs font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-bold">
                     {unreadNotifsCount} nuevas
                   </span>
                 )}
@@ -270,7 +271,7 @@ export default function DashboardLayout({
               <div className="px-6 py-3 border-b border-slate-100 flex justify-end">
                 <button
                   onClick={markAllNotificationsRead}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Marcar todas como leídas
@@ -301,12 +302,12 @@ export default function DashboardLayout({
                       className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-3 relative ${
                         notif.read
                           ? "bg-slate-50/50 border-slate-100 hover:bg-slate-50"
-                          : "bg-blue-50/20 border-blue-100 hover:bg-blue-50/40"
+                          : "bg-emerald-50/20 border-emerald-100 hover:bg-emerald-50/40"
                       }`}
                     >
                       {/* Unread Glow Pin */}
                       {!notif.read && (
-                        <span className="absolute top-4 right-4 h-2.5 w-2.5 rounded-full bg-blue-500 shadow shadow-blue-500" />
+                        <span className="absolute top-4 right-4 h-2.5 w-2.5 rounded-full bg-emerald-500 shadow shadow-emerald-500" />
                       )}
 
                       {/* Status Icon */}
@@ -319,7 +320,7 @@ export default function DashboardLayout({
                                 ? "bg-red-50 text-red-500 border border-red-100"
                                 : notif.type === "warning"
                                   ? "bg-amber-50 text-amber-500 border border-amber-100"
-                                  : "bg-blue-50 text-blue-500 border border-blue-100"
+                                  : "bg-teal-50 text-teal-500 border border-teal-100"
                           }`}
                         >
                           {notif.type === "success" ? (

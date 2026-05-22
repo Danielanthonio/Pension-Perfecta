@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/utils/context/AppContext";
-import { ArrowRight, Lock, Mail, ShieldAlert, Sparkles, User, Phone, KeyRound } from "lucide-react";
+import { ArrowRight, Lock, Mail, ShieldAlert, User, Phone, KeyRound, Heart } from "lucide-react";
 import Link from "next/link";
 
 export default function RegisterAliadoPage() {
@@ -42,22 +42,20 @@ export default function RegisterAliadoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center py-12 px-6 relative overflow-hidden select-none">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-teal-950 to-teal-900 flex items-center justify-center py-12 px-6 relative overflow-hidden select-none">
       {/* Background glow filters */}
-      <div className="absolute top-[-20%] left-[-15%] w-[60%] h-[60%] rounded-full bg-blue-500/10 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-15%] w-[60%] h-[60%] rounded-full bg-indigo-500/10 blur-[150px] pointer-events-none" />
+      <div className="absolute top-[-20%] left-[-15%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[150px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-15%] w-[60%] h-[60%] rounded-full bg-teal-500/10 blur-[150px] pointer-events-none" />
 
       <div className="max-w-md w-full bg-white/[0.03] backdrop-blur-xl border border-white/5 p-8 md:p-10 rounded-3xl shadow-2xl relative z-10 flex flex-col">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-3xl mb-4">
-            🤝
-          </div>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Heart className="h-12 w-12 text-emerald-400 fill-emerald-400/20 mb-4" strokeWidth={2} />
           <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
             Nuevo Aliado
           </h2>
           <p className="mt-1 text-xs text-slate-400 font-semibold tracking-wider uppercase">
-            Únete a la Red PensiónFlow
+            Únete a la Red Pensión Perfecta
           </p>
         </div>
 
@@ -105,7 +103,7 @@ export default function RegisterAliadoPage() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Tu nombre"
                   disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-blue-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
             </div>
@@ -124,7 +122,7 @@ export default function RegisterAliadoPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="10 dígitos"
                   disabled={loading}
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-blue-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-blue-500"
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
             </div>
@@ -144,7 +142,7 @@ export default function RegisterAliadoPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ej: roberto@asesores.com"
                 disabled={loading}
-                className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-blue-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
               />
             </div>
           </div>
@@ -163,7 +161,7 @@ export default function RegisterAliadoPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 disabled={loading}
-                className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-blue-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-3 bg-white/5 hover:bg-white/[0.07] border border-white/5 focus:border-emerald-500 focus:bg-white/[0.08] outline-none text-white rounded-xl text-sm transition-all focus:ring-1 focus:ring-emerald-500"
               />
             </div>
           </div>

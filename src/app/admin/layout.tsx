@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRightLeft,
   UserPlus,
+  Heart,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -84,14 +85,14 @@ export default function AdminLayout({
       {isDemoMode && (
         <div className="w-full bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold relative z-45">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-teal-500 animate-pulse" />
             <span>
-              💡 MODO EVALUACIÓN • Vista Dirección: <span className="text-indigo-400">{user.full_name} (Director de Operaciones)</span>
+              💡 MODO EVALUACIÓN • Vista Dirección: <span className="text-teal-400">{user.full_name} (Director de Operaciones)</span>
             </span>
           </div>
           <button
             onClick={handleRoleSwitch}
-            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm"
+            className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm"
           >
             Switch to Ally View 💼
           </button>
@@ -105,10 +106,10 @@ export default function AdminLayout({
           {/* Logo Brand */}
           <div className="h-20 flex flex-col justify-center px-6 border-b border-slate-800 bg-[#070b13]">
             <Link href="/admin" className="flex items-center gap-2.5">
-              <span className="text-2xl">🏦</span>
+              <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20" strokeWidth={2.5} />
               <div>
-                <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-indigo-400 to-blue-300 bg-clip-text text-transparent">
-                  PensiónFlow
+                <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                  Pensión Perfecta
                 </span>
                 <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">
                   Consola Operativa
@@ -128,7 +129,7 @@ export default function AdminLayout({
                   href="/admin"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isAdminRoot
-                      ? "bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/10"
+                      ? "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/10"
                       : "hover:bg-slate-850 hover:text-white text-slate-400"
                   }`}
                 >
@@ -142,7 +143,7 @@ export default function AdminLayout({
                   href="/admin/aliados"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isAliados
-                      ? "bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/10"
+                      ? "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/10"
                       : "hover:bg-slate-850 hover:text-white text-slate-400"
                   }`}
                 >
@@ -156,7 +157,7 @@ export default function AdminLayout({
                   href="/admin/usuarios"
                   className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
                     isUsuarios
-                      ? "bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/10"
+                      ? "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/10"
                       : "hover:bg-slate-850 hover:text-white text-slate-400"
                   }`}
                 >
@@ -172,7 +173,7 @@ export default function AdminLayout({
           {/* User Section / Logout */}
           <div className="p-4 border-t border-slate-800 bg-[#070b13]">
             <div className="flex items-center gap-3 px-2 py-3">
-              <div className="h-9 w-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black">
+              <div className="h-9 w-9 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 font-black">
                 {user.full_name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
@@ -209,7 +210,7 @@ export default function AdminLayout({
                     ? "Control de Fuerza de Ventas B2B"
                     : isUsuarios
                       ? "Consola de Administración de Usuarios"
-                      : "PensiónFlow Director"}
+                      : "Pensión Perfecta Director"}
               </h2>
             </div>
 
@@ -221,7 +222,7 @@ export default function AdminLayout({
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotifsCount > 0 && (
-                  <span className="absolute top-[-2px] right-[-2px] h-5 min-w-[20px] px-1 rounded-full bg-indigo-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-bounce border-2 border-white shadow-sm">
+                  <span className="absolute top-[-2px] right-[-2px] h-5 min-w-[20px] px-1 rounded-full bg-teal-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-bounce border-2 border-white shadow-sm">
                     {unreadNotifsCount}
                   </span>
                 )}

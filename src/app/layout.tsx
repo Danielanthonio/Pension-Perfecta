@@ -7,7 +7,7 @@ import ToastSimulator from "@/components/ToastSimulator";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PensiónFlow - Asesoría y Financiamiento Ley 73",
+  title: "Pensión Perfecta - Asesoría y Financiamiento Ley 73",
   description: "Gestión comercial y operativa de pensiones para aliados y directores",
 };
 
