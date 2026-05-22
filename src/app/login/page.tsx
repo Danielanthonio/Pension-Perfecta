@@ -44,14 +44,14 @@ export default function RoleSelectionPage() {
     const role: UserRole = isDirectorEmail ? "director" : "aliado";
 
     try {
-      await login(emailInput, role, passwordInput);
-      if (role === "director") {
+      const realRole = await login(emailInput, role, passwordInput);
+      if (realRole === "director") {
         router.push("/admin");
       } else {
         router.push("/dashboard");
       }
     } catch (err) {
-      setErrorMsg("Credenciales inválidas.");
+      setErrorMsg("Credenciales inválidas o error de red.");
     } finally {
       setLoading(false);
     }

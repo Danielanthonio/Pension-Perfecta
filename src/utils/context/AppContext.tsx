@@ -98,7 +98,7 @@ interface AppContextType {
   toast: ToastMessage | null;
   isDemoMode: boolean;
   isLoading: boolean;
-  login: (email: string, role: UserRole, password?: string) => Promise<boolean>;
+  login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
@@ -599,7 +599,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem(key, JSON.stringify(value));
   };
 
-  const login = async (email: string, role: UserRole, password?: string): Promise<boolean> => {
+  const login = async (email: string, role: UserRole, password?: string): Promise<UserRole | null> => {
     setIsLoading(true);
     if (isDemoMode || !supabase) {
       const storedProfiles = localStorage.getItem("pensionflow_profiles");
@@ -619,7 +619,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       saveToStorage("pensionflow_user", profile);
       saveToStorage("pensionflow_active_role", role);
       setIsLoading(false);
-      return true;
+      return profile.role;
     } else {
       try {
         let profile: UserProfile | null = null;
@@ -666,9 +666,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               created_at: n.created_at
             })));
           }
+          setIsLoading(false);
+          return profile.role;
         }
+
         setIsLoading(false);
-        return true;
+        return null;
       } catch (error: any) {
         console.error("Supabase login error:", error);
         setIsLoading(false);
