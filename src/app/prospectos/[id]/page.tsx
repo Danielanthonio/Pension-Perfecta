@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   Calendar,
   Clock,
+  Folder,
+  Send,
 } from "lucide-react";
 
 export default function ProspectoDetalle() {
@@ -261,7 +263,7 @@ export default function ProspectoDetalle() {
   };
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-12 animate-fade-in">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-40 animate-fade-in">
       {/* Return button header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <button
@@ -906,39 +908,34 @@ export default function ProspectoDetalle() {
 
       </div>
 
-      {/* Horizontal Bottom Actions Bar */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-md flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="w-full sm:w-auto text-center sm:text-left">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Acciones del Director</span>
-          <span className="text-xs font-black text-slate-700 mt-0.5">Control y emisión del dictamen comercial</span>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto items-stretch sm:items-center">
-          {/* Rechazar Button */}
+      {/* Sticky Bottom Actions Bar (Matches reference design) */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] rounded-t-[32px] z-40 select-none">
+        <div className="max-w-[1700px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          {/* Rechazar */}
           <button
             onClick={() => setShowRejectionModal(true)}
-            className="px-6 py-3.5 border border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/50 rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+            className="w-full py-4.5 bg-[#e53e3e] hover:bg-[#c53030] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-500/10"
           >
-            <XCircle className="h-4.5 w-4.5" />
-            Rechazar Expediente
+            <XCircle className="h-5 w-5 stroke-[2.5]" />
+            Rechazar
           </button>
-
-          {/* Condicionar Button */}
+          
+          {/* Condicionar */}
           <button
             onClick={() => setShowConditionModal(true)}
-            className="px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-amber-500/10"
+            className="w-full py-4.5 bg-[#ecc94b] hover:bg-[#d69e2e] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-amber-500/10"
           >
-            <Clock className="h-4.5 w-4.5" />
-            Condicionar Expediente
+            <Clock className="h-5 w-5 stroke-[2.5]" />
+            Condicionar
           </button>
 
-          {/* Aprobar Button (Most Prominent) */}
+          {/* Aprobar */}
           <button
             onClick={handleEmitSimulation}
-            className="px-10 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15"
+            className="w-full py-4.5 bg-[#38a169] hover:bg-[#2f855a] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15"
           >
-            <CheckCircle className="h-4.5 w-4.5" />
-            Aprobar y Emitir Simulación
+            <CheckCircle className="h-5 w-5 stroke-[2.5]" />
+            Aprobar
           </button>
         </div>
       </div>
@@ -1008,7 +1005,7 @@ export default function ProspectoDetalle() {
             <div className="border-b border-slate-150 pb-4">
               <h3 className="text-lg font-black text-slate-800 tracking-tight">Condicionar Expediente</h3>
               <p className="text-xs text-slate-400 font-semibold mt-1">
-                Selecciona el motivo por el cual se condiciona el expediente
+                Selecciona el motivo por el cual se condiciona el expediente:
               </p>
             </div>
 
@@ -1018,28 +1015,28 @@ export default function ProspectoDetalle() {
                   id: "evaluacion_pendiente",
                   label: "Evaluación Pendiente",
                   desc: "Falta información o evaluación por completar",
-                  color: "text-amber-500 bg-amber-50 border-amber-100",
+                  iconColor: "text-orange-500",
                   icon: Clock,
                 },
                 {
                   id: "asesoria_agendada",
                   label: "Asesoría Agendada",
                   desc: "El cliente tiene una asesoría programada",
-                  color: "text-yellow-500 bg-yellow-50 border-yellow-100",
+                  iconColor: "text-amber-500",
                   icon: Calendar,
                 },
                 {
                   id: "doc_proceso",
                   label: "Expediente en Trámite",
                   desc: "El expediente se encuentra en proceso",
-                  color: "text-blue-500 bg-blue-50 border-blue-100",
-                  icon: FileText,
+                  iconColor: "text-blue-500",
+                  icon: Folder,
                 },
                 {
                   id: "analisis_riesgo",
                   label: "Análisis de Riesgo",
                   desc: "En evaluación por el área de riesgos",
-                  color: "text-purple-500 bg-purple-50 border-purple-100",
+                  iconColor: "text-purple-500",
                   icon: ShieldCheck,
                 },
               ].map((opt) => {
@@ -1049,28 +1046,28 @@ export default function ProspectoDetalle() {
                   <div
                     key={opt.id}
                     onClick={() => setSelectedConditionOption(opt.id as any)}
-                    className={`border p-4 rounded-2xl flex items-center justify-between cursor-pointer transition-all transform hover:scale-[1.01] ${
+                    className={`border p-4.5 rounded-[22px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
                       isSelected
-                        ? "bg-indigo-50/40 border-indigo-500 ring-2 ring-indigo-500/10 shadow-sm"
+                        ? "bg-[#ecc94b]/5 border-[#ecc94b] ring-1 ring-[#ecc94b]/20 shadow-sm"
                         : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
                     }`}
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div className={`h-10 w-10 rounded-xl border flex items-center justify-center ${opt.color}`}>
-                        <IconComp className="h-5 w-5" />
+                    <div className="flex items-center gap-4">
+                      <div className={`h-11 w-11 rounded-full border border-slate-100 flex items-center justify-center bg-white shadow-sm shrink-0 ${opt.iconColor}`}>
+                        <IconComp className="h-5 w-5 stroke-[2]" />
                       </div>
                       <div>
                         <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{opt.desc}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-none">{opt.desc}</p>
                       </div>
                     </div>
                     
                     <div className="flex items-center">
                       <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
-                        isSelected ? "border-indigo-600 bg-indigo-600 font-bold" : "border-slate-300"
+                        isSelected ? "border-[#ecc94b] bg-white" : "border-slate-300"
                       }`}>
                         {isSelected && (
-                          <div className="h-2 w-2 rounded-full bg-white animate-fade-in" />
+                          <div className="h-2.5 w-2.5 rounded-full bg-[#ecc94b] animate-fade-in" />
                         )}
                       </div>
                     </div>
@@ -1082,9 +1079,9 @@ export default function ProspectoDetalle() {
             <div className="pt-2">
               <button
                 onClick={handleConditionProspect}
-                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-black shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#ecc94b] hover:bg-[#d69e2e] text-slate-800 rounded-[20px] text-sm font-extrabold shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2"
               >
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                <Send className="h-4.5 w-4.5 stroke-[2.5]" />
                 Enviar
               </button>
             </div>
