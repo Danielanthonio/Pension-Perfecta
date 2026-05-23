@@ -18,6 +18,7 @@ import {
   FileCheck,
   ShieldCheck,
   Calendar,
+  Clock,
 } from "lucide-react";
 
 export default function ProspectoDetalle() {
@@ -51,6 +52,10 @@ export default function ProspectoDetalle() {
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [realFileData, setRealFileData] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState<boolean>(false);
+
+  // Condition modal states
+  const [showConditionModal, setShowConditionModal] = useState<boolean>(false);
+  const [selectedConditionOption, setSelectedConditionOption] = useState<Prospect["status"] | null>(null);
 
   useEffect(() => {
     if (prospects.length > 0) {
@@ -177,6 +182,18 @@ export default function ProspectoDetalle() {
     router.push(backPath);
   };
 
+  const handleConditionProspect = async () => {
+    if (!selectedConditionOption) {
+      alert("Por favor selecciona un motivo para condicionar el expediente.");
+      return;
+    }
+
+    await updateProspectStatus(prospect.id, selectedConditionOption, "Expediente condicionado por el Director");
+    setShowConditionModal(false);
+    setSelectedConditionOption(null);
+    router.push(backPath);
+  };
+
   const getStageBadgeColor = (status: Prospect["status"]) => {
     switch (status) {
       case "evaluacion_pendiente":
@@ -244,7 +261,7 @@ export default function ProspectoDetalle() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 select-none pb-12 animate-fade-in">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-12 animate-fade-in">
       {/* Return button header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <button
@@ -294,388 +311,387 @@ export default function ProspectoDetalle() {
         </div>
       </div>
 
-      {/* Main Core Layout: Files Audit vs Calculator */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+      {/* Main Core Layout: 3 Columns Split */}
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
         
-        {/* Left Column: Repository Audit & Visualizer (3/5) */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
+        {/* Columna Izquierda: Repositorio de Archivos B2B (~19%) */}
+        <div className="w-full lg:w-[19%] flex flex-col shrink-0">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[350px] transition-all">
             {/* Header info */}
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Repositorio de Archivos B2B</span>
-              <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">Auditoría de Documentos</span>
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex flex-col gap-1 flex-shrink-0">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">Repositorio</span>
+              <span className="text-[9px] text-indigo-600 font-black tracking-wider uppercase">Archivos B2B</span>
             </div>
 
-            {/* Core container splitter */}
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left pane: File folders */}
-              <div className="w-1/3 border-r border-slate-150 p-4 space-y-3.5 bg-slate-50/50 overflow-y-auto">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-2 px-1">
-                  Documentos Enviados
-                </span>
-                
-                {prospect.documents.map((doc) => {
-                  const isActive = selectedDoc?.id === doc.id;
-                  return (
-                    <button
-                      key={doc.id}
-                      onClick={() => {
-                        setSelectedDoc(doc);
-                        setSelectedDocType(doc.file_type as any);
-                        setSelectedDocName(doc.file_name);
-                      }}
-                      className={`w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-1.5 active:scale-97 transform ${
-                        isActive
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/10"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                        <span className="text-[10px] font-black uppercase tracking-wider">
-                          Expediente {doc.file_type}
-                        </span>
-                      </div>
-                      <span className={`text-[10px] truncate max-w-[140px] font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
-                        {doc.file_name}
+            {/* Left pane: File folders */}
+            <div className="flex-1 p-3.5 space-y-3 bg-slate-50/50 overflow-y-auto">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1 px-1">
+                Documentos Enviados
+              </span>
+              
+              {prospect.documents.map((doc) => {
+                const isActive = selectedDoc?.id === doc.id;
+                return (
+                  <button
+                    key={doc.id}
+                    onClick={() => {
+                      setSelectedDoc(doc);
+                      setSelectedDocType(doc.file_type as any);
+                      setSelectedDocName(doc.file_name);
+                    }}
+                    className={`w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-1.5 active:scale-97 transform ${
+                      isActive
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/10"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
+                      <span className="text-[9px] font-black uppercase tracking-wider">
+                        Expediente {doc.file_type}
                       </span>
-                    </button>
-                  );
-                })}
-
-                {prospect.documents.length === 0 && (
-                  <div className="text-center py-8 text-slate-400 text-xs font-semibold">
-                    No se adjuntaron expedientes.
-                  </div>
-                )}
-              </div>
-
-              {/* Right pane: Stylized high fidelity PDF sheet viewer */}
-              <div className="w-2/3 bg-slate-100 flex flex-col overflow-hidden border-l border-slate-200">
-                {selectedDocType === null ? (
-                  <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
-                    <div className="text-center max-w-[240px] space-y-3 text-slate-400">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
-                        <Eye className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-700">Ver Expediente Técnico</h4>
-                        <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                          Haz clic en cualquiera de los documentos de la izquierda para desplegar el simulador visual del expediente.
-                        </p>
-                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
-                    {/* PDF Chrome Bar */}
-                    <div className="h-11 bg-slate-800 text-slate-200 px-4 flex items-center justify-between border-b border-slate-700 shrink-0 text-xs">
-                      <div className="flex items-center gap-2 font-mono truncate max-w-[180px] sm:max-w-xs text-[10px]">
-                        <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">PDF</span>
-                        <span className="font-extrabold truncate text-slate-200">{selectedDocName}</span>
-                      </div>
-                      
-                      {/* Zoom and Page controls */}
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => setZoomLevel(prev => Math.max(70, prev - 10))}
-                          className="p-1 hover:bg-slate-700 rounded transition-colors text-[10px] font-bold"
-                          title="Reducir Zoom"
-                        >
-                          A-
-                        </button>
-                        <span className="text-[9px] font-bold text-slate-400 font-mono w-10 text-center">
-                          {zoomLevel}%
-                        </span>
-                        <button 
-                          onClick={() => setZoomLevel(prev => Math.min(130, prev + 10))}
-                          className="p-1 hover:bg-slate-700 rounded transition-colors text-[10px] font-bold"
-                          title="Aumentar Zoom"
-                        >
-                          A+
-                        </button>
-                        <span className="h-3 w-px bg-slate-700 mx-1" />
-                        <span className="text-[9px] font-mono font-bold text-slate-400">Pág 1 / 1</span>
-                      </div>
+                    <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
+                      {doc.file_name}
+                    </span>
+                  </button>
+                );
+              })}
 
-                      {/* Download & Print actions */}
-                      <div className="flex items-center gap-2.5">
-                        <button
-                          onClick={() => triggerPushNotification(`📥 Descarga Exitosa: El archivo '${selectedDocName}' ha sido descargado en tu carpeta local de forma segura bajo cifrado SSL.`, "email", "Director Eduardo")}
-                          className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
-                          title="Descargar Archivo"
-                        >
-                          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        </button>
-                        <button
-                          onClick={() => triggerPushNotification(`🖨️ Impresión Iniciada: Enviando '${selectedDocName}' a la cola de impresión de la red operativa.`, "email", "Director Eduardo")}
-                          className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
-                          title="Imprimir"
-                        >
-                          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        </button>
-                        <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-black uppercase tracking-wider border border-indigo-500/20">
-                          Secure PDF
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* PDF Document Viewer Canvas */}
-                    <div className="flex-1 bg-slate-650 p-6 overflow-y-auto flex items-start justify-center animate-fade-in">
-                      {loadingFile ? (
-                        <div className="w-full max-w-[450px] bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-xl self-center">
-                          <div className="h-10 w-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto" />
-                          <div>
-                            <h4 className="text-xs font-bold text-slate-700">Cargando Documento</h4>
-                            <p className="text-[10px] text-slate-400 mt-1 font-sans">Recuperando el expediente en alta resolución desde IndexedDB...</p>
-                          </div>
-                        </div>
-                      ) : realFileData ? (
-                        realFileData.startsWith("data:application/pdf") ? (
-                          <div 
-                            className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[580px]"
-                            style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "600px" }}
-                          >
-                            <iframe
-                              src={realFileData}
-                              className="w-full h-full border-0"
-                              title={selectedDocName}
-                            />
-                          </div>
-                        ) : (
-                          <div 
-                            className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform origin-top p-4"
-                            style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "600px" }}
-                          >
-                            <img
-                              src={realFileData}
-                              className="max-w-full max-h-[500px] object-contain rounded"
-                              alt={selectedDocName}
-                            />
-                          </div>
-                        )
-                      ) : (
-                        <div 
-                          className="w-full bg-white shadow-2xl border border-slate-350 rounded-sm p-6 sm:p-8 font-mono text-[9px] text-slate-700 relative overflow-hidden transition-all duration-300 transform origin-top"
-                          style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "450px" }}
-                        >
-                          {/* Dynamic Watermark Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.03] rotate-[-30deg] text-[18px] font-black text-slate-900 leading-none whitespace-nowrap">
-                            PENSIONFLOW AUDITORÍA • PENSIONFLOW AUDITORÍA
-                          </div>
-
-                          {selectedDocType === "IMSS" ? (
-                          /* High fidelity IMSS Weeks Report simulated page sheet */
-                          <div className="space-y-4 relative z-10">
-                            {/* IMSS logo header */}
-                            <div className="flex items-start justify-between border-b-2 border-slate-800 pb-3">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-sm">🟢</span>
-                                  <span className="font-black text-slate-900 text-[10px]">INSTITUTO MEXICANO DEL SEGURO SOCIAL</span>
-                                </div>
-                                <span className="block text-[7px] text-slate-500 uppercase tracking-wider font-extrabold">
-                                  DIRECCIÓN DE INCORPORACIÓN Y RECAUDACIÓN • SUBDELEGACIÓN METROPOLITANA
-                                </span>
-                              </div>
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200 uppercase tracking-wider text-[7px] font-sans">
-                                Validado IMSS-Digital
-                              </span>
-                            </div>
-
-                            <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-slate-800 leading-normal font-sans">
-                              <div><span className="text-slate-400">ASEGURADO:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
-                              <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
-                              <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
-                              <div><span className="text-slate-400">EMISIÓN:</span> <span className="font-bold text-slate-900">{new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}</span></div>
-                              <div><span className="text-slate-400">ESTADO:</span> <span className="font-bold text-emerald-600">VIGENTE / LEY 73</span></div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <span className="font-black text-slate-800 uppercase tracking-wider block text-[8px] border-b border-slate-300 pb-1">
-                                📊 RESUMEN DE COTIZACIONES (HISTORIAL CERTIFICADO)
-                              </span>
-                              <div className="grid grid-cols-3 gap-2 bg-slate-50/50 border border-slate-150 p-2.5 rounded text-center font-sans">
-                                <div>
-                                  <span className="block text-[6.5px] text-slate-400 uppercase font-extrabold">Semanas Totales</span>
-                                  <span className="block text-xs font-black text-slate-800">{semanas}</span>
-                                </div>
-                                <div>
-                                  <span className="block text-[6.5px] text-slate-400 uppercase font-extrabold">Semanas Descontadas</span>
-                                  <span className="block text-xs font-black text-slate-800">0</span>
-                                </div>
-                                <div>
-                                  <span className="block text-[6.5px] text-slate-400 uppercase font-extrabold">Años Cotizados</span>
-                                  <span className="block text-xs font-black text-indigo-600">{(semanas / 52).toFixed(1)}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Job History Table */}
-                            <div className="space-y-1.5">
-                              <span className="font-black text-slate-800 uppercase tracking-wider block text-[8px]">
-                                🏢 DETALLE DE ÚLTIMOS PATRONES REGISTRADOS
-                              </span>
-                              <table className="w-full text-left border-collapse border border-slate-200 text-[8px] font-sans">
-                                <thead>
-                                  <tr className="bg-slate-100 font-black text-slate-700 border-b border-slate-300">
-                                    <th className="p-1.5">Razón Social del Patrón</th>
-                                    <th className="p-1.5">Periodo Laboral</th>
-                                    <th className="p-1.5 text-right">Semanas</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-150">
-                                  <tr>
-                                    <td className="p-1.5 font-bold truncate max-w-[150px]">CONSTRUCTORA E INMOBILIARIA MEXICANA S.A.</td>
-                                    <td className="p-1.5 font-semibold">2018 - 2024</td>
-                                    <td className="p-1.5 text-right font-black text-slate-900">312</td>
-                                  </tr>
-                                  <tr>
-                                    <td className="p-1.5 font-bold truncate max-w-[150px]">SERVICIOS INDUSTRIALES Y LOGÍSTICOS DEL NORTE</td>
-                                    <td className="p-1.5 font-semibold">2002 - 2018</td>
-                                    <td className="p-1.5 text-right font-black text-slate-900">832</td>
-                                  </tr>
-                                  <tr className="bg-slate-50/50">
-                                    <td className="p-1.5 font-bold truncate max-w-[150px]">DISTRIBUIDORA COMERCIAL METROPOLITANA</td>
-                                    <td className="p-1.5 font-semibold">1995 - 2002</td>
-                                    <td className="p-1.5 text-right font-black text-slate-900">364</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* Digital security validation seals */}
-                            <div className="border-t border-slate-200 pt-3 space-y-2 text-[6.5px] text-slate-400 font-sans leading-relaxed">
-                              <div>
-                                <span className="font-extrabold text-slate-600 uppercase tracking-widest block mb-0.5">Sello Digital de Validación Federal</span>
-                                <span className="block font-mono bg-slate-50 border border-slate-100 p-1 rounded font-medium text-slate-400 truncate">
-                                  IMSS-DIR-SUBMET-2026-4d82f939e92ffa0591c28c89ef12cb02aa11e4f9b8c0819c9e88
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center justify-between gap-4 mt-2">
-                                <div className="space-y-0.5">
-                                  <span className="font-bold text-slate-500">Cadena de Certificación:</span>
-                                  <span className="block font-mono">||1.1|GOVN680820HDF|IMSS-RECAUDACION|2026-05-20||</span>
-                                </div>
-                                <div className="h-7 w-7 bg-slate-100 border border-slate-200 flex items-center justify-center text-[5px] text-slate-400 uppercase font-bold text-center">
-                                  QR CODE
-                                </div>
-                              </div>
-
-                              <div className="border-t border-slate-100 pt-2 text-[6px] text-center font-bold text-slate-400 font-mono">
-                                * ESTE REPORTE ES UNA COPIA SIMULADA CERTIFICADA GENERADA PARA LA AUDITORÍA COMERCIAL DE EXPEDIENTES. *
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          /* High fidelity AFORE Report simulated page sheet */
-                          <div className="space-y-4 relative z-10">
-                            {/* Afore logo header */}
-                            <div className="flex items-start justify-between border-b-2 border-indigo-900 pb-3">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-sm">🏦</span>
-                                  <span className="font-black text-indigo-950 text-[10px]">AFORE XXI BANORTE S.A. DE C.V.</span>
-                                </div>
-                                <span className="block text-[7px] text-slate-500 uppercase tracking-wider font-extrabold">
-                                  COMISIÓN NACIONAL DEL SISTEMA DE AHORRO PARA EL RETIRO (CONSAR)
-                                </span>
-                              </div>
-                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-150 uppercase tracking-wider text-[7px] font-sans">
-                                Retiro y Vejez
-                              </span>
-                            </div>
-
-                            <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-slate-800 leading-normal font-sans">
-                              <div><span className="text-slate-400">TITULAR:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
-                              <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
-                              <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
-                              <div><span className="text-slate-400">PERIODO:</span> <span className="font-bold text-slate-900">1er Trimestre 2026</span></div>
-                              <div><span className="text-slate-400">SIEFORE:</span> <span className="font-bold text-indigo-650">Básica 65-69 (Fondo Regulado)</span></div>
-                            </div>
-
-                            <div className="space-y-2.5">
-                              <span className="font-black text-indigo-950 uppercase tracking-wider block text-[8px] border-b border-slate-300 pb-1">
-                                💼 RESUMEN DE SALDOS ACUMULADOS EN TU CUENTA INDIVIDUAL
-                              </span>
-                              <div className="grid grid-cols-3 gap-2 font-sans">
-                                <div className="bg-slate-50 border border-slate-150 p-2 rounded text-center">
-                                  <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold">Retiro RCV L97</span>
-                                  <span className="block text-[9px] font-black text-slate-800 mt-1">$185,000.00</span>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-150 p-2 rounded text-center">
-                                  <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold">Vivienda (INFONAVIT)</span>
-                                  <span className="block text-[9px] font-black text-slate-800 mt-1">$215,000.00</span>
-                                </div>
-                                <div className="bg-slate-50 border border-slate-150 p-2 rounded text-center">
-                                  <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold">SAR IMSS 92</span>
-                                  <span className="block text-[9px] font-black text-emerald-600 mt-1">$50,000.00</span>
-                                </div>
-                              </div>
-
-                              <div className="bg-indigo-950 text-white p-3 rounded-xl flex items-center justify-between border border-indigo-900/50 shadow-md font-sans">
-                                <div className="space-y-0.5">
-                                  <span className="font-extrabold text-indigo-200 text-[7px] uppercase tracking-widest block leading-none">Saldo Global Consolidado</span>
-                                  <span className="text-[7.5px] text-white/70 font-semibold block leading-none">Total disponible para cesantía</span>
-                                </div>
-                                <span className="text-xs font-black text-white font-mono bg-white/10 px-2.5 py-1 rounded-lg">
-                                  $450,000.00 MXN
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1.5 font-sans leading-relaxed text-[7.5px] text-slate-500 border-t border-slate-200 pt-3">
-                              <span className="font-extrabold text-slate-700 uppercase tracking-wider block text-[8px] font-mono">
-                                🔔 AVISO OFICIAL REGULATORIO (CONSAR)
-                              </span>
-                              <p className="font-semibold text-justify">
-                                Los recursos en tu Cuenta Individual son propiedad única y exclusiva del trabajador, y su inversión está sujeta a las disposiciones vigentes del Banco de México y la Comisión Nacional de Ahorro para el Retiro. El saldo de SAR IMSS 92 Vivienda está garantizado bajo el régimen de viabilidad fiscal Ley 73.
-                              </p>
-                            </div>
-
-                            {/* Digital security validation seals */}
-                            <div className="border-t border-slate-200 pt-3 space-y-2 text-[6.5px] text-slate-400 font-sans leading-relaxed">
-                              <div>
-                                <span className="font-extrabold text-slate-600 uppercase tracking-widest block mb-0.5">Sello Digital de Seguridad Financiera CONSAR</span>
-                                <span className="block font-mono bg-slate-50 border border-slate-100 p-1 rounded font-medium text-slate-400 truncate">
-                                  CONSAR-AFORE-XXIBAN-2026-5b92e219f8a32d19283f982a1762c90c76391d4512
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center justify-between gap-4 mt-2">
-                                <div className="space-y-0.5">
-                                  <span className="font-bold text-slate-500">Sello de Timbrado Electrónico:</span>
-                                  <span className="block font-mono">||BANORTE|AFORE-VERIFIED|XXI-2026-05-20|🔒||</span>
-                                </div>
-                                <div className="h-7 w-7 bg-slate-100 border border-slate-200 flex items-center justify-center text-[5px] text-slate-400 uppercase font-bold text-center">
-                                  QR CODE
-                                </div>
-                              </div>
-
-                              <div className="border-t border-slate-100 pt-2 text-[6px] text-center font-bold text-slate-400 font-mono">
-                                * ESTE DOCUMENTO ES UNA COMPROBACIÓN GRÁFICA DE AUDITORÍA SIN CONEXIÓN DE BASE DE DATOS. *
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {prospect.documents.length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs font-semibold">
+                  No se adjuntaron expedientes.
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Ley 73 Reactive Simulator Form (2/5) */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
+        {/* Columna Central: Visor PDF Grande (~48%) */}
+        <div className="w-full lg:w-[48%] flex flex-col shrink-0">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[550px] transition-all">
+            {selectedDocType === null ? (
+              <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+                <div className="text-center max-w-[280px] space-y-4 text-slate-400">
+                  <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 shadow-inner">
+                    <Eye className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Ver Expediente Técnico</h4>
+                    <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+                      Haz clic en cualquiera de los documentos de la izquierda para desplegar el simulador visual del expediente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+                {/* PDF Chrome Bar */}
+                <div className="h-11 bg-slate-800 text-slate-200 px-4 flex items-center justify-between border-b border-slate-700 shrink-0 text-xs">
+                  <div className="flex items-center gap-2 font-mono truncate max-w-[150px] sm:max-w-xs text-[10px]">
+                    <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-black">PDF</span>
+                    <span className="font-extrabold truncate text-slate-200">{selectedDocName}</span>
+                  </div>
+                  
+                  {/* Zoom and Page controls */}
+                  <div className="flex items-center gap-2.5">
+                    <button 
+                      onClick={() => setZoomLevel(prev => Math.max(70, prev - 10))}
+                      className="p-1 hover:bg-slate-700 rounded transition-colors text-[10px] font-bold"
+                      title="Reducir Zoom"
+                    >
+                      A-
+                    </button>
+                    <span className="text-[9px] font-bold text-slate-400 font-mono w-9 text-center">
+                      {zoomLevel}%
+                    </span>
+                    <button 
+                      onClick={() => setZoomLevel(prev => Math.min(130, prev + 10))}
+                      className="p-1 hover:bg-slate-700 rounded transition-colors text-[10px] font-bold"
+                      title="Aumentar Zoom"
+                    >
+                      A+
+                    </button>
+                    <span className="h-3 w-px bg-slate-700 mx-0.5" />
+                    <span className="text-[9px] font-mono font-bold text-slate-400">Pág 1 / 1</span>
+                  </div>
+
+                  {/* Download & Print actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => triggerPushNotification(`📥 Descarga Exitosa: El archivo '${selectedDocName}' ha sido descargado en tu carpeta local de forma segura bajo cifrado SSL.`, "email", "Director Eduardo")}
+                      className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
+                      title="Descargar Archivo"
+                    >
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </button>
+                    <button
+                      onClick={() => triggerPushNotification(`🖨️ Impresión Iniciada: Enviando '${selectedDocName}' a la cola de impresión de la red operativa.`, "email", "Director Eduardo")}
+                      className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
+                      title="Imprimir"
+                    >
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    </button>
+                    <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-black uppercase tracking-wider border border-indigo-500/20 leading-none">
+                      Secure PDF
+                    </span>
+                  </div>
+                </div>
+
+                {/* PDF Document Viewer Canvas */}
+                <div className="flex-1 bg-slate-600 p-4 sm:p-6 overflow-y-auto flex items-start justify-center animate-fade-in">
+                  {loadingFile ? (
+                    <div className="w-full max-w-[400px] bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-xl self-center">
+                      <div className="h-10 w-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-700">Cargando Documento</h4>
+                        <p className="text-[10px] text-slate-400 mt-1">Recuperando el expediente en alta resolución...</p>
+                      </div>
+                    </div>
+                  ) : realFileData ? (
+                    realFileData.startsWith("data:application/pdf") ? (
+                      <div 
+                        className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[690px]"
+                        style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
+                      >
+                        <iframe
+                          src={realFileData}
+                          className="w-full h-full border-0"
+                          title={selectedDocName}
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform origin-top p-4"
+                        style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
+                      >
+                        <img
+                          src={realFileData}
+                          className="max-w-full max-h-[600px] object-contain rounded"
+                          alt={selectedDocName}
+                        />
+                      </div>
+                    )
+                  ) : (
+                    <div 
+                      className="w-full bg-white shadow-2xl border border-slate-300 rounded-xl p-6 sm:p-8 font-mono text-[9px] text-slate-700 relative overflow-hidden transition-all duration-300 transform origin-top"
+                      style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "680px" }}
+                    >
+                      {/* Dynamic Watermark Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.03] rotate-[-30deg] text-[18px] font-black text-slate-900 leading-none whitespace-nowrap">
+                        PENSIONFLOW AUDITORÍA • PENSIONFLOW AUDITORÍA
+                      </div>
+
+                      {selectedDocType === "IMSS" ? (
+                      /* High fidelity IMSS Weeks Report simulated page sheet */
+                      <div className="space-y-4 relative z-10">
+                        {/* IMSS logo header */}
+                        <div className="flex items-start justify-between border-b-2 border-slate-800 pb-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">🟢</span>
+                              <span className="font-black text-slate-900 text-[10px]">INSTITUTO MEXICANO DEL SEGURO SOCIAL</span>
+                            </div>
+                            <span className="block text-[7px] text-slate-500 uppercase tracking-wider font-extrabold">
+                              DIRECCIÓN DE INCORPORACIÓN Y RECAUDACIÓN • SUBDELEGACIÓN METROPOLITANA
+                            </span>
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-200 uppercase tracking-wider text-[7px] font-sans">
+                            Validado IMSS-Digital
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 text-slate-800 leading-normal font-sans text-[9px]">
+                          <div><span className="text-slate-400">ASEGURADO:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
+                          <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
+                          <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
+                          <div><span className="text-slate-400">EMISIÓN:</span> <span className="font-bold text-slate-900">{new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+                          <div><span className="text-slate-400">ESTADO:</span> <span className="font-bold text-emerald-600">VIGENTE / LEY 73</span></div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="font-black text-slate-800 uppercase tracking-wider block text-[8px] border-b border-slate-350 pb-1">
+                            📊 RESUMEN DE COTIZACIONES (HISTORIAL CERTIFICADO)
+                          </span>
+                          <div className="grid grid-cols-3 gap-2 bg-slate-50/50 border border-slate-150 p-2.5 rounded-xl text-center font-sans">
+                            <div>
+                              <span className="block text-[7px] text-slate-400 uppercase font-extrabold">Semanas Totales</span>
+                              <span className="block text-xs font-black text-slate-800">{semanas}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[7px] text-slate-400 uppercase font-extrabold">Semanas Descontadas</span>
+                              <span className="block text-xs font-black text-slate-800">0</span>
+                            </div>
+                            <div>
+                              <span className="block text-[7px] text-slate-400 uppercase font-extrabold">Años Cotizados</span>
+                              <span className="block text-xs font-black text-indigo-600">{(semanas / 52).toFixed(1)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Job History Table */}
+                        <div className="space-y-1.5">
+                          <span className="font-black text-slate-800 uppercase tracking-wider block text-[8px]">
+                            🏢 DETALLE DE ÚLTIMOS PATRONES REGISTRADOS
+                          </span>
+                          <table className="w-full text-left border-collapse border border-slate-200 text-[8px] font-sans">
+                            <thead>
+                              <tr className="bg-slate-100 font-black text-slate-700 border-b border-slate-300">
+                                <th className="p-1.5">Razón Social del Patrón</th>
+                                <th className="p-1.5">Periodo Laboral</th>
+                                <th className="p-1.5 text-right">Semanas</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-150">
+                              <tr>
+                                <td className="p-1.5 font-bold truncate max-w-[150px]">CONSTRUCTORA E INMOBILIARIA MEXICANA S.A.</td>
+                                <td className="p-1.5 font-semibold">2018 - 2024</td>
+                                <td className="p-1.5 text-right font-black text-slate-900">312</td>
+                              </tr>
+                              <tr>
+                                <td className="p-1.5 font-bold truncate max-w-[150px]">SERVICIOS INDUSTRIALES Y LOGÍSTICOS DEL NORTE</td>
+                                <td className="p-1.5 font-semibold">2002 - 2018</td>
+                                <td className="p-1.5 text-right font-black text-slate-900">832</td>
+                              </tr>
+                              <tr className="bg-slate-50/50">
+                                <td className="p-1.5 font-bold truncate max-w-[150px]">DISTRIBUIDORA COMERCIAL METROPOLITANA</td>
+                                <td className="p-1.5 font-semibold">1995 - 2002</td>
+                                <td className="p-1.5 text-right font-black text-slate-900">364</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Digital security validation seals */}
+                        <div className="border-t border-slate-200 pt-3 space-y-2 text-[6.5px] text-slate-400 font-sans leading-relaxed">
+                          <div>
+                            <span className="font-extrabold text-slate-600 uppercase tracking-widest block mb-0.5">Sello Digital de Validación Federal</span>
+                            <span className="block font-mono bg-slate-50 border border-slate-100 p-1 rounded font-medium text-slate-400 truncate text-[6px]">
+                              IMSS-DIR-SUBMET-2026-4d82f939e92ffa0591c28c89ef12cb02aa11e4f9b8c0819c9e88
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between gap-4 mt-2">
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-slate-500">Cadena de Certificación:</span>
+                              <span className="block font-mono">||1.1|GOVN680820HDF|IMSS-RECAUDACION|2026-05-20||</span>
+                            </div>
+                            <div className="h-7 w-7 bg-slate-100 border border-slate-200 flex items-center justify-center text-[5px] text-slate-400 uppercase font-bold text-center">
+                              QR CODE
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-2 text-[6px] text-center font-bold text-slate-400 font-mono">
+                            * ESTE REPORTE ES UNA COPIA SIMULADA CERTIFICADA GENERADA PARA LA AUDITORÍA COMERCIAL DE EXPEDIENTES. *
+                          </div>
+                        </div>
+                      </div>
+                      ) : (
+                      /* High fidelity AFORE Report simulated page sheet */
+                      <div className="space-y-4 relative z-10">
+                        {/* Afore logo header */}
+                        <div className="flex items-start justify-between border-b-2 border-indigo-900 pb-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">🏦</span>
+                              <span className="font-black text-indigo-950 text-[10px]">AFORE XXI BANORTE S.A. DE C.V.</span>
+                            </div>
+                            <span className="block text-[7px] text-slate-500 uppercase tracking-wider font-extrabold">
+                              COMISIÓN NACIONAL DEL SISTEMA DE AHORRO PARA EL RETIRO (CONSAR)
+                            </span>
+                          </div>
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-extrabold border border-indigo-150 uppercase tracking-wider text-[7px] font-sans">
+                            Retiro y Vejez
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-slate-800 leading-normal font-sans text-[9px]">
+                          <div><span className="text-slate-400">TITULAR:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
+                          <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
+                          <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
+                          <div><span className="text-slate-400">PERIODO:</span> <span className="font-bold text-slate-900">1er Trimestre 2026</span></div>
+                          <div><span className="text-slate-400">SIEFORE:</span> <span className="font-bold text-indigo-650">Básica 65-69 (Fondo Regulado)</span></div>
+                        </div>
+
+                        <div className="space-y-2.5 font-sans text-[9px]">
+                          <span className="font-black text-indigo-950 uppercase tracking-wider block text-[8px] border-b border-slate-350 pb-1">
+                            💼 RESUMEN DE SALDOS ACUMULADOS EN TU CUENTA INDIVIDUAL
+                          </span>
+                          <div className="grid grid-cols-3 gap-2 font-sans">
+                            <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl text-center">
+                              <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold leading-none">Retiro RCV L97</span>
+                              <span className="block text-[9px] font-black text-slate-800 mt-1">$185,000.00</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl text-center">
+                              <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold leading-none">Vivienda (INFONAVIT)</span>
+                              <span className="block text-[9px] font-black text-slate-800 mt-1">$215,000.00</span>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-150 p-2 rounded-xl text-center">
+                              <span className="block text-[5.5px] text-slate-400 uppercase font-extrabold leading-none">SAR IMSS 92</span>
+                              <span className="block text-[9px] font-black text-emerald-600 mt-1">$50,000.00</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-indigo-950 text-white p-3 rounded-2xl flex items-center justify-between border border-indigo-900/50 shadow-md font-sans">
+                            <div className="space-y-0.5">
+                              <span className="font-extrabold text-indigo-200 text-[7px] uppercase tracking-widest block leading-none">Saldo Global Consolidado</span>
+                              <span className="text-[7.5px] text-white/70 font-semibold block leading-none">Total disponible para cesantía</span>
+                            </div>
+                            <span className="text-xs font-black text-white font-mono bg-white/10 px-2.5 py-1 rounded-lg">
+                              $450,000.00 MXN
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 font-sans leading-relaxed text-[7.5px] text-slate-500 border-t border-slate-200 pt-3">
+                          <span className="font-extrabold text-slate-700 uppercase tracking-wider block text-[8px] font-mono">
+                            🔔 AVISO OFICIAL REGULATORIO (CONSAR)
+                          </span>
+                          <p className="font-semibold text-justify">
+                            Los recursos en tu Cuenta Individual son propiedad única y exclusiva del trabajador, y su inversión está sujeta a las disposiciones vigentes del Banco de México y la Comisión Nacional de Ahorro para el Retiro. El saldo de SAR IMSS 92 Vivienda está garantizado bajo el régimen de viabilidad fiscal Ley 73.
+                          </p>
+                        </div>
+
+                        {/* Digital security validation seals */}
+                        <div className="border-t border-slate-200 pt-3 space-y-2 text-[6.5px] text-slate-400 font-sans leading-relaxed">
+                          <div>
+                            <span className="font-extrabold text-slate-600 uppercase tracking-widest block mb-0.5">Sello Digital de Seguridad Financiera CONSAR</span>
+                            <span className="block font-mono bg-slate-50 border border-slate-100 p-1 rounded font-medium text-slate-400 truncate text-[6px]">
+                              CONSAR-AFORE-XXIBAN-2026-5b92e219f8a32d19283f982a1762c90c76391d4512
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between gap-4 mt-2">
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-slate-500">Sello de Timbrado Electrónico:</span>
+                              <span className="block font-mono">||BANORTE|AFORE-VERIFIED|XXI-2026-05-20|🔒||</span>
+                            </div>
+                            <div className="h-7 w-7 bg-slate-100 border border-slate-200 flex items-center justify-center text-[5px] text-slate-400 uppercase font-bold text-center">
+                              QR CODE
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-2 text-[6px] text-center font-bold text-slate-400 font-mono">
+                            * ESTE DOCUMENTO ES UNA COMPROBACIÓN GRÁFICA DE AUDITORÍA SIN CONEXIÓN DE BASE DE DATOS. *
+                          </div>
+                        </div>
+                      </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Columna Derecha: Simulador Ley 73 (~33%) */}
+        <div className="w-full lg:w-[33%] flex flex-col shrink-0">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-auto transition-all">
             {/* Header title */}
-            <div className="px-6 py-5 border-b border-slate-150 bg-slate-50 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-4 border-b border-slate-150 bg-slate-50 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-indigo-500" />
+                <Calculator className="h-4.5 w-4.5 text-indigo-500" />
                 <div>
                   <h3 className="text-xs font-black text-slate-800">Simulador Ley 73</h3>
                   <span className="block text-[9px] text-slate-400 font-semibold">Emisión de dictamen financiero</span>
@@ -684,8 +700,7 @@ export default function ProspectoDetalle() {
             </div>
 
             {/* Scrollable Form Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
               {/* Form Input fields */}
               <div className="space-y-4">
                 {/* Semanas Cotizadas */}
@@ -697,41 +712,41 @@ export default function ProspectoDetalle() {
                     type="number"
                     value={semanas}
                     onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl px-3 py-2 text-xs font-semibold transition-colors"
+                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all"
                   />
                 </div>
 
                 {/* Pensión inputs grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
                       Pensión Actual
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
                         type="number"
                         value={pensionActual}
                         onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
                       Pensión Proyectada
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
                         type="number"
                         value={pensionMejorada}
                         onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -740,34 +755,34 @@ export default function ProspectoDetalle() {
                 {/* Financing inputs grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
                       Financiamiento M40
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
                         type="number"
                         value={financiamiento}
                         onChange={(e) => setFinanciamiento(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
                       Costo Cobertura / Gestión
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
                         type="number"
                         value={costoGestion}
                         onChange={(e) => setCostoGestion(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -776,28 +791,28 @@ export default function ProspectoDetalle() {
                 {/* Afore and Aportacion grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
                       Afore al Pensionarse
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
                         type="number"
                         value={aforePensionarse}
                         onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl py-2 text-xs font-semibold transition-colors"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between font-sans">
                       <span>Aportación</span>
-                      <span className="text-[7.5px] text-slate-400 font-extrabold normal-case">Sugerido: ${suggestedAportacion.toLocaleString()}</span>
+                      <span className="text-[7.5px] text-slate-400 font-extrabold normal-case leading-none">Sug: ${suggestedAportacion.toLocaleString()}</span>
                     </label>
-                    <div className="relative rounded-xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                         $
                       </div>
                       <input
@@ -807,7 +822,7 @@ export default function ProspectoDetalle() {
                           setAportacion(Math.max(0, Number(e.target.value)));
                           setIsAportacionManual(true);
                         }}
-                        className={`w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border outline-none rounded-xl py-2 text-xs font-semibold transition-colors ${
+                        className={`w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border outline-none rounded-2xl py-2.5 text-xs font-bold transition-all ${
                           isAportacionManual ? "border-teal-500 focus:border-teal-600" : "border-slate-200 focus:border-indigo-500"
                         }`}
                       />
@@ -819,7 +834,7 @@ export default function ProspectoDetalle() {
                           setIsAportacionManual(false);
                           setAportacion(suggestedAportacion);
                         }}
-                        className="text-[8px] text-indigo-600 hover:text-indigo-800 font-bold mt-1 text-right block w-full transition-colors"
+                        className="text-[8px] text-indigo-600 hover:text-indigo-800 font-bold mt-1 text-right block w-full transition-colors leading-none"
                       >
                         Reajustar al sugerido
                       </button>
@@ -837,77 +852,95 @@ export default function ProspectoDetalle() {
                     onChange={(e) => setComments(e.target.value)}
                     rows={3}
                     placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-xl px-3 py-2 text-xs font-semibold transition-colors resize-none"
+                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none"
                   />
                 </div>
               </div>
 
               {/* Dynamic computed outputs */}
               <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5 space-y-4">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block flex items-center gap-1">
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1 leading-none">
                   <Info className="h-3.5 w-3.5 text-indigo-500" /> Resultados Calculados en Tiempo Real
                 </span>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Total Crédito</span>
-                    <span className="text-sm font-black text-slate-800 block mt-0.5">
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Total Crédito</span>
+                    <span className="text-sm font-black text-slate-800 block mt-1 leading-none">
                       ${totalCredito.toLocaleString()}
                     </span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Incremento Mensual</span>
-                    <span className="text-sm font-black text-indigo-600 block mt-0.5">
+                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Incremento Mensual</span>
+                    <span className="text-sm font-black text-indigo-600 block mt-1 leading-none">
                       ${incrementoMensual > 0 ? incrementoMensual.toLocaleString() : 0}
                     </span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Afore al Pensionarse</span>
-                    <span className="text-sm font-black text-amber-600 block mt-0.5">
+                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Afore al Pensionarse</span>
+                    <span className="text-sm font-black text-amber-600 block mt-1 leading-none">
                       ${aforePensionarse.toLocaleString()}
                     </span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-xl p-3 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Aportación</span>
-                    <span className={`text-sm font-black block mt-0.5 ${aportacion > 0 ? "text-teal-600" : "text-slate-500"}`}>
+                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
+                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Aportación</span>
+                    <span className={`text-sm font-black block mt-1 leading-none ${aportacion > 0 ? "text-teal-600" : "text-slate-500"}`}>
                       ${aportacion.toLocaleString()}
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-600 text-white rounded-xl p-4 flex items-center justify-between shadow-md shadow-indigo-500/10">
+                <div className="bg-gradient-to-br from-indigo-600 to-blue-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-indigo-500/10">
                   <div className="space-y-0.5">
-                    <span className="text-[7.5px] text-indigo-100 font-bold uppercase tracking-widest">Retorno de Inversión (ROI)</span>
-                    <span className="text-[10px] text-white/90 font-semibold block leading-none">Punto de equilibrio estimado</span>
+                    <span className="text-[7.5px] text-indigo-100 font-bold uppercase tracking-widest block leading-none">Retorno de Inversión (ROI)</span>
+                    <span className="text-[10px] text-white/90 font-semibold block leading-none mt-1">Punto de equilibrio estimado</span>
                   </div>
-                  <span className="text-lg font-black text-white bg-white/10 border border-white/20 px-3 py-1 rounded-xl">
+                  <span className="text-base font-black text-white bg-white/10 border border-white/20 px-3 py-1 rounded-xl">
                     {roiMeses} Meses
                   </span>
                 </div>
               </div>
             </div>
-
-            {/* Interactive footer action CTA */}
-            <div className="p-6 bg-slate-50 border-t border-slate-150 flex-shrink-0 flex items-center gap-3">
-              <button
-                onClick={() => setShowRejectionModal(true)}
-                className="flex-1 py-3 border border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/50 rounded-2xl text-xs font-bold transition-all active:scale-95 transform flex items-center justify-center gap-1.5"
-              >
-                <XCircle className="h-4.5 w-4.5" />
-                Rechazar Expediente
-              </button>
-              
-              <button
-                onClick={handleEmitSimulation}
-                className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-1.5"
-              >
-                <CheckCircle className="h-4.5 w-4.5" />
-                Aprobar e Emitir Simulación
-              </button>
-            </div>
           </div>
         </div>
 
+      </div>
+
+      {/* Horizontal Bottom Actions Bar */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-md flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="w-full sm:w-auto text-center sm:text-left">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Acciones del Director</span>
+          <span className="text-xs font-black text-slate-700 mt-0.5">Control y emisión del dictamen comercial</span>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto items-stretch sm:items-center">
+          {/* Rechazar Button */}
+          <button
+            onClick={() => setShowRejectionModal(true)}
+            className="px-6 py-3.5 border border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/50 rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+          >
+            <XCircle className="h-4.5 w-4.5" />
+            Rechazar Expediente
+          </button>
+
+          {/* Condicionar Button */}
+          <button
+            onClick={() => setShowConditionModal(true)}
+            className="px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-amber-500/10"
+          >
+            <Clock className="h-4.5 w-4.5" />
+            Condicionar Expediente
+          </button>
+
+          {/* Aprobar Button (Most Prominent) */}
+          <button
+            onClick={handleEmitSimulation}
+            className="px-10 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15"
+          >
+            <CheckCircle className="h-4.5 w-4.5" />
+            Aprobar y Emitir Simulación
+          </button>
+        </div>
       </div>
 
       {/* Rejection comment modal overlay */}
@@ -952,6 +985,107 @@ export default function ProspectoDetalle() {
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95"
               >
                 Confirmar Rechazo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Condition selection modal overlay */}
+      {showConditionModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+          <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
+            <button
+              onClick={() => {
+                setShowConditionModal(false);
+                setSelectedConditionOption(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+
+            <div className="border-b border-slate-150 pb-4">
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Condicionar Expediente</h3>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Selecciona el motivo por el cual se condiciona el expediente
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  id: "evaluacion_pendiente",
+                  label: "Evaluación Pendiente",
+                  desc: "Falta información o evaluación por completar",
+                  color: "text-amber-500 bg-amber-50 border-amber-100",
+                  icon: Clock,
+                },
+                {
+                  id: "asesoria_agendada",
+                  label: "Asesoría Agendada",
+                  desc: "El cliente tiene una asesoría programada",
+                  color: "text-yellow-500 bg-yellow-50 border-yellow-100",
+                  icon: Calendar,
+                },
+                {
+                  id: "doc_proceso",
+                  label: "Expediente en Trámite",
+                  desc: "El expediente se encuentra en proceso",
+                  color: "text-blue-500 bg-blue-50 border-blue-100",
+                  icon: FileText,
+                },
+                {
+                  id: "analisis_riesgo",
+                  label: "Análisis de Riesgo",
+                  desc: "En evaluación por el área de riesgos",
+                  color: "text-purple-500 bg-purple-50 border-purple-100",
+                  icon: ShieldCheck,
+                },
+              ].map((opt) => {
+                const isSelected = selectedConditionOption === opt.id;
+                const IconComp = opt.icon;
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => setSelectedConditionOption(opt.id as any)}
+                    className={`border p-4 rounded-2xl flex items-center justify-between cursor-pointer transition-all transform hover:scale-[1.01] ${
+                      isSelected
+                        ? "bg-indigo-50/40 border-indigo-500 ring-2 ring-indigo-500/10 shadow-sm"
+                        : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className={`h-10 w-10 rounded-xl border flex items-center justify-center ${opt.color}`}>
+                        <IconComp className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{opt.desc}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+                        isSelected ? "border-indigo-600 bg-indigo-600 font-bold" : "border-slate-300"
+                      }`}>
+                        {isSelected && (
+                          <div className="h-2 w-2 rounded-full bg-white animate-fade-in" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleConditionProspect}
+                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-black shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                Enviar
               </button>
             </div>
           </div>
