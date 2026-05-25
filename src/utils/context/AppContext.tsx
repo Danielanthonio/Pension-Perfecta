@@ -109,6 +109,7 @@ interface AppContextType {
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
   sendPasswordReset: (email: string) => Promise<void>;
   updateUserPassword: (newPassword: string) => Promise<void>;
+  updateUserProfile: (fullName: string, phone: string) => Promise<void>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -745,6 +746,30 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     if (error) {
       console.error("Error updating password:", error);
       throw error;
+    }
+  };
+
+  const updateUserProfile = async (fullName: string, phone: string): Promise<void> => {
+    if (!user) return;
+    
+    const updatedUser = { ...user, full_name: fullName, phone };
+    setUser(updatedUser);
+    saveToStorage("pensionflow_user", updatedUser);
+    
+    // Update in profiles list as well
+    const updatedProfiles = profiles.map((p) => p.id === user.id ? { ...p, full_name: fullName, phone } : p);
+    setProfiles(updatedProfiles);
+    saveToStorage("pensionflow_profiles", updatedProfiles);
+    
+    if (!isDemoMode && supabase) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, phone })
+        .eq("id", user.id);
+      if (error) {
+        console.error("Error updating profile in database:", error);
+        throw error;
+      }
     }
   };
 
@@ -1901,6 +1926,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         login,
         sendPasswordReset,
         updateUserPassword,
+        updateUserProfile,
         logout,
         switchRole,
         addProspect,

@@ -22,6 +22,7 @@ import {
   Folder,
   Send,
 } from "lucide-react";
+import UserSettingsModal from "@/components/UserSettingsModal";
 
 export default function ProspectoDetalle() {
   const params = useParams();
@@ -32,6 +33,7 @@ export default function ProspectoDetalle() {
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Simulation calculator input states
   const [semanas, setSemanas] = useState<number>(0);
@@ -292,7 +294,10 @@ export default function ProspectoDetalle() {
 
           {/* User Profile Widget */}
           {user && (
-            <div className="flex items-center gap-3.5 select-none">
+            <div 
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-3.5 select-none cursor-pointer hover:opacity-85 transition-opacity duration-150"
+            >
               <div className="text-right hidden sm:block">
                 <span className="block text-xs font-black text-slate-800 leading-none">
                   {user.full_name}
@@ -1123,6 +1128,9 @@ export default function ProspectoDetalle() {
           </div>
         </div>
       )}
+
+      {/* User Settings Modal */}
+      <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
     </div>
   );

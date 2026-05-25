@@ -19,6 +19,7 @@ import {
   Heart,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import UserSettingsModal from "@/components/UserSettingsModal";
 
 export default function AdminLayout({
   children,
@@ -40,6 +41,7 @@ export default function AdminLayout({
 
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -236,7 +238,10 @@ export default function AdminLayout({
 
               {/* User Profile Widget */}
               {user && (
-                <div className="flex items-center gap-3.5 pl-5 border-l border-slate-200 select-none">
+                <div 
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex items-center gap-3.5 pl-5 border-l border-slate-200 select-none cursor-pointer hover:opacity-85 transition-opacity duration-150"
+                >
                   <div className="text-right hidden sm:block">
                     <span className="block text-xs font-black text-slate-800 leading-none">
                       {user.full_name}
@@ -259,6 +264,9 @@ export default function AdminLayout({
           </main>
         </div>
       </div>
+
+      {/* User Settings Modal */}
+      <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Notifications Right Drawer */}
       {notifDrawerOpen && (
