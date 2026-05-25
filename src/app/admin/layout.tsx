@@ -220,7 +220,7 @@ export default function AdminLayout({
               </h2>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-5">
               {/* Notification Bell */}
               <button
                 onClick={() => setNotifDrawerOpen(true)}
@@ -233,6 +233,23 @@ export default function AdminLayout({
                   </span>
                 )}
               </button>
+
+              {/* User Profile Widget */}
+              {user && (
+                <div className="flex items-center gap-3.5 pl-5 border-l border-slate-200 select-none">
+                  <div className="text-right hidden sm:block">
+                    <span className="block text-xs font-black text-slate-800 leading-none">
+                      {user.full_name}
+                    </span>
+                    <span className="inline-block text-[8px] font-extrabold text-teal-600 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans">
+                      Director
+                    </span>
+                  </div>
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 border border-teal-400/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
+                    {user.full_name.charAt(0)}
+                  </div>
+                </div>
+              )}
             </div>
           </header>
 

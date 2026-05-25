@@ -266,19 +266,54 @@ export default function ProspectoDetalle() {
     <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-40 animate-fade-in">
       {/* Return button header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-        <button
-          onClick={() => router.push(backPath)}
-          className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm active:scale-95"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver a la Consola
-        </button>
+        <div className="flex items-center gap-3.5">
+          <button
+            onClick={() => router.push(backPath)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm active:scale-95"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a la Consola
+          </button>
+          
+          <div className="hidden sm:flex items-center gap-2 border-l border-slate-200 pl-3.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado:</span>
+            <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${getStageBadgeColor(prospect.status)}`}>
+              {getStageLabel(prospect.status)}
+            </span>
+          </div>
+        </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Estado de expediente</span>
-          <span className={`px-3 py-1 rounded-full text-xs font-black border uppercase tracking-wider ${getStageBadgeColor(prospect.status)}`}>
-            {getStageLabel(prospect.status)}
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="flex sm:hidden items-center gap-2 mr-2">
+            <span className={`px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${getStageBadgeColor(prospect.status)}`}>
+              {getStageLabel(prospect.status)}
+            </span>
+          </div>
+
+          {/* User Profile Widget */}
+          {user && (
+            <div className="flex items-center gap-3.5 select-none">
+              <div className="text-right hidden sm:block">
+                <span className="block text-xs font-black text-slate-800 leading-none">
+                  {user.full_name}
+                </span>
+                <span className={`inline-block text-[8px] font-extrabold rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans border ${
+                  user.role === "director"
+                    ? "text-teal-600 bg-teal-50 border-teal-100"
+                    : "text-emerald-600 bg-emerald-50 border-emerald-100"
+                }`}>
+                  {user.role === "director" ? "Director" : "Aliado"}
+                </span>
+              </div>
+              <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
+                user.role === "director"
+                  ? "bg-gradient-to-br from-teal-500 to-emerald-600 border-teal-400/20"
+                  : "bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/20"
+              }`}>
+                {user.full_name.charAt(0)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

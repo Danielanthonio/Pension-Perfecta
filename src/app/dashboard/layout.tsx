@@ -219,7 +219,7 @@ export default function DashboardLayout({
               </h2>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-5">
               {/* Notification Bell */}
               <button
                 onClick={() => setNotifDrawerOpen(true)}
@@ -232,6 +232,23 @@ export default function DashboardLayout({
                   </span>
                 )}
               </button>
+
+              {/* User Profile Widget */}
+              {user && (
+                <div className="flex items-center gap-3.5 pl-5 border-l border-slate-200 select-none">
+                  <div className="text-right hidden sm:block">
+                    <span className="block text-xs font-black text-slate-800 leading-none">
+                      {user.full_name}
+                    </span>
+                    <span className="inline-block text-[8px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans">
+                      Aliado
+                    </span>
+                  </div>
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-600 border border-emerald-400/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
+                    {user.full_name.charAt(0)}
+                  </div>
+                </div>
+              )}
             </div>
           </header>
 
