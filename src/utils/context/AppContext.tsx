@@ -110,6 +110,7 @@ interface AppContextType {
   sendPasswordReset: (email: string) => Promise<void>;
   updateUserPassword: (newPassword: string) => Promise<void>;
   updateUserProfile: (fullName: string, phone: string) => Promise<void>;
+  uploadDocument: (prospectId: string, fileType: "AFORE" | "IMSS" | "OTROS", fileName: string, fileDataUrl: string) => Promise<DocumentItem>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -771,6 +772,77 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         throw error;
       }
     }
+  };
+
+  const uploadDocument = async (
+    prospectId: string,
+    fileType: "AFORE" | "IMSS" | "OTROS",
+    fileName: string,
+    fileDataUrl: string
+  ): Promise<DocumentItem> => {
+    const docId = generateUUID();
+    const newDoc: DocumentItem = {
+      id: docId,
+      prospect_id: prospectId,
+      file_name: fileName,
+      file_url: "#",
+      file_type: fileType,
+      uploaded_at: new Date().toISOString(),
+    };
+
+    // Save in IndexedDB (local storage fallback)
+    await saveFile(docId, fileDataUrl);
+
+    if (!isDemoMode && supabase) {
+      // 1. Upload to Supabase Storage
+      const base64Data = fileDataUrl.split(",")[1];
+      const blob = await fetch(`data:application/octet-stream;base64,${base64Data}`).then((res) => res.blob());
+      const storagePath = `${prospectId}/${docId}_${fileName}`;
+      
+      const { error: uploadErr } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, blob);
+      
+      if (uploadErr) {
+        console.error("Storage upload error:", uploadErr);
+        throw uploadErr;
+      }
+
+      // Get public URL or private path
+      newDoc.storage_path = storagePath;
+      newDoc.file_url = storagePath;
+
+      // 2. Save metadata in Supabase documents table
+      const { error: dbErr } = await supabase.from("documents").insert({
+        id: docId,
+        prospect_id: prospectId,
+        file_name: fileName,
+        file_url: storagePath,
+        file_type: fileType,
+        storage_path: storagePath,
+      });
+
+      if (dbErr) {
+        console.error("Metadata insert error:", dbErr);
+        throw dbErr;
+      }
+    }
+
+    // Update state
+    const updatedProspects = prospects.map((p) => {
+      if (p.id === prospectId) {
+        return {
+          ...p,
+          documents: [...(p.documents || []), newDoc],
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return p;
+    });
+    setProspects(updatedProspects);
+    saveToStorage("pensionflow_prospects", updatedProspects);
+
+    return newDoc;
   };
 
   const login = async (email: string, role: UserRole, password?: string): Promise<UserRole | null> => {
@@ -1927,6 +1999,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         sendPasswordReset,
         updateUserPassword,
         updateUserProfile,
+        uploadDocument,
         logout,
         switchRole,
         addProspect,
