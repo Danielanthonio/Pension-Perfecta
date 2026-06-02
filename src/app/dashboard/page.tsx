@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect } from "@/utils/context/AppContext";
+import SalesFunnel from "@/components/SalesFunnel";
 import {
   Folder,
   Hourglass,
@@ -125,82 +126,8 @@ export default function DashboardAliado() {
         </Link>
       </div>
 
-      {/* Metrics Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-        {/* Card 1 */}
-        <div
-          onClick={() => setActiveTab("activos")}
-          className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden group"
-        >
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-blue-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-          <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Proyectos Activos</span>
-            <Folder className="text-blue-500 h-5 w-5 bg-blue-50 p-1 rounded" />
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-black text-slate-800">{proyectosActivos.length}</div>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">En proceso de firma o cierre</span>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div
-          onClick={() => setActiveTab("evaluacion")}
-          className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden group"
-        >
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-amber-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-          <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">En Evaluación</span>
-            <Hourglass className="text-amber-500 h-5 w-5 bg-amber-50 p-1 rounded" />
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-black text-slate-800">{enEvaluacion.length}</div>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Esperando dictamen técnico</span>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div
-          onClick={() => setActiveTab("listo")}
-          className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden group"
-        >
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-emerald-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform" />
-          <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Listos para Presentar</span>
-            <CheckSquare className="text-emerald-500 h-5 w-5 bg-emerald-50 p-1 rounded" />
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-black text-emerald-600">{listoPresentar.length}</div>
-            <span className="text-[10px] text-emerald-500 font-semibold mt-1 block">Simulaciones listas</span>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between h-36 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total por Financiar</span>
-            <DollarSign className="text-blue-500 h-5 w-5 bg-blue-50 p-1 rounded" />
-          </div>
-          <div className="mt-4">
-            <div className="text-2xl font-black text-blue-600">${totalPorFinanciar.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Proyectos aprobados</span>
-          </div>
-        </div>
-
-        {/* Card 5 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 flex flex-col justify-between h-36 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
-          <div className="flex justify-between items-start">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Monto Ejecutado</span>
-            <CheckCircle2 className="text-emerald-600 h-5 w-5 bg-emerald-50 p-1 rounded" />
-          </div>
-          <div className="mt-4">
-            <div className="text-2xl font-black text-emerald-600">${totalEjecutados.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-400 font-semibold mt-1 block">Financiamientos pagados</span>
-          </div>
-        </div>
-      </div>
+      {/* Sales Funnel Section */}
+      <SalesFunnel prospects={prospects} />
 
       {/* Incidencia Alert Bar (Incompletos) */}
       {faltaDocumentos.length > 0 && (

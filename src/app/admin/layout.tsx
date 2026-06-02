@@ -141,10 +141,10 @@ export default function AdminLayout({
                       : "hover:bg-slate-850 hover:text-white text-slate-400"
                   }`}
                 >
-                  <FolderKanban
+                   <FolderKanban
                     className={`mr-3 h-5 w-5 ${isAdminRoot ? "text-white" : "text-slate-500 group-hover:text-white transition-colors"}`}
                   />
-                  Pipeline Manager
+                  Gestión Director
                 </Link>
 
                 <Link

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect } from "@/utils/context/AppContext";
+import SalesFunnel from "@/components/SalesFunnel";
 import {
   FolderKanban,
   Search,
@@ -169,49 +170,13 @@ export default function PipelineManager() {
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Pipeline Comercial B2B</h1>
-          <p className="text-slate-500 text-sm mt-1">Supervisa y audita las 8 etapas operativas de los expedientes enviados por tus aliados comerciales.</p>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Gestión Director</h1>
+          <p className="text-slate-500 text-sm mt-1">Supervisa y audita las etapas operativas de los expedientes comerciales y tasas del embudo.</p>
         </div>
       </div>
 
-      {/* Stats metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Evaluaciones Pendientes</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800">{pendingCases}</span>
-            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold">Casos Nuevos</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aprobados / Listos</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-600">{approvedCases}</span>
-            <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold">Por agendar</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Monto Financiamiento Proceso</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-indigo-600">${totalFundedAmount.toLocaleString()}</span>
-            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">M40 Activas</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden group">
-          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Proyectos Cerrados</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-amber-600">{closedCases}</span>
-            <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-bold">Comisiones Pagadas</span>
-          </div>
-        </div>
-      </div>
+      {/* Sales Funnel Section */}
+      <SalesFunnel prospects={prospects} />
 
       {/* Query Search Matrix */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">

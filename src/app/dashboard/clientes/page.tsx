@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect } from "@/utils/context/AppContext";
+import SalesFunnel from "@/components/SalesFunnel";
 import {
   Search,
   SlidersHorizontal,
@@ -135,6 +136,9 @@ export default function MisClientes() {
           <p className="text-slate-500 text-sm mt-1">Busca, filtra y audita el historial de todos tus clientes registrados.</p>
         </div>
       </div>
+
+      {/* Embudo comercial */}
+      <SalesFunnel prospects={prospects} />
 
       {/* Query Search Matrix bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
