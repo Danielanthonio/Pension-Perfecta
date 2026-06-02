@@ -38,6 +38,7 @@ export interface Simulation {
   comments?: string;
   aforePensionarse?: number;
   aportacion?: number;
+  creditoNomina?: number;
 }
 
 export interface Prospect {
@@ -67,6 +68,8 @@ export interface Prospect {
   notes_director?: string;
   simulation?: Simulation;
   documents: DocumentItem[];
+  google_drive_folder?: string;
+  google_drive_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -119,7 +122,7 @@ interface AppContextType {
     prospectData: Omit<
       Prospect,
       "id" | "aliado_id" | "status" | "created_at" | "updated_at" | "documents" | "simulation"
-    >,
+    > & { simulation?: Simulation; google_drive_folder?: string; google_drive_url?: string },
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ) => Promise<Prospect>;
@@ -963,7 +966,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     prospectData: Omit<
       Prospect,
       "id" | "aliado_id" | "status" | "created_at" | "updated_at" | "documents" | "simulation"
-    >,
+    > & { simulation?: Simulation; google_drive_folder?: string; google_drive_url?: string },
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ): Promise<Prospect> => {
@@ -1048,6 +1051,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             email: prospectData.email,
             notes_aliado: prospectData.notes_aliado,
             status: "evaluacion_pendiente",
+            // Simulation parameters mapping to database columns
+            semanas_imss: prospectData.simulation?.semanas,
+            pension_actual: prospectData.simulation?.pensionActual,
+            pension_mejorada: prospectData.simulation?.pensionMejorada,
+            monto_financiamiento: prospectData.simulation?.financiamiento,
+            costo_gestion: prospectData.simulation?.costoGestion,
+            roi_months: prospectData.simulation?.roiMonths,
+            simulation_comments: prospectData.simulation?.comments,
+            afore_pensionarse: prospectData.simulation?.aforePensionarse,
+            aportacion: prospectData.simulation?.aportacion,
           })
           .select()
           .single();

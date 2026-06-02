@@ -16,6 +16,7 @@ import {
   Mail,
   Phone,
   FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function SubirProspecto() {
@@ -29,6 +30,22 @@ export default function SubirProspecto() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [notesAliado, setNotesAliado] = useState("");
+
+  // Ley 73 Calculation Fields
+  const [semanas, setSemanas] = useState<string>("");
+  const [pensionActual, setPensionActual] = useState<string>("");
+  const [pensionProyectada, setPensionProyectada] = useState<string>("");
+  const [financiamientoM40, setFinanciamientoM40] = useState<string>("");
+  const [costoCobertura, setCostoCobertura] = useState<string>("");
+  const [aforePensionarse, setAforePensionarse] = useState<string>("");
+  const [creditoNomina, setCreditoNomina] = useState<string>("");
+  const [observaciones, setObservaciones] = useState<string>("");
+
+  // Real-time calculated properties
+  const totalCredito = (Number(financiamientoM40) || 0) + (Number(costoCobertura) || 0);
+  const aportacion = totalCredito - (Number(aforePensionarse) || 0) - (Number(creditoNomina) || 0);
+  const diff = (Number(pensionProyectada) || 0) - (Number(pensionActual) || 0);
+  const roiMonths = diff > 0 ? Math.round(totalCredito / diff) : 0;
 
   // File Upload State Simulations
   const [aforeFileName, setAforeFileName] = useState("");
@@ -62,10 +79,20 @@ export default function SubirProspecto() {
     setPhone("9876544444");
     setEmail("nolberto@gmail.com");
     
+    // Auto-fill Ley 73 calculation metrics matching the user reference
+    setSemanas("1308");
+    setPensionActual("11825");
+    setPensionProyectada("33213");
+    setFinanciamientoM40("408778");
+    setCostoCobertura("57880");
+    setAforePensionarse("392672");
+    setCreditoNomina("50000");
+    setObservaciones("Expediente preliminar extraído con éxito por OCR.");
+    
     setHighlightFields(true);
-    setOcrSuccessMsg("Extracción Inteligente: Documento analizado y resumen generado con éxito.");
-    setTimeout(() => setHighlightFields(false), 3000);
-    setTimeout(() => setOcrSuccessMsg(""), 6000);
+    setOcrSuccessMsg("Extracción Inteligente: Carpeta de Google Drive creada e información del prospecto + cálculos Ley 73 completados automáticamente.");
+    setTimeout(() => setHighlightFields(false), 3500);
+    setTimeout(() => setOcrSuccessMsg(""), 7000);
   };
 
   // Real-time Validations
@@ -168,7 +195,22 @@ export default function SubirProspecto() {
           curp: curp.toUpperCase(),
           phone,
           email,
-          notes_aliado: notesAliado,
+          notes_aliado: notesAliado || observaciones,
+          simulation: {
+            semanas: Number(semanas) || 0,
+            pensionActual: Number(pensionActual) || 0,
+            pensionMejorada: Number(pensionProyectada) || 0,
+            financiamiento: Number(financiamientoM40) || 0,
+            costoGestion: Number(costoCobertura) || 0,
+            totalCredito: totalCredito,
+            roiMonths: roiMonths,
+            comments: observaciones,
+            aforePensionarse: Number(aforePensionarse) || 0,
+            aportacion: aportacion,
+            creditoNomina: Number(creditoNomina) || 0,
+          },
+          google_drive_folder: `${fullName} - ${nss}`,
+          google_drive_url: `https://drive.google.com/drive/folders/mock-id-${nss}`,
         },
         aforeFileName ? { name: aforeFileName, dataUrl: aforeFileDataUrl } : undefined,
         imssFileName ? { name: imssFileName, dataUrl: imssFileDataUrl } : undefined
@@ -379,6 +421,166 @@ export default function SubirProspecto() {
               </div>
             </div>
           </div>
+
+          {/* Cálculo y Diagnóstico Ley 73 Card */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                <FileSpreadsheet className="h-4.5 w-4.5 text-blue-500" />
+                Cálculo y Diagnóstico Ley 73
+              </h2>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              {/* Semanas cotizadas */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Semanas cotizadas</label>
+                <input
+                  type="text"
+                  value={semanas}
+                  onChange={(e) => setSemanas(e.target.value.replace(/\D/g, ""))}
+                  placeholder="ej: 1308"
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                />
+              </div>
+
+              {/* Pensión actual & Pensión proyectada */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pensión actual (M)</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={pensionActual}
+                      onChange={(e) => setPensionActual(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 11825"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pensión proyectada (M)</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={pensionProyectada}
+                      onChange={(e) => setPensionProyectada(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 33213"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Financiamiento M40 & Costo Cobertura */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex justify-between items-center">
+                    <span>Financiamiento M40 (M)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={financiamientoM40}
+                      onChange={(e) => setFinanciamientoM40(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 408778"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Costo Cobertura (M)</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={costoCobertura}
+                      onChange={(e) => setCostoCobertura(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 57880"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Afore al pensionarse & Credito de nomina */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Afore al pensionarse (M)</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={aforePensionarse}
+                      onChange={(e) => setAforePensionarse(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 392672"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Crédito de nómina (M)</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      value={creditoNomina}
+                      onChange={(e) => setCreditoNomina(e.target.value.replace(/\D/g, ""))}
+                      placeholder="ej: 50000"
+                      className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-xs font-semibold outline-none focus:bg-white transition-all border-slate-200 focus:border-blue-500 ${highlightFields ? "ring-2 ring-emerald-400 bg-emerald-50/50 transition-all duration-500" : ""}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Observaciones</label>
+                <textarea
+                  rows={3}
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Escribe observaciones adicionales sobre el diagnóstico de pensión..."
+                  className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 hover:bg-slate-100/80 outline-none text-xs font-semibold focus:bg-white focus:border-blue-500 transition-all resize-none"
+                />
+              </div>
+
+              {/* DIAGNÓSTICO HEADER */}
+              <div className="border-t border-slate-100 pt-4">
+                <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-3">Diagnóstico</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Total Crédito (Formula) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Total crédito (Fórmula)</span>
+                    <span className="text-lg font-black text-slate-850 mt-2 block">
+                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }).format(totalCredito)}
+                    </span>
+                    <span className="text-[8px] text-slate-400 font-medium mt-1 leading-normal">
+                      Fórmula: Financiamiento M40 + Costo Cobertura
+                    </span>
+                  </div>
+
+                  {/* Aportación (Formula) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                    <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Aportación (Fórmula)</span>
+                    <span className={`text-lg font-black mt-2 block ${aportacion >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }).format(aportacion)}
+                    </span>
+                    <span className="text-[8px] text-slate-400 font-medium mt-1 leading-normal">
+                      Fórmula: Total crédito - Afore al pensionarse - Crédito de nómina
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Side: Document Upload and Validation rules */}
@@ -395,6 +597,17 @@ export default function SubirProspecto() {
               <span className="text-[10px] text-slate-400 font-medium block leading-normal">
                 Sube reportes PDF o imágenes legibles. Es **obligatorio** subir al menos uno para iniciar.
               </span>
+
+              {/* Google Drive Status Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-3.5 flex flex-col gap-1.5 shadow-sm">
+                <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Google Drive Sincronizado
+                </span>
+                <span className="text-[9px] text-slate-500 font-bold select-all overflow-x-auto whitespace-nowrap block no-scrollbar">
+                  📁 /Pensiones/{fullName || "Cliente"} - {nss || "NSS"}/
+                </span>
+              </div>
 
               {/* Dropzone 1: Afore */}
               <div className="space-y-2">
@@ -416,7 +629,7 @@ export default function SubirProspecto() {
                           <div className="w-full bg-slate-200 rounded-full h-1.5">
                             <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
                           </div>
-                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo... {aforeProgress}%</span>
+                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo a Google Drive... {aforeProgress}%</span>
                         </div>
                       )}
 
@@ -425,13 +638,13 @@ export default function SubirProspecto() {
                           <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
                           <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
-                            Analizando con IA...
+                            Creando carpeta y analizando...
                           </span>
                         </div>
                       )}
 
                       {aforeOcrStatus === "completed" && (
-                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Cargado con éxito ✅</span>
+                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Guardado en Google Drive ✅</span>
                       )}
                     </div>
                   ) : (
@@ -464,22 +677,22 @@ export default function SubirProspecto() {
                           <div className="w-full bg-slate-200 rounded-full h-1.5">
                             <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${imssProgress}%` }} />
                           </div>
-                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo... {imssProgress}%</span>
+                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo a Google Drive... {imssProgress}%</span>
                         </div>
                       )}
 
                       {imssOcrStatus === "analyzing" && (
                         <div className="w-full mt-3 flex flex-col items-center gap-1">
-                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
+                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-650 rounded-full w-full animate-pulse" />
                           <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
-                            Analizando con IA...
+                            Creando carpeta y analizando...
                           </span>
                         </div>
                       )}
 
                       {imssOcrStatus === "completed" && (
-                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Cargado con éxito ✅</span>
+                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Guardado en Google Drive ✅</span>
                       )}
                     </div>
                   ) : (
