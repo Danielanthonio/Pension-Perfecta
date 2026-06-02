@@ -166,7 +166,7 @@ export default function PipelineManager() {
 
   return (
     <>
-    <div className="space-y-8 select-none max-w-6xl mx-auto animate-fade-in">
+    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in">
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>

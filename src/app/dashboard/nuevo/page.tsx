@@ -185,7 +185,7 @@ export default function SubirProspecto() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-16 select-none animate-fade-in">
+    <div className="max-w-[1700px] mx-auto space-y-6 pb-16 select-none animate-fade-in">
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div>
           <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">Nuevo Expediente</span>

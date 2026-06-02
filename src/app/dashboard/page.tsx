@@ -110,7 +110,7 @@ export default function DashboardAliado() {
   };
 
   return (
-    <div className="space-y-8 select-none max-w-6xl mx-auto">
+    <div className="space-y-8 select-none max-w-[1700px] mx-auto">
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

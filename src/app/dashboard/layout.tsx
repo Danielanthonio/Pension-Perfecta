@@ -106,163 +106,112 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Main Core Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 bg-[#0f172a] text-slate-300 flex flex-col flex-shrink-0 z-30 shadow-xl border-r border-slate-800">
-          {/* Logo Brand */}
-          <div className="h-20 flex flex-col justify-center px-6 border-b border-slate-800 bg-[#0b0f19]">
-            <Link href="/dashboard" className="flex items-center gap-2.5">
-              <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20" strokeWidth={2.5} />
-              <div>
-                <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                  Pensión Perfecta
-                </span>
-                <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">
-                  Portal Aliados
-                </span>
-              </div>
-            </Link>
+      {/* Top Header Bar */}
+      <header className="h-20 bg-[#0f172a] text-slate-300 flex items-center justify-between px-6 sm:px-10 flex-shrink-0 z-20 shadow-md border-b border-slate-800">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20" strokeWidth={2.5} />
+          <div>
+            <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+              Pensión Perfecta
+            </span>
+            <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider leading-none mt-0.5">
+              Portal Aliados
+            </span>
           </div>
+        </Link>
 
-          {/* Navigation Links */}
-          <div className="flex-1 px-4 py-6 overflow-y-auto space-y-7">
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 mb-3 tracking-widest uppercase px-3">
-                Menú Comercial
-              </p>
-              <nav className="space-y-1">
-                <Link
-                  href="/dashboard"
-                  className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
-                    isDashboard
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
-                      : "hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <LayoutDashboard
-                    className={`mr-3 h-5 w-5 ${isDashboard ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`}
-                  />
-                  Resumen de Panel
-                </Link>
+        <div className="flex items-center gap-4.5">
+          {/* Notification Bell */}
+          <button
+            onClick={() => setNotifDrawerOpen(true)}
+            className="relative p-2.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 rounded-xl transition-colors border border-slate-700/60 active:scale-95 transform"
+          >
+            <Bell className="h-4.5 w-4.5" />
+            {unreadNotifsCount > 0 && (
+              <span className="absolute top-[-2px] right-[-2px] h-4.5 min-w-[18px] px-1 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-slate-900 shadow-sm">
+                {unreadNotifsCount}
+              </span>
+            )}
+          </button>
 
-                <Link
-                  href="/dashboard/clientes"
-                  className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
-                    isClientes
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
-                      : "hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <Folder
-                    className={`mr-3 h-5 w-5 ${isClientes ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`}
-                  />
-                  Mis Clientes (Listado)
-                </Link>
-
-                <Link
-                  href="/dashboard/nuevo"
-                  className={`flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl transition-all group ${
-                    isNuevo
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/10"
-                      : "hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <Plus
-                    className={`mr-3 h-5 w-5 ${isNuevo ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}`}
-                  />
-                  Subir Prospecto
-                </Link>
-              </nav>
-            </div>
-          </div>
-
-          {/* User Section / Logout */}
-          <div className="p-4 border-t border-slate-800 bg-[#0b0f19]">
-            <div className="flex items-center gap-3 px-2 py-3">
-              <div className="h-9 w-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black">
-                {user.full_name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="block text-xs font-bold text-slate-200 truncate">
+          {/* User Profile Widget */}
+          {user && (
+            <div 
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-3.5 pl-4 border-l border-slate-800 select-none cursor-pointer hover:opacity-85 transition-opacity duration-150"
+            >
+              <div className="text-right hidden sm:block">
+                <span className="block text-xs font-black text-white leading-none">
                   {user.full_name}
                 </span>
-                <span className="block text-[10px] text-slate-500 font-semibold truncate mt-0.5">
-                  {user.email}
+                <span className="inline-block text-[8px] font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans">
+                  Aliado B2B
                 </span>
               </div>
+              <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 border border-emerald-400/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
+                {user.full_name.charAt(0)}
+              </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="mt-2 w-full flex items-center px-3 py-2 text-xs font-bold text-slate-400 hover:text-red-400 hover:bg-red-500/5 rounded-xl transition-all"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Cerrar Sesión
-            </button>
-          </div>
-        </aside>
+          )}
 
-        {/* Dashboard Main Console */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Header */}
-          <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-10 flex-shrink-0 z-20 shadow-sm">
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Workspace
-              </span>
-              <h2 className="text-lg font-extrabold text-slate-800 tracking-tight mt-0.5">
-                {isDashboard
-                  ? "Panel de Control"
-                  : isClientes
-                    ? "Gestión de Expedientes"
-                    : isNuevo
-                      ? "Registrar Ley 73"
-                      : "Pensión Perfecta"}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-5">
-              {/* Notification Bell */}
-              <button
-                onClick={() => setNotifDrawerOpen(true)}
-                className="relative p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-colors border border-slate-200 active:scale-95 transform"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotifsCount > 0 && (
-                  <span className="absolute top-[-2px] right-[-2px] h-5 min-w-[20px] px-1 rounded-full bg-emerald-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-bounce border-2 border-white shadow-sm">
-                    {unreadNotifsCount}
-                  </span>
-                )}
-              </button>
-
-              {/* User Profile Widget */}
-              {user && (
-                <div 
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex items-center gap-3.5 pl-5 border-l border-slate-200 select-none cursor-pointer hover:opacity-85 transition-opacity duration-150"
-                >
-                  <div className="text-right hidden sm:block">
-                    <span className="block text-xs font-black text-slate-800 leading-none">
-                      {user.full_name}
-                    </span>
-                    <span className="inline-block text-[8px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans">
-                      Aliado
-                    </span>
-                  </div>
-                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-600 border border-emerald-400/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
-                    {user.full_name.charAt(0)}
-                  </div>
-                </div>
-              )}
-            </div>
-          </header>
-
-          {/* Dynamic App Route Content */}
-          <main className="flex-1 overflow-y-auto p-10 bg-[#f8fafc]">
-            {children}
-          </main>
+          {/* Logout button */}
+          <button
+            onClick={handleLogout}
+            className="p-2.5 bg-slate-800/80 hover:bg-red-500/10 hover:text-red-400 text-slate-400 rounded-xl transition-all border border-slate-700/60 active:scale-95"
+            title="Cerrar Sesión"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </button>
         </div>
+      </header>
+
+      {/* Horizontal Navigation Menu Bar */}
+      <div className="bg-white border-b border-slate-200 flex items-center px-6 sm:px-10 shadow-sm flex-shrink-0 z-10">
+        <nav className="flex flex-row overflow-x-auto gap-2 py-2.5 w-full no-scrollbar select-none whitespace-nowrap">
+          <Link
+            href="/dashboard"
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
+              isDashboard
+                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
+                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+            }`}
+          >
+            <LayoutDashboard className="mr-2 h-4 w-4 stroke-[2]" />
+            Resumen de Panel
+          </Link>
+
+          <Link
+            href="/dashboard/clientes"
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
+              isClientes
+                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
+                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+            }`}
+          >
+            <Folder className="mr-2 h-4 w-4 stroke-[2]" />
+            Mis Clientes (Listado)
+          </Link>
+
+          <Link
+            href="/dashboard/nuevo"
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
+              isNuevo
+                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
+                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+            }`}
+          >
+            <Plus className="mr-2 h-4 w-4 stroke-[2]" />
+            Subir Prospecto
+          </Link>
+        </nav>
       </div>
+
+      {/* Dynamic App Route Content */}
+      <main className="flex-grow overflow-y-auto p-6 sm:p-10 bg-[#f8fafc]">
+        <div className="max-w-[1700px] mx-auto w-full">
+          {children}
+        </div>
+      </main>
 
       {/* User Settings Modal */}
       <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />

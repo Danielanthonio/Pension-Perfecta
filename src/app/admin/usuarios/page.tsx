@@ -124,7 +124,7 @@ export default function GestionUsuarios() {
   const latestRegisteredUser = sortedProfilesForLog[0]?.full_name || "N/A";
 
   return (
-    <div className="space-y-8 select-none max-w-6xl mx-auto animate-fade-in pb-12">
+    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in pb-12">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>

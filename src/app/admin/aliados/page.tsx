@@ -141,7 +141,7 @@ export default function GestorAliados() {
   const unusedCodesCount = invitationCodes.filter((c) => !c.is_used).length;
 
   return (
-    <div className="space-y-8 select-none max-w-6xl mx-auto animate-fade-in pb-12">
+    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in pb-12">
       {/* Upper description header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>

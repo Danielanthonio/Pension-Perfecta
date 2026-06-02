@@ -129,7 +129,7 @@ export default function MisClientes() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 select-none animate-fade-in">
+    <div className="max-w-[1700px] mx-auto space-y-6 select-none animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">Expedientes de Prospectos</h1>
