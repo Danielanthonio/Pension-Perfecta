@@ -11,6 +11,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+
+  // Evitar error de límite de hilos (nproc) en Hostinger
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
+  },
 };
 
 module.exports = nextConfig;
