@@ -84,6 +84,36 @@ export default function MisClientes() {
             ★ Comisión Liberada
           </span>
         );
+      case "aportacion":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-100">
+            Aportación Requerida
+          </span>
+        );
+      case "falta_reporte":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
+            Falta Reporte IMSS
+          </span>
+        );
+      case "falta_afore":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100">
+            Falta Afore
+          </span>
+        );
+      case "pendiente_documentos":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+            Pendiente Documentos
+          </span>
+        );
+      case "cerrado_perdido":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+            Cerrado Perdido
+          </span>
+        );
       default:
         return null;
     }
