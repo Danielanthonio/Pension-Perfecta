@@ -111,8 +111,7 @@ export default function ProspectoDetalle() {
   const [financiamiento, setFinanciamiento] = useState<number>(0);
   const [costoGestion, setCostoGestion] = useState<number>(0);
   const [aforePensionarse, setAforePensionarse] = useState<number>(0);
-  const [aportacion, setAportacion] = useState<number>(0);
-  const [isAportacionManual, setIsAportacionManual] = useState<boolean>(false);
+  const [creditoNomina, setCreditoNomina] = useState<number>(0);
   const [comments, setComments] = useState<string>("");
 
   // Document preview state
@@ -261,8 +260,7 @@ export default function ProspectoDetalle() {
           setFinanciamiento(found.simulation.financiamiento);
           setCostoGestion(found.simulation.costoGestion);
           setAforePensionarse(found.simulation.aforePensionarse || 0);
-          setAportacion(found.simulation.aportacion !== undefined ? found.simulation.aportacion : 0);
-          setIsAportacionManual(found.simulation.aportacion !== undefined && found.simulation.aportacion !== Math.max(0, (found.simulation.financiamiento + found.simulation.costoGestion) - (found.simulation.aforePensionarse || 0)));
+          setCreditoNomina(found.simulation.creditoNomina || 0);
           setComments(found.simulation.comments || "");
         } else {
           // Defaults based on client CURP or general profile
@@ -272,8 +270,7 @@ export default function ProspectoDetalle() {
           setFinanciamiento(420000);
           setCostoGestion(42000);
           setAforePensionarse(0);
-          setAportacion(462000);
-          setIsAportacionManual(false);
+          setCreditoNomina(0);
           setComments("Viabilidad financiera aprobada. Se proyecta un crecimiento sustancial bajo Ley 73.");
         }
 
@@ -318,13 +315,7 @@ export default function ProspectoDetalle() {
   const totalCredito = financiamiento + costoGestion;
   const incrementoMensual = pensionMejorada - pensionActual;
   const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
-  const suggestedAportacion = Math.max(0, totalCredito - aforePensionarse);
-
-  useEffect(() => {
-    if (!isAportacionManual) {
-      setAportacion(suggestedAportacion);
-    }
-  }, [totalCredito, aforePensionarse, isAportacionManual, suggestedAportacion]);
+  const aportacion = Math.max(0, totalCredito - aforePensionarse - creditoNomina);
 
   if (!prospect) {
     return (
@@ -1029,6 +1020,7 @@ export default function ProspectoDetalle() {
       financiamiento,
       costoGestion,
       aforePensionarse,
+      creditoNomina,
       aportacion,
       comments,
     });
@@ -1631,7 +1623,7 @@ export default function ProspectoDetalle() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Costo Cobertura / Gestión
+                      Costo Cobertura
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1647,7 +1639,7 @@ export default function ProspectoDetalle() {
                   </div>
                 </div>
 
-                {/* Afore and Aportacion grid */}
+                {/* Afore and Credito de Nomina grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
@@ -1666,9 +1658,8 @@ export default function ProspectoDetalle() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between font-sans">
-                      <span>Aportación</span>
-                      <span className="text-[7.5px] text-slate-400 font-extrabold normal-case leading-none">Sug: ${suggestedAportacion.toLocaleString()}</span>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
+                      Crédito de Nómina
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1676,28 +1667,11 @@ export default function ProspectoDetalle() {
                       </div>
                       <input
                         type="number"
-                        value={aportacion}
-                        onChange={(e) => {
-                          setAportacion(Math.max(0, Number(e.target.value)));
-                          setIsAportacionManual(true);
-                        }}
-                        className={`w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border outline-none rounded-2xl py-2.5 text-xs font-bold transition-all ${
-                          isAportacionManual ? "border-teal-500 focus:border-teal-600" : "border-slate-200 focus:border-indigo-500"
-                        }`}
+                        value={creditoNomina}
+                        onChange={(e) => setCreditoNomina(Math.max(0, Number(e.target.value)))}
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
-                    {isAportacionManual && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setIsAportacionManual(false);
-                          setAportacion(suggestedAportacion);
-                        }}
-                        className="text-[8px] text-indigo-600 hover:text-indigo-800 font-bold mt-1 text-right block w-full transition-colors leading-none"
-                      >
-                        Reajustar al sugerido
-                      </button>
-                    )}
                   </div>
                 </div>
 

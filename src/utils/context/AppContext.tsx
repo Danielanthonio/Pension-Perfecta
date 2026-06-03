@@ -502,6 +502,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         comments: dbProspect.simulation_comments || "",
         aforePensionarse: Number(dbProspect.afore_pensionarse) || 0,
         aportacion: Number(dbProspect.aportacion) || 0,
+        creditoNomina: Number(dbProspect.credito_nomina) || 0,
       } : undefined,
       documents: (dbProspect.documents || []).map((doc: any) => ({
         id: doc.id,
@@ -1531,7 +1532,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const roiMonths = incremento > 0 ? Math.ceil(totalCredito / incremento) : 0;
 
     const aforePensionarse = simulationData.aforePensionarse || 0;
-    const aportacion = simulationData.aportacion !== undefined ? simulationData.aportacion : Math.max(0, totalCredito - aforePensionarse);
+    const creditoNomina = simulationData.creditoNomina || 0;
+    const aportacion = Math.max(0, totalCredito - aforePensionarse - creditoNomina);
 
     const fullSimulation: Simulation = {
       ...simulationData,
@@ -1539,6 +1541,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       roiMonths,
       aforePensionarse,
       aportacion,
+      creditoNomina,
     };
 
     const newStatus = aportacion > 0 ? ("aportacion" as const) : ("aprobado_listo" as const);
@@ -1604,6 +1607,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             notes_director: simulationData.comments,
             afore_pensionarse: aforePensionarse,
             aportacion: aportacion,
+            credito_nomina: creditoNomina,
           })
           .eq("id", id);
 

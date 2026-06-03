@@ -257,3 +257,6 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_file_id text;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_file_url text;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_folder_id text;
 ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_by uuid REFERENCES profiles(id) ON DELETE SET NULL;
+
+-- MIGRACIÓN: Soporte para Crédito de Nómina en Simulación
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS credito_nomina numeric DEFAULT 0;

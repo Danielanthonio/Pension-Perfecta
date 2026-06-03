@@ -780,8 +780,8 @@ export default function GestorAliados() {
                               <span className="font-extrabold text-slate-700">{selectedProspect.simulation.semanas} semanas</span>
                             </div>
                             <div>
-                              <span className="text-slate-400 font-semibold block">Financiamiento:</span>
-                              <span className="font-extrabold text-slate-750">${selectedProspect.simulation.financiamiento?.toLocaleString()} MXN</span>
+                              <span className="text-slate-400 font-semibold block">Financiamiento M40:</span>
+                              <span className="font-extrabold text-slate-700">${selectedProspect.simulation.financiamiento?.toLocaleString()} MXN</span>
                             </div>
                             <div>
                               <span className="text-slate-400 font-semibold block">Pensión Actual:</span>
@@ -791,6 +791,20 @@ export default function GestorAliados() {
                               <span className="text-slate-400 font-semibold block">Pensión Estimada:</span>
                               <span className="font-extrabold text-emerald-600">${selectedProspect.simulation.pensionMejorada?.toLocaleString()} MXN</span>
                             </div>
+                            <div>
+                              <span className="text-slate-400 font-semibold block">Total Crédito:</span>
+                              <span className="font-extrabold text-indigo-600">${selectedProspect.simulation.totalCredito?.toLocaleString()} MXN</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 font-semibold block">Aportación:</span>
+                              <span className="font-extrabold text-teal-600">${selectedProspect.simulation.aportacion?.toLocaleString()} MXN</span>
+                            </div>
+                            {selectedProspect.simulation.creditoNomina !== undefined && selectedProspect.simulation.creditoNomina > 0 && (
+                              <div>
+                                <span className="text-slate-400 font-semibold block">Crédito de Nómina:</span>
+                                <span className="font-extrabold text-slate-700">${selectedProspect.simulation.creditoNomina?.toLocaleString()} MXN</span>
+                              </div>
+                            )}
                             <div className="col-span-2 border-t pt-2 mt-1">
                               <span className="text-slate-450 font-bold block mb-1">Notas del Director:</span>
                               <p className="text-[10px] text-slate-600 leading-normal bg-slate-50 p-2 rounded-lg italic">
