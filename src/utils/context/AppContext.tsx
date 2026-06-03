@@ -135,6 +135,7 @@ interface AppContextType {
   scheduleAssessment: (id: string, date: string, time: string) => Promise<void>;
   generateInvitationCode: () => Promise<InvitationCode>;
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
+  deleteProfile: (id: string) => Promise<void>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearToast: () => void;
@@ -1934,6 +1935,70 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const deleteProfile = async (id: string): Promise<void> => {
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return;
+
+    if (isDemoMode || !supabase) {
+      // Filter profiles
+      const updatedProfiles = profiles.filter((p) => p.id !== id);
+      setProfiles(updatedProfiles);
+      saveToStorage("pensionflow_profiles", updatedProfiles);
+
+      // Filter invitation codes
+      let codesToUpdate = [...invitationCodes];
+      if (profile.invitation_code_used) {
+        codesToUpdate = codesToUpdate.filter(c => c.code !== profile.invitation_code_used);
+      }
+      codesToUpdate = codesToUpdate.filter(c => c.used_by !== id);
+      setInvitationCodes(codesToUpdate);
+      saveToStorage("pensionflow_codes", codesToUpdate);
+
+      // Notify
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Usuario Eliminado 👤❌",
+        message: `El perfil de ${profile.full_name} (${profile.email}) y su código de invitación fueron eliminados del sistema.`,
+        type: "warning",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+    } else {
+      // In Supabase mode:
+      try {
+        // Delete invitation code used by this user (if any)
+        if (profile.invitation_code_used) {
+          await supabase.from("invitation_codes").delete().eq("code", profile.invitation_code_used);
+        }
+        await supabase.from("invitation_codes").delete().eq("used_by", id);
+
+        // Delete profile from DB (deleting from profiles table is enough to revoke access)
+        await supabase.from("profiles").delete().eq("id", id);
+
+        setProfiles((prev) => prev.filter((p) => p.id !== id));
+        
+        if (profile.invitation_code_used) {
+          setInvitationCodes((prev) => prev.filter((c) => c.code !== profile.invitation_code_used && c.used_by !== id));
+        } else {
+          setInvitationCodes((prev) => prev.filter((c) => c.used_by !== id));
+        }
+
+        // Insert notification
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Usuario Eliminado 👤❌",
+          message: `El perfil de ${profile.full_name} (${profile.email}) fue eliminado del sistema.`,
+          type: "warning",
+          read: false,
+        });
+      } catch (err) {
+        console.error("Error deleting profile:", err);
+      }
+    }
+  };
+
   const getFileContent = async (doc: DocumentItem): Promise<string | null> => {
     if (isDemoMode || !supabase) {
       return getFile(doc.id);
@@ -2024,6 +2089,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         registerAliado,
         initializeDirector,
         createProfile,
+        deleteProfile,
         markNotificationRead,
         markAllNotificationsRead,
         clearToast,
