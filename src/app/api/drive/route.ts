@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
 
       // Real Google Drive creation
       const response = await drive.files.create({
+        supportsAllDrives: true,
         requestBody: {
           name: folderName,
           mimeType: "application/vnd.google-apps.folder",
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
       // Enable public link sharing as reader so anyone in the app can open it
       await drive.permissions.create({
         fileId: folderId!,
+        supportsAllDrives: true,
         requestBody: {
           role: "reader",
           type: "anyone",
@@ -128,6 +130,7 @@ export async function POST(req: NextRequest) {
       stream.push(null);
 
       const response = await drive.files.create({
+        supportsAllDrives: true,
         requestBody: {
           name: fileName,
           parents: [folderId],
@@ -145,6 +148,7 @@ export async function POST(req: NextRequest) {
       // Make the file publicly viewable so it can be opened directly
       await drive.permissions.create({
         fileId: fileId!,
+        supportsAllDrives: true,
         requestBody: {
           role: "reader",
           type: "anyone",
@@ -174,6 +178,7 @@ export async function POST(req: NextRequest) {
       // Real delete
       await drive.files.delete({
         fileId: fileId,
+        supportsAllDrives: true,
       });
 
       return NextResponse.json({ success: true, simulated: false });
