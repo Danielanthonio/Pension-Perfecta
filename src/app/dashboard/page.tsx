@@ -30,11 +30,31 @@ export default function DashboardAliado() {
   const [selectedTime, setSelectedTime] = useState("");
   const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
 
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  const filteredByDate = prospects.filter((p) => {
+    if (!p.created_at) return true;
+    const createdDate = new Date(p.created_at).getTime();
+    
+    if (startDate) {
+      const start = new Date(startDate + "T00:00:00").getTime();
+      if (createdDate < start) return false;
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate + "T23:59:59").getTime();
+      if (createdDate > end) return false;
+    }
+    
+    return true;
+  });
+
   // Dynamic calculations based on global state
-  const enEvaluacion = prospects.filter((p) =>
+  const enEvaluacion = filteredByDate.filter((p) =>
     ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
   );
-  const listoPresentar = prospects.filter((p) =>
+  const listoPresentar = filteredByDate.filter((p) =>
     ["aprobado_listo", "aportacion"].includes(p.status)
   );
   
@@ -45,10 +65,10 @@ export default function DashboardAliado() {
     "firma_programada",
     "pagado_comision",
   ];
-  const proyectosActivos = prospects.filter((p) => activeStatuses.includes(p.status));
+  const proyectosActivos = filteredByDate.filter((p) => activeStatuses.includes(p.status));
   
   // Missing docs: in evaluation but have less than 2 documents uploaded
-  const faltaDocumentos = prospects.filter(
+  const faltaDocumentos = filteredByDate.filter(
     (p) => p.status === "evaluacion_pendiente" && p.documents.length < 2
   );
 
@@ -61,12 +81,12 @@ export default function DashboardAliado() {
     "analisis_riesgo",
     "firma_programada",
   ];
-  const totalPorFinanciar = prospects
+  const totalPorFinanciar = filteredByDate
     .filter((p) => pendingFinancingStatuses.includes(p.status) && p.simulation)
     .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
 
   // Total Financing amount executed (sum of paid/closed M40 projects in pagado_comision status)
-  const totalEjecutados = prospects
+  const totalEjecutados = filteredByDate
     .filter((p) => p.status === "pagado_comision" && p.simulation)
     .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
 
@@ -126,8 +146,51 @@ export default function DashboardAliado() {
         </Link>
       </div>
 
+      {/* Date Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-bold text-slate-800">Filtrar por Fecha</h4>
+            <p className="text-[10px] text-slate-400 mt-0.5">Filtra el embudo y listados por fecha de registro.</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Sales Funnel Section */}
-      <SalesFunnel prospects={prospects} />
+      <SalesFunnel prospects={filteredByDate} />
 
       {/* Incidencia Alert Bar (Incompletos) */}
       {faltaDocumentos.length > 0 && (

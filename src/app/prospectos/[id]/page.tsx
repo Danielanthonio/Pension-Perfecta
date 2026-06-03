@@ -222,6 +222,15 @@ export default function ProspectoDetalle() {
   }, [prospects, id, selectedDoc]);
 
   useEffect(() => {
+    if (user?.role === "director" && prospect) {
+      const initialStatuses = ["pendiente_documentos", "falta_reporte", "falta_afore"];
+      if (initialStatuses.includes(prospect.status)) {
+        updateProspectStatus(prospect.id, "evaluacion_pendiente");
+      }
+    }
+  }, [user, prospect, updateProspectStatus]);
+
+  useEffect(() => {
     if (selectedDoc) {
       setLoadingFile(true);
       getFileContent(selectedDoc)

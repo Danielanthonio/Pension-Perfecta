@@ -17,6 +17,7 @@ import {
   Layers,
   Sparkles,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,6 +26,25 @@ export default function PipelineManager() {
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [selectedAlly, setSelectedAlly] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  const filteredByDate = prospects.filter((p) => {
+    if (!p.created_at) return true;
+    const createdDate = new Date(p.created_at).getTime();
+    
+    if (startDate) {
+      const start = new Date(startDate + "T00:00:00").getTime();
+      if (createdDate < start) return false;
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate + "T23:59:59").getTime();
+      if (createdDate > end) return false;
+    }
+    
+    return true;
+  });
 
   // Delete confirmation modal state
   const [deleteTarget, setDeleteTarget] = useState<Prospect | null>(null);
@@ -99,20 +119,20 @@ export default function PipelineManager() {
   };
 
   // Calculations for stats
-  const totalCases = prospects.length;
-  const pendingCases = prospects.filter((p) => p.status === "evaluacion_pendiente").length;
-  const approvedCases = prospects.filter((p) => p.status === "aprobado_listo").length;
-  const closedCases = prospects.filter((p) => p.status === "pagado_comision").length;
+  const totalCases = filteredByDate.length;
+  const pendingCases = filteredByDate.filter((p) => p.status === "evaluacion_pendiente").length;
+  const approvedCases = filteredByDate.filter((p) => p.status === "aprobado_listo").length;
+  const closedCases = filteredByDate.filter((p) => p.status === "pagado_comision").length;
 
-  const totalFundedAmount = prospects
+  const totalFundedAmount = filteredByDate
     .filter((p) => ["doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"].includes(p.status))
     .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
 
   // Extract unique allies for filter dropdown
-  const uniqueAllies = Array.from(new Set(prospects.map((p) => p.aliado_name || "Asesor Comercial")));
+  const uniqueAllies = Array.from(new Set(filteredByDate.map((p) => p.aliado_name || "Asesor Comercial")));
 
   // Filtering matrices
-  const filteredProspects = prospects
+  const filteredProspects = filteredByDate
     .filter((p) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -175,8 +195,51 @@ export default function PipelineManager() {
         </div>
       </div>
 
+      {/* Date Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-bold text-slate-800">Filtrar por Fecha</h4>
+            <p className="text-[10px] text-slate-400 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Sales Funnel Section */}
-      <SalesFunnel prospects={prospects} />
+      <SalesFunnel prospects={filteredByDate} />
 
       {/* Query Search Matrix */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">

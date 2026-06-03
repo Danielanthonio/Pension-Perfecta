@@ -13,6 +13,7 @@ import {
   CheckCircle,
   ArrowUpDown,
   FileText,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +22,8 @@ export default function MisClientes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name">("recent");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   // Format Date Helper
   const formatDate = (dateStr: string) => {
@@ -86,8 +89,26 @@ export default function MisClientes() {
     }
   };
 
+  // 0. Filter by date first
+  const filteredByDate = prospects.filter((p) => {
+    if (!p.created_at) return true;
+    const createdDate = new Date(p.created_at).getTime();
+    
+    if (startDate) {
+      const start = new Date(startDate + "T00:00:00").getTime();
+      if (createdDate < start) return false;
+    }
+    
+    if (endDate) {
+      const end = new Date(endDate + "T23:59:59").getTime();
+      if (createdDate > end) return false;
+    }
+    
+    return true;
+  });
+
   // 1. Text Search Filter (FullName, NSS, CURP)
-  const filteredSearch = prospects.filter((p) => {
+  const filteredSearch = filteredByDate.filter((p) => {
     const term = searchTerm.toLowerCase();
     return (
       p.full_name.toLowerCase().includes(term) ||
@@ -137,8 +158,51 @@ export default function MisClientes() {
         </div>
       </div>
 
+      {/* Date Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
+          <div>
+            <h4 className="text-xs font-bold text-slate-800">Filtrar por Fecha</h4>
+            <p className="text-[10px] text-slate-400 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Embudo comercial */}
-      <SalesFunnel prospects={prospects} />
+      <SalesFunnel prospects={filteredByDate} />
 
       {/* Query Search Matrix bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
@@ -206,8 +270,8 @@ export default function MisClientes() {
                 <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
                   <th className="px-6 py-4.5 w-1/3">Cliente</th>
                   <th className="px-6 py-4.5">NSS / CURP</th>
-                  <th className="px-6 py-4.5">Fecha Captura</th>
-                  <th className="px-6 py-4.5">Estatus Pipeline</th>
+                  <th className="px-6 py-4.5">Fecha de Subida</th>
+                  <th className="px-6 py-4.5">Estado</th>
                   <th className="px-6 py-4.5 relative"><span className="sr-only">Expediente</span></th>
                 </tr>
               </thead>
