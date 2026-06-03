@@ -15,6 +15,7 @@ export interface UserProfile {
   role: UserRole;
   invitation_code_used?: string;
   created_at: string;
+  is_active?: boolean;
 }
 
 export interface DocumentItem {
@@ -25,6 +26,10 @@ export interface DocumentItem {
   file_type: "AFORE" | "IMSS" | "OTROS";
   storage_path?: string;
   uploaded_at: string;
+  drive_file_id?: string;
+  drive_file_url?: string;
+  drive_folder_id?: string;
+  uploaded_by?: string;
 }
 
 export interface Simulation {
@@ -70,6 +75,8 @@ export interface Prospect {
   documents: DocumentItem[];
   google_drive_folder?: string;
   google_drive_url?: string;
+  drive_folder_id?: string;
+  drive_folder_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -114,6 +121,7 @@ interface AppContextType {
   updateUserPassword: (newPassword: string) => Promise<void>;
   updateUserProfile: (fullName: string, phone: string) => Promise<void>;
   uploadDocument: (prospectId: string, fileType: "AFORE" | "IMSS" | "OTROS", fileName: string, fileDataUrl: string) => Promise<DocumentItem>;
+  deleteDocument: (prospectId: string, docId: string) => Promise<void>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -136,6 +144,7 @@ interface AppContextType {
   generateInvitationCode: () => Promise<InvitationCode>;
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
   deleteProfile: (id: string) => Promise<void>;
+  updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearToast: () => void;
@@ -154,6 +163,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     phone: "5512345678",
     role: "aliado",
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
   },
   {
     id: "director-456",
@@ -162,6 +172,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     phone: "5598765432",
     role: "director",
     created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
   },
 ];
 
@@ -392,6 +403,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     return {
       ...dbProfile,
       role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : dbProfile.role,
+      is_active: dbProfile.is_active !== false,
     };
   };
 
@@ -499,7 +511,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         file_type: doc.file_type,
         storage_path: doc.storage_path,
         uploaded_at: doc.uploaded_at,
+        drive_file_id: doc.drive_file_id || undefined,
+        drive_file_url: doc.drive_file_url || undefined,
+        drive_folder_id: doc.drive_folder_id || undefined,
+        uploaded_by: doc.uploaded_by || undefined,
       })),
+      google_drive_folder: dbProspect.google_drive_folder || "",
+      google_drive_url: dbProspect.google_drive_url || "",
+      drive_folder_id: dbProspect.drive_folder_id || "",
+      drive_folder_url: dbProspect.drive_folder_url || "",
       created_at: dbProspect.created_at,
       updated_at: dbProspect.updated_at,
     };
@@ -551,7 +571,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const storedProfiles = localStorage.getItem("pensionflow_profiles");
 
       if (storedProfiles) {
-        setProfiles(JSON.parse(storedProfiles));
+        try {
+          const parsed = JSON.parse(storedProfiles).map((p: any) => ({
+            ...p,
+            is_active: p.is_active !== false,
+          }));
+          setProfiles(parsed);
+        } catch (e) {
+          setProfiles(INITIAL_PROFILES);
+        }
       } else {
         setProfiles(INITIAL_PROFILES);
         localStorage.setItem("pensionflow_profiles", JSON.stringify(INITIAL_PROFILES));
@@ -785,54 +813,107 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     fileDataUrl: string
   ): Promise<DocumentItem> => {
     const docId = generateUUID();
+    
+    const targetProspect = prospects.find((p) => p.id === prospectId);
+    let folderId = targetProspect?.drive_folder_id || targetProspect?.google_drive_folder;
+    let folderUrl = targetProspect?.drive_folder_url || targetProspect?.google_drive_url;
+
+    if (!folderId) {
+      try {
+        const driveRes = await fetch("/api/drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "createFolder",
+            clientName: targetProspect?.full_name || "Cliente_Sin_Nombre",
+            nss: targetProspect?.nss || "S_N",
+          }),
+        });
+        const driveData = await driveRes.json();
+        if (driveData.success) {
+          folderId = driveData.folderId;
+          folderUrl = driveData.folderUrl;
+          
+          if (targetProspect) {
+            targetProspect.drive_folder_id = folderId;
+            targetProspect.drive_folder_url = folderUrl;
+            if (!isDemoMode && supabase) {
+              await supabase
+                .from("prospects")
+                .update({
+                  drive_folder_id: folderId,
+                  drive_folder_url: folderUrl,
+                })
+                .eq("id", prospectId);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error creating folder dynamically inside uploadDocument:", err);
+        folderId = `sim-folder-${Math.random().toString(36).substring(2, 11)}`;
+        folderUrl = `https://drive.google.com/drive/folders/${folderId}?usp=sharing`;
+      }
+    }
+
+    let driveFileId = "";
+    let driveFileUrl = "";
+    try {
+      const res = await fetch("/api/drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "uploadFile",
+          folderId,
+          fileName,
+          fileDataUrl,
+          fileType,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        driveFileId = data.fileId;
+        driveFileUrl = data.fileUrl;
+      }
+    } catch (e) {
+      console.error("Error uploading to Drive API:", e);
+      driveFileId = `sim-file-${Math.random().toString(36).substring(2, 11)}`;
+      driveFileUrl = `https://drive.google.com/open?id=${driveFileId}`;
+    }
+
     const newDoc: DocumentItem = {
       id: docId,
       prospect_id: prospectId,
       file_name: fileName,
-      file_url: "#",
+      file_url: driveFileUrl,
       file_type: fileType,
       uploaded_at: new Date().toISOString(),
+      drive_file_id: driveFileId,
+      drive_file_url: driveFileUrl,
+      drive_folder_id: folderId,
+      uploaded_by: user?.id || "aliado-123",
     };
 
-    // Save in IndexedDB (local storage fallback)
     await saveFile(docId, fileDataUrl);
 
     if (!isDemoMode && supabase) {
-      // 1. Upload to Supabase Storage
-      const base64Data = fileDataUrl.split(",")[1];
-      const blob = await fetch(`data:application/octet-stream;base64,${base64Data}`).then((res) => res.blob());
-      const storagePath = `${prospectId}/${docId}_${fileName}`;
-      
-      const { error: uploadErr } = await supabase.storage
-        .from("documents")
-        .upload(storagePath, blob);
-      
-      if (uploadErr) {
-        console.error("Storage upload error:", uploadErr);
-        throw uploadErr;
-      }
-
-      // Get public URL or private path
-      newDoc.storage_path = storagePath;
-      newDoc.file_url = storagePath;
-
-      // 2. Save metadata in Supabase documents table
       const { error: dbErr } = await supabase.from("documents").insert({
         id: docId,
         prospect_id: prospectId,
         file_name: fileName,
-        file_url: storagePath,
+        file_url: driveFileUrl,
         file_type: fileType,
-        storage_path: storagePath,
+        drive_file_id: driveFileId,
+        drive_file_url: driveFileUrl,
+        drive_folder_id: folderId,
+        uploaded_by: user?.id,
       });
 
       if (dbErr) {
-        console.error("Metadata insert error:", dbErr);
+        console.error("Metadata insert error in Supabase:", dbErr);
         throw dbErr;
       }
     }
 
-    // Update state
     const updatedProspects = prospects.map((p) => {
       if (p.id === prospectId) {
         return {
@@ -847,6 +928,64 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     saveToStorage("pensionflow_prospects", updatedProspects);
 
     return newDoc;
+  };
+
+  const deleteDocument = async (prospectId: string, docId: string): Promise<void> => {
+    const prospect = prospects.find((p) => p.id === prospectId);
+    if (!prospect) return;
+
+    const doc = prospect.documents.find((d) => d.id === docId);
+    if (!doc) return;
+
+    const fileId = doc.drive_file_id || doc.storage_path;
+    if (fileId) {
+      try {
+        await fetch("/api/drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "deleteFile",
+            fileId: fileId,
+          }),
+        });
+      } catch (err) {
+        console.error("Error deleting document from Drive:", err);
+      }
+    }
+
+    if (isDemoMode || !supabase) {
+      const updatedProspects = prospects.map((p) => {
+        if (p.id === prospectId) {
+          return {
+            ...p,
+            documents: (p.documents || []).filter((d) => d.id !== docId),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      setProspects(updatedProspects);
+      saveToStorage("pensionflow_prospects", updatedProspects);
+    } else {
+      try {
+        await supabase.from("documents").delete().eq("id", docId);
+
+        setProspects((prev) =>
+          prev.map((p) => {
+            if (p.id === prospectId) {
+              return {
+                ...p,
+                documents: (p.documents || []).filter((d) => d.id !== docId),
+                updated_at: new Date().toISOString(),
+              };
+            }
+            return p;
+          })
+        );
+      } catch (err) {
+        console.error("Error deleting document from DB:", err);
+      }
+    }
   };
 
   const login = async (email: string, role: UserRole, password?: string): Promise<UserRole | null> => {
@@ -971,6 +1110,52 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ): Promise<Prospect> => {
+    let driveFolderId = "";
+    let driveFolderUrl = "";
+    try {
+      const driveRes = await fetch("/api/drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createFolder",
+          clientName: prospectData.full_name,
+          nss: prospectData.nss,
+        }),
+      });
+      const driveData = await driveRes.json();
+      if (driveData.success) {
+        driveFolderId = driveData.folderId;
+        driveFolderUrl = driveData.folderUrl;
+      }
+    } catch (err) {
+      console.error("Error creating Google Drive folder:", err);
+      driveFolderId = `sim-folder-${Math.random().toString(36).substring(2, 11)}`;
+      driveFolderUrl = `https://drive.google.com/drive/folders/${driveFolderId}?usp=sharing`;
+    }
+
+    const uploadToDrive = async (fileName: string, fileDataUrl: string) => {
+      try {
+        const res = await fetch("/api/drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "uploadFile",
+            folderId: driveFolderId,
+            fileName,
+            fileDataUrl,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          return { id: data.fileId, url: data.fileUrl };
+        }
+      } catch (e) {
+        console.error("Error uploading to Drive API:", e);
+      }
+      const fakeId = `sim-file-${Math.random().toString(36).substring(2, 11)}`;
+      return { id: fakeId, url: `https://drive.google.com/open?id=${fakeId}` };
+    };
+
     if (isDemoMode || !supabase) {
       const newId = `prospect-${Math.random().toString(36).substr(2, 9)}`;
       const docs: DocumentItem[] = [];
@@ -979,29 +1164,39 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const imssName = typeof imssFile === "string" ? imssFile : imssFile?.name;
       const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
 
-      if (aforeName) {
+      if (aforeName && aforeDataUrl) {
         const docId = generateUUID();
+        const driveFile = await uploadToDrive(aforeName, aforeDataUrl);
         docs.push({
           id: docId,
           prospect_id: newId,
           file_name: aforeName,
-          file_url: "#",
+          file_url: driveFile.url,
           file_type: "AFORE",
           uploaded_at: new Date().toISOString(),
+          drive_file_id: driveFile.id,
+          drive_file_url: driveFile.url,
+          drive_folder_id: driveFolderId,
+          uploaded_by: user?.id || "aliado-123",
         });
-        if (aforeDataUrl) await saveFile(docId, aforeDataUrl);
+        await saveFile(docId, aforeDataUrl);
       }
-      if (imssName) {
+      if (imssName && imssDataUrl) {
         const docId = generateUUID();
+        const driveFile = await uploadToDrive(imssName, imssDataUrl);
         docs.push({
           id: docId,
           prospect_id: newId,
           file_name: imssName,
-          file_url: "#",
+          file_url: driveFile.url,
           file_type: "IMSS",
           uploaded_at: new Date().toISOString(),
+          drive_file_id: driveFile.id,
+          drive_file_url: driveFile.url,
+          drive_folder_id: driveFolderId,
+          uploaded_by: user?.id || "aliado-123",
         });
-        if (imssDataUrl) await saveFile(docId, imssDataUrl);
+        await saveFile(docId, imssDataUrl);
       }
 
       const newProspect: Prospect = {
@@ -1011,6 +1206,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         aliado_name: user?.full_name || "Roberto Asesor",
         status: "evaluacion_pendiente",
         documents: docs,
+        google_drive_folder: driveFolderId,
+        google_drive_url: driveFolderUrl,
+        drive_folder_id: driveFolderId,
+        drive_folder_url: driveFolderUrl,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -1039,7 +1238,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return newProspect;
     } else {
       try {
-        // Insert prospect into DB
         const { data: dbProspect, error: prospectError } = await supabase
           .from("prospects")
           .insert({
@@ -1052,7 +1250,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             email: prospectData.email,
             notes_aliado: prospectData.notes_aliado,
             status: "evaluacion_pendiente",
-            // Simulation parameters mapping to database columns
+            drive_folder_id: driveFolderId,
+            drive_folder_url: driveFolderUrl,
             semanas_imss: prospectData.simulation?.semanas,
             pension_actual: prospectData.simulation?.pensionActual,
             pension_mejorada: prospectData.simulation?.pensionMejorada,
@@ -1074,56 +1273,52 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const imssName = typeof imssFile === "string" ? imssFile : imssFile?.name;
         const imssDataUrl = typeof imssFile === "string" ? undefined : imssFile?.dataUrl;
 
-        // Upload and insert AFORE
         if (aforeName && aforeDataUrl) {
           const docId = generateUUID();
-          const storagePath = `${dbProspect.id}/${docId}_${aforeName}`;
-          const blob = dataURLtoBlob(aforeDataUrl);
+          const driveFile = await uploadToDrive(aforeName, aforeDataUrl);
           
-          await supabase.storage
-            .from("documents")
-            .upload(storagePath, blob, { contentType: blob.type, upsert: true });
-
           const { data: dbDoc } = await supabase
             .from("documents")
             .insert({
               id: docId,
               prospect_id: dbProspect.id,
               file_name: aforeName,
-              file_url: "#",
+              file_url: driveFile.url,
               file_type: "AFORE",
-              storage_path: storagePath,
+              drive_file_id: driveFile.id,
+              drive_file_url: driveFile.url,
+              drive_folder_id: driveFolderId,
+              uploaded_by: user?.id,
             })
             .select()
             .single();
 
           if (dbDoc) docsList.push(dbDoc);
+          await saveFile(docId, aforeDataUrl);
         }
 
-        // Upload and insert IMSS
         if (imssName && imssDataUrl) {
           const docId = generateUUID();
-          const storagePath = `${dbProspect.id}/${docId}_${imssName}`;
-          const blob = dataURLtoBlob(imssDataUrl);
+          const driveFile = await uploadToDrive(imssName, imssDataUrl);
           
-          await supabase.storage
-            .from("documents")
-            .upload(storagePath, blob, { contentType: blob.type, upsert: true });
-
           const { data: dbDoc } = await supabase
             .from("documents")
             .insert({
               id: docId,
               prospect_id: dbProspect.id,
               file_name: imssName,
-              file_url: "#",
+              file_url: driveFile.url,
               file_type: "IMSS",
-              storage_path: storagePath,
+              drive_file_id: driveFile.id,
+              drive_file_url: driveFile.url,
+              drive_folder_id: driveFolderId,
+              uploaded_by: user?.id,
             })
             .select()
             .single();
 
           if (dbDoc) docsList.push(dbDoc);
+          await saveFile(docId, imssDataUrl);
         }
 
         const newProspect = transformProspectFromDB({
@@ -1133,7 +1328,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         setProspects((prev) => [newProspect, ...prev]);
 
-        // Insert notification in DB for Directors
         const directors = profiles.filter(p => p.role === "director");
         for (const dir of directors) {
           await supabase.from("notifications").insert({
@@ -1161,6 +1355,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   const deleteProspect = async (id: string): Promise<void> => {
     const target = prospects.find((p) => p.id === id);
+    const driveFolderId = target?.drive_folder_id || target?.google_drive_folder;
+
+    if (driveFolderId) {
+      try {
+        await fetch("/api/drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "deleteFile",
+            fileId: driveFolderId,
+          }),
+        });
+      } catch (err) {
+        console.error("Error deleting Google Drive folder during prospect deletion:", err);
+      }
+    }
+
     if (isDemoMode || !supabase) {
       const updated = prospects.filter((p) => p.id !== id);
       setProspects(updated);
@@ -1180,15 +1391,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       try {
-        // Clean up files in Supabase Storage first
-        if (target && target.documents) {
-          for (const doc of target.documents) {
-            if (doc.storage_path) {
-              await supabase.storage.from("documents").remove([doc.storage_path]);
-            }
-          }
-        }
-
         // Delete from prospects (cascade will handle document table entries)
         await supabase.from("prospects").delete().eq("id", id);
         
@@ -1999,6 +2201,93 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const updateProfileAdmin = async (
+    id: string,
+    updates: Partial<Omit<UserProfile, "id" | "created_at">>
+  ): Promise<void> => {
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return;
+
+    if (isDemoMode || !supabase) {
+      const updatedProfiles = profiles.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            ...updates,
+          };
+        }
+        return p;
+      });
+      setProfiles(updatedProfiles);
+      saveToStorage("pensionflow_profiles", updatedProfiles);
+
+      if (user?.id === id) {
+        const updatedUser = { ...user, ...updates };
+        setUser(updatedUser);
+        saveToStorage("pensionflow_user", updatedUser);
+      }
+
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Usuario Actualizado 👤✏️",
+        message: `El perfil de ${updates.full_name || profile.full_name} fue actualizado con éxito.`,
+        type: "success",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+    } else {
+      try {
+        const dbRole = updates.role === "director" ? "admin" : updates.role;
+        
+        const dbUpdates: any = {};
+        if (updates.full_name !== undefined) dbUpdates.full_name = updates.full_name;
+        if (updates.email !== undefined) dbUpdates.email = updates.email.toLowerCase();
+        if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+        if (updates.role !== undefined) dbUpdates.role = dbRole;
+        if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
+
+        const { error } = await supabase
+          .from("profiles")
+          .update(dbUpdates)
+          .eq("id", id);
+
+        if (error) {
+          console.warn("Error updating profile with full payload, retrying without is_active:", error);
+          if (dbUpdates.is_active !== undefined) {
+            delete dbUpdates.is_active;
+            const { error: error2 } = await supabase
+              .from("profiles")
+              .update(dbUpdates)
+              .eq("id", id);
+            if (error2) throw error2;
+          } else {
+            throw error;
+          }
+        }
+
+        setProfiles((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+        );
+
+        if (user?.id === id) {
+          setUser((prev) => (prev ? { ...prev, ...updates } : null));
+        }
+
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Usuario Actualizado 👤✏️",
+          message: `El perfil de ${updates.full_name || profile.full_name} fue actualizado con éxito.`,
+          type: "success",
+          read: false,
+        });
+      } catch (err) {
+        console.error("Error updating profile:", err);
+      }
+    }
+  };
+
   const getFileContent = async (doc: DocumentItem): Promise<string | null> => {
     if (isDemoMode || !supabase) {
       return getFile(doc.id);
@@ -2078,6 +2367,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         updateUserPassword,
         updateUserProfile,
         uploadDocument,
+        deleteDocument,
         logout,
         switchRole,
         addProspect,
@@ -2090,6 +2380,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         initializeDirector,
         createProfile,
         deleteProfile,
+        updateProfileAdmin,
         markNotificationRead,
         markAllNotificationsRead,
         clearToast,

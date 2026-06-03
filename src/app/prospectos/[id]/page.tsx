@@ -23,6 +23,7 @@ import {
   Send,
   Upload,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 
@@ -31,7 +32,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, saveSimulation, updateProspectStatus, uploadDocument, triggerPushNotification, getFileContent } = useApp();
+  const { user, prospects, profiles, saveSimulation, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -133,10 +134,56 @@ export default function ProspectoDetalle() {
   const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const canDeleteDoc = user?.role === "director" || (prospect && prospect.aliado_id === user?.id);
+
+  const handleDeleteSelectedDoc = async () => {
+    if (!prospect || !selectedDoc) return;
+    const confirmDelete = window.confirm(`¿Estás seguro de que deseas eliminar el documento "${selectedDoc.file_name}" de Google Drive?`);
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDocument(prospect.id, selectedDoc.id);
+      
+      setProspect((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          documents: (prev.documents || []).filter((d) => d.id !== selectedDoc.id),
+        };
+      });
+
+      triggerPushNotification(
+        `🗑️ Documento Eliminado: Se eliminó '${selectedDoc.file_name}' de Google Drive.`,
+        "email",
+        user?.email || ""
+      );
+
+      setSelectedDoc(null);
+      setSelectedDocType(null);
+      setSelectedDocName("");
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar el documento.");
+    }
+  };
+
   const handleDocumentUpload = async (type: "AFORE" | "IMSS" | "OTROS", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!prospect) return;
+
+    const allowedExtensions = ["pdf", "png", "jpg", "jpeg"];
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!allowedExtensions.includes(fileExtension)) {
+      alert("Error: Solo se permiten archivos PDF, PNG, JPG y JPEG.");
+      return;
+    }
+
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert("Error: El archivo excede el tamaño máximo permitido de 10MB.");
+      return;
+    }
 
     setUploadingType(type);
     setUploadProgress(10);
@@ -146,8 +193,21 @@ export default function ProspectoDetalle() {
       const base64Data = event.target?.result as string;
       if (!base64Data) return;
 
-      setUploadProgress(50);
+      setUploadProgress(30);
       try {
+        const existingDoc = prospect.documents.find((d) => d.file_type === type);
+        if (existingDoc) {
+          if (!canDeleteDoc) {
+            alert("No tienes permisos para reemplazar documentos existentes.");
+            setUploadingType(null);
+            setUploadProgress(0);
+            return;
+          }
+          setUploadProgress(50);
+          await deleteDocument(prospect.id, existingDoc.id);
+        }
+
+        setUploadProgress(70);
         const newDoc = await uploadDocument(prospect.id, type, file.name, base64Data);
         setUploadProgress(100);
         setSelectedDoc(newDoc);
@@ -156,9 +216,10 @@ export default function ProspectoDetalle() {
 
         setProspect((prev) => {
           if (!prev) return null;
+          const otherDocs = (prev.documents || []).filter((d) => d.file_type !== type);
           return {
             ...prev,
-            documents: [...(prev.documents || []), newDoc],
+            documents: [...otherDocs, newDoc],
             updated_at: new Date().toISOString(),
           };
         });
@@ -185,6 +246,11 @@ export default function ProspectoDetalle() {
     if (prospects.length > 0) {
       const found = prospects.find((p) => p.id === id);
       if (found) {
+        if (user?.role === "aliado" && found.aliado_id !== user.id) {
+          router.push("/dashboard");
+          return;
+        }
+
         setProspect(found);
         
         // Pre-populate calculator from existing simulation if available, otherwise sensible defaults
@@ -1126,6 +1192,18 @@ export default function ProspectoDetalle() {
                     <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
                       {doc.file_name}
                     </span>
+                    <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1.5 w-full text-left">
+                      <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                        Por: {(() => {
+                          const uploader = profiles.find(p => p.id === doc.uploaded_by);
+                          if (uploader) return uploader.full_name;
+                          return doc.uploaded_by === user?.id ? user?.full_name : "Sistema";
+                        })()}
+                      </span>
+                      <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                        Subido: {new Date(doc.uploaded_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
@@ -1190,6 +1268,15 @@ export default function ProspectoDetalle() {
 
                   {/* Download & Print actions */}
                   <div className="flex items-center gap-2">
+                    {canDeleteDoc && (
+                      <button
+                        onClick={handleDeleteSelectedDoc}
+                        className="p-1.5 hover:bg-slate-700 hover:text-red-400 rounded transition-colors text-slate-350"
+                        title="Eliminar Expediente"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     <button
                       onClick={() => triggerPushNotification(`📥 Descarga Exitosa: El archivo '${selectedDocName}' ha sido descargado en tu carpeta local de forma segura bajo cifrado SSL.`, "email", "Director Eduardo")}
                       className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
@@ -1221,13 +1308,13 @@ export default function ProspectoDetalle() {
                       </div>
                     </div>
                   ) : realFileData ? (
-                    realFileData.startsWith("data:application/pdf") ? (
+                    realFileData.startsWith("data:application/pdf") || realFileData.startsWith("http") ? (
                       <div 
                         className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[690px]"
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <iframe
-                          src={realFileData}
+                          src={realFileData.includes("drive.google.com") && !realFileData.includes("/preview") && !realFileData.includes("/embed") ? realFileData.replace(/\/view.*/, "/preview") : realFileData}
                           className="w-full h-full border-0"
                           title={selectedDocName}
                         />

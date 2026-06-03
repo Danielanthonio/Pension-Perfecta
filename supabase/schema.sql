@@ -246,3 +246,14 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_prospects_updated_at
   BEFORE UPDATE ON prospects
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================================================
+-- MIGRACIÓN: Soporte para Google Drive API
+-- =============================================================================
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS drive_folder_id text;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS drive_folder_url text;
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_file_id text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_file_url text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS drive_folder_id text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_by uuid REFERENCES profiles(id) ON DELETE SET NULL;
