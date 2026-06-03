@@ -197,45 +197,71 @@ export default function DashboardAliado() {
                 <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {enEvaluacion.map((p) => {
-                  const isIncomplete = p.documents.length < 2;
-                  return (
-                    <div key={p.id} className="p-6 hover:bg-slate-50/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-slate-800">{p.full_name}</h4>
-                          {isIncomplete ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                              <AlertCircle className="h-3 w-3" /> Falta Reporte IMSS
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                              Validando
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500">NSS: {p.nss} • CURP: {p.curp}</p>
-                        {p.notes_aliado && <p className="text-[11px] text-slate-400 italic max-w-lg mt-1 font-medium">Nota: &quot;{p.notes_aliado}&quot;</p>}
-                      </div>
-                      
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Sube</span>
-                          <span className="block text-xs font-semibold text-slate-600 mt-0.5">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Email</th>
+                      <th className="px-6 py-4.5">Notas</th>
+                      <th className="px-6 py-4.5">Fecha Registro</th>
+                      <th className="px-6 py-4.5">Estatus</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {enEvaluacion.map((p) => {
+                      const isIncomplete = p.documents.length < 2;
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.email}
+                          </td>
+                          <td className="px-6 py-4 max-w-[200px] truncate text-xs text-slate-500 font-medium" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-300 italic font-normal">Sin notas</span>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
-                        </div>
-                        <Link
-                          href={`/prospectos/${p.id}`}
-                          className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-xl transition-all border border-slate-200/60"
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {isIncomplete ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
+                                <AlertCircle className="h-3 w-3" /> Falta Reporte IMSS
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                                Validando
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <Link
+                              href={`/prospectos/${p.id}`}
+                              className="inline-flex p-1.5 bg-slate-100 group-hover:bg-blue-50 text-slate-500 group-hover:text-blue-600 rounded-xl transition-all border border-slate-200/60"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -243,119 +269,113 @@ export default function DashboardAliado() {
 
         {/* TAB 2: LISTO PARA PRESENTAR (PROPUESSTAS EMITIDAS) */}
         {activeTab === "listo" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
+            </div>
+
             {listoPresentar.length === 0 ? (
-              <div className="col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
+              <div className="py-16 text-center">
                 <CheckSquare className="mx-auto h-12 w-12 text-slate-300" />
                 <h4 className="text-sm font-bold text-slate-700 mt-3">Ninguna simulación aprobada aún</h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.</p>
               </div>
             ) : (
-              listoPresentar.map((p) => {
-                if (!p.simulation) return null;
-                const gainPercent = Math.round(
-                  ((p.simulation.pensionMejorada - p.simulation.pensionActual) / p.simulation.pensionActual) * 100
-                );
-                return (
-                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all">
-                    {/* Card Header */}
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
-                      <div>
-                        <h4 className="text-sm font-extrabold text-slate-800 leading-tight">{p.full_name}</h4>
-                        <p className="text-[10px] text-slate-500 mt-0.5">NSS: {p.nss} • Semanas IMSS: {p.simulation.semanas}</p>
-                      </div>
-                      {p.status === "aportacion" ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-600 border border-teal-100 shadow-sm">
-                          Requiere Aportación
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                          Dictamen Emitido
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Simulation Metrics Visualizer */}
-                    <div className="p-6 space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* Comparison */}
-                        <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex flex-col justify-between">
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Pensión Anterior</span>
-                          <span className="text-sm font-bold text-slate-500 mt-1.5">${p.simulation.pensionActual.toLocaleString()}</span>
-                        </div>
-                        <div className="bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/20 flex flex-col justify-between relative overflow-hidden">
-                          <TrendingUp className="absolute top-2 right-2 h-4 w-4 text-emerald-500" />
-                          <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Mejora Ley 73</span>
-                          <div className="flex items-baseline gap-1 mt-1.5">
-                            <span className="text-base font-extrabold text-emerald-600">${p.simulation.pensionMejorada.toLocaleString()}</span>
-                            <span className="text-[9px] font-bold text-emerald-500">+{gainPercent}%</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Financing Numbers */}
-                      <div className="bg-[#f8fafc] border border-slate-200/80 rounded-xl p-4 space-y-2 text-xs font-semibold">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Financiamiento Aprobado:</span>
-                          <span className="text-slate-800">${p.simulation.financiamiento.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Costos Administrativos:</span>
-                          <span className="text-slate-800">${p.simulation.costoGestion.toLocaleString()}</span>
-                        </div>
-                        <div className="border-t border-slate-200/60 my-2 pt-2 flex justify-between font-bold">
-                          <span className="text-slate-500">Total Crédito (M40 + Gestión):</span>
-                          <span className="text-slate-900">${p.simulation.totalCredito.toLocaleString()}</span>
-                        </div>
-                        
-                        {p.simulation.aforePensionarse !== undefined && p.simulation.aforePensionarse > 0 && (
-                          <div className="flex justify-between text-amber-600 font-semibold bg-amber-500/5 p-1.5 px-2 rounded-lg">
-                            <span>(-) Afore al Pensionarse:</span>
-                            <span>-${p.simulation.aforePensionarse.toLocaleString()}</span>
-                          </div>
-                        )}
-                        {p.simulation.aportacion !== undefined && p.simulation.aportacion > 0 && (
-                          <div className="flex justify-between text-teal-600 font-bold bg-teal-500/5 p-1.5 px-2 rounded-lg">
-                            <span>(=) Aportación Requerida:</span>
-                            <span>${p.simulation.aportacion.toLocaleString()}</span>
-                          </div>
-                        )}
-
-                        <div className="flex justify-between text-emerald-600 font-bold bg-emerald-500/5 p-1 px-2 rounded-lg mt-2">
-                          <span>Retorno ROI Estimado:</span>
-                          <span>{p.simulation.roiMonths} Meses</span>
-                        </div>
-                      </div>
-
-                      {/* Comments */}
-                      {p.simulation.comments && (
-                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Notas del Evaluador:</span>
-                          <p className="text-[11px] text-slate-500 leading-relaxed font-medium">&quot;{p.simulation.comments}&quot;</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bottom CTA Actions */}
-                    <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50/50">
-                      <Link
-                        href={`/prospectos/${p.id}`}
-                        className="flex-1 inline-flex justify-center items-center px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition-colors"
-                      >
-                        <FileText className="h-4 w-4 mr-1.5" />
-                        Ver Expediente
-                      </Link>
-                      <button
-                        onClick={() => handleOpenSchedule(p)}
-                        className="flex-1 inline-flex justify-center items-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow shadow-blue-500/10 border border-blue-400 transition-all hover:scale-[1.02] active:scale-[0.98] transform animate-pulse hover:animate-none"
-                      >
-                        <Calendar className="h-4 w-4 mr-1.5" />
-                        Agendar Asesoría
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Email</th>
+                      <th className="px-6 py-4.5">Notas</th>
+                      <th className="px-6 py-4.5">Pensión Ley 73</th>
+                      <th className="px-6 py-4.5">Crédito Total</th>
+                      <th className="px-6 py-4.5">Retorno ROI</th>
+                      <th className="px-6 py-4.5">Estatus</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {listoPresentar.map((p) => {
+                      if (!p.simulation) return null;
+                      const gainPercent = Math.round(
+                        ((p.simulation.pensionMejorada - p.simulation.pensionActual) / p.simulation.pensionActual) * 100
+                      );
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.email}
+                          </td>
+                          <td className="px-6 py-4 max-w-[150px] truncate text-xs text-slate-500 font-medium" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-300 italic font-normal">Sin notas</span>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-500">${p.simulation.pensionActual.toLocaleString()}</span>
+                              <span className="text-slate-400">→</span>
+                              <span className="text-xs font-extrabold text-emerald-600">${p.simulation.pensionMejorada.toLocaleString()}</span>
+                              <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1 rounded">+{gainPercent}%</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <span className="block text-xs font-bold text-slate-700">${p.simulation.totalCredito.toLocaleString()}</span>
+                              <span className="block text-[9px] text-slate-400">M40 + Gestión</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-700">
+                            {p.simulation.roiMonths} meses
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {p.status === "aportacion" ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-600 border border-teal-100 shadow-sm">
+                                Aportación Requerida
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                Dictamen Emitido
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200/60"
+                                title="Ver Expediente"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Link>
+                              <button
+                                onClick={() => handleOpenSchedule(p)}
+                                className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-95"
+                                title="Agendar Asesoría"
+                              >
+                                <Calendar className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -375,30 +395,54 @@ export default function DashboardAliado() {
                 const isPaid = p.status === "pagado_comision";
                 return (
                   <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 transition-all">
-                    {/* Header Details */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                      <div>
-                        <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                          {p.full_name}
-                          {isPaid && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/20 shadow-inner">
-                              ★ Comisión Liberada
-                            </span>
-                          )}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 mt-0.5">NSS: {p.nss} • CURP: {p.curp}</p>
+                    {/* Header Details in Horizontal Grid */}
+                    <div className="pb-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 flex-1">
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Cliente</span>
+                          <span className="text-xs font-extrabold text-slate-800 leading-tight block mt-0.5 flex items-center gap-1.5">
+                            {p.full_name}
+                            {isPaid && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                                ★
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">NSS</span>
+                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.nss}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">CURP</span>
+                          <span className="text-xs font-semibold text-slate-600 block mt-0.5 uppercase">{p.curp}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Teléfono</span>
+                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.phone}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Email</span>
+                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.email}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Notas</span>
+                          <span className="text-xs text-slate-500 block mt-0.5 truncate" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-350 italic">Sin notas</span>}
+                          </span>
+                        </div>
                       </div>
                       
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between xl:justify-end gap-6 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100">
                         {p.simulation && (
-                          <div className="text-right sm:border-r sm:pr-4 sm:border-slate-100">
-                            <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider">Crédito Total</span>
-                            <span className="block text-xs font-extrabold text-slate-700">${p.simulation.totalCredito.toLocaleString()}</span>
+                          <div className="text-left xl:text-right xl:border-r xl:pr-4 xl:border-slate-100">
+                            <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Crédito Total</span>
+                            <span className="block text-xs font-extrabold text-slate-700 mt-0.5">${p.simulation.totalCredito.toLocaleString()}</span>
                           </div>
                         )}
                         <Link
                           href={`/prospectos/${p.id}`}
-                          className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1"
+                          className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5"
                         >
                           Expediente <ArrowUpRight className="h-3 w-3" />
                         </Link>
