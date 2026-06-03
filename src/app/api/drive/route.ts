@@ -13,7 +13,14 @@ const isConfigured = serviceAccountEmail && privateKey && parentFolderId;
 let drive: any = null;
 if (isConfigured) {
   try {
-    const formattedPrivateKey = privateKey!.replace(/\\n/g, "\n");
+    let formattedPrivateKey = privateKey!.replace(/\\n/g, "\n");
+    // Remove wrapping quotes if they exist in env
+    if (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) {
+      formattedPrivateKey = formattedPrivateKey.slice(1, -1);
+    }
+    // Remove escaped double quotes if they exist
+    formattedPrivateKey = formattedPrivateKey.replace(/\\"/g, '"');
+    
     const auth = new google.auth.JWT({
       email: serviceAccountEmail,
       key: formattedPrivateKey,
