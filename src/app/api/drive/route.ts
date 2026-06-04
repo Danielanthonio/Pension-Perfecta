@@ -211,10 +211,136 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, simulated: false });
     }
 
+    if (action === "scanOcr") {
+      const { fileDataUrl, fileName } = body;
+
+      if (!fileDataUrl) {
+        return NextResponse.json({ success: false, error: "Missing fileDataUrl for OCR" }, { status: 400 });
+      }
+
+      if (runInSimulation) {
+        return NextResponse.json({
+          success: true,
+          simulated: true,
+          error: "Drive client not configured for OCR"
+        });
+      }
+
+      // Parse base64 URL
+      const matches = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
+      if (!matches) {
+        return NextResponse.json({ success: false, error: "Invalid data URL format" }, { status: 400 });
+      }
+
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // Convert buffer to stream
+      const stream = new Readable();
+      stream.push(buffer);
+      stream.push(null);
+
+      // Upload file to Google Drive and convert to Google Doc for OCR
+      const createResponse = await drive.files.create({
+        supportsAllDrives: true,
+        requestBody: {
+          name: `Temp_OCR_${Date.now()}`,
+          mimeType: "application/vnd.google-apps.document", // Triggers OCR conversion
+        },
+        media: {
+          mimeType,
+          body: stream,
+        },
+        fields: "id",
+      });
+
+      const tempDocId = createResponse.data.id;
+
+      if (!tempDocId) {
+        throw new Error("Failed to create temporary OCR document in Google Drive");
+      }
+
+      // Export Google Doc as plain text
+      const exportResponse = await drive.files.export({
+        fileId: tempDocId,
+        mimeType: "text/plain",
+      });
+
+      const extractedText = exportResponse.data || "";
+
+      // Delete the temporary file
+      await drive.files.delete({
+        fileId: tempDocId,
+        supportsAllDrives: true,
+      });
+
+      // Parse text to extract candidate data (Name, NSS, CURP)
+      const data = extractProspectData(extractedText);
+
+      return NextResponse.json({
+        success: true,
+        simulated: false,
+        data,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
 
   } catch (error: any) {
     console.error("Google Drive API Error:", error);
     return NextResponse.json({ success: false, error: error.message || "Internal Server Error" }, { status: 500 });
   }
+}
+
+function extractProspectData(text: string): { fullName: string; nss: string; curp: string } {
+  const cleanText = text.replace(/\r/g, "");
+  
+  // 1. Extract CURP
+  const curpPattern = /\b([A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]{2})\b/i;
+  const curpMatch = cleanText.match(curpPattern);
+  const curp = curpMatch ? curpMatch[1].toUpperCase() : "";
+
+  // 2. Extract NSS
+  const nssPattern = /\b(\d{2}[-\s]?\d{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d)\b/;
+  const nssMatch = cleanText.match(nssPattern);
+  const nss = nssMatch ? nssMatch[1].replace(/[-\s]/g, "") : "";
+
+  // 3. Extract Name
+  let fullName = "";
+  const namePatterns = [
+    /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{3,60})/i,
+    /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*\n\s*([A-ZÁÉÍÓÚÑ\s.,]{5,60})/i,
+  ];
+
+  for (const pattern of namePatterns) {
+    const match = cleanText.match(pattern);
+    if (match && match[1]) {
+      const candidate = match[1].trim();
+      if (candidate.length > 5 && !/curp|nss|rfc|afore|imss|direcc/i.test(candidate)) {
+        fullName = candidate.replace(/\s+/g, " ");
+        break;
+      }
+    }
+  }
+
+  // Fallback: look for uppercase lines that resemble a full name
+  if (!fullName) {
+    const lines = cleanText.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (/^[A-ZÁÉÍÓÚÑ\s]{8,50}$/.test(trimmed) && trimmed.split(/\s+/).length >= 3 && trimmed.split(/\s+/).length <= 5) {
+        if (!/ESTADO|CUENTA|DOCUMENTO|IMSS|AFORE|REPORTE|SEMANAS|COTIZADAS|SOCIAL|NSS|CURP/i.test(trimmed)) {
+          fullName = trimmed;
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    fullName: fullName.toUpperCase(),
+    nss,
+    curp,
+  };
 }
