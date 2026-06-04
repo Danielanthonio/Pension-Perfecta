@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp, Prospect } from "@/utils/context/AppContext";
+import { useApp, Prospect, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import {
   Folder,
@@ -17,6 +17,8 @@ import {
   ArrowUpRight,
   CheckCircle2,
   X,
+  Layers,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,6 +34,49 @@ export default function DashboardAliado() {
 
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [subStageFilter, setSubStageFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
+  const getStageLabel = (status: Prospect["status"]) => {
+    const { stage, subStage } = getStageAndSubStage(status);
+    const stageObj = STAGES_LIST.find((s) => s.id === stage);
+    const stageLabel = stageObj ? stageObj.label : stage;
+    return subStage ? `${stageLabel} • ${subStage}` : stageLabel;
+  };
+
+  const getStageColor = (status: Prospect["status"]) => {
+    switch (status) {
+      case "evaluacion_pendiente":
+        return "bg-blue-50 text-blue-600 border-blue-100";
+      case "rechazado":
+        return "bg-red-50 text-red-600 border-red-100";
+      case "aprobado_listo":
+        return "bg-emerald-50 text-emerald-600 border-emerald-100";
+      case "asesoria_agendada":
+        return "bg-purple-50 text-purple-600 border-purple-100";
+      case "doc_proceso":
+        return "bg-amber-50 text-amber-600 border-amber-100";
+      case "analisis_riesgo":
+        return "bg-cyan-50 text-cyan-600 border-cyan-100";
+      case "firma_programada":
+        return "bg-indigo-50 text-indigo-600 border-indigo-100";
+      case "pagado_comision":
+        return "bg-amber-500/10 text-amber-700 border-amber-500/20 shadow-sm";
+      case "aportacion":
+        return "bg-teal-50 text-teal-700 border-teal-100 shadow-sm";
+      case "falta_reporte":
+        return "bg-rose-50 text-rose-600 border-rose-100";
+      case "falta_afore":
+        return "bg-orange-50 text-orange-600 border-orange-100";
+      case "pendiente_documentos":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "cerrado_perdido":
+        return "bg-slate-100 text-slate-600 border-slate-200";
+      default:
+        return "bg-slate-50 text-slate-600 border-slate-200";
+    }
+  };
 
   const filteredByDate = prospects.filter((p) => {
     if (!p.created_at) return true;
@@ -50,11 +95,32 @@ export default function DashboardAliado() {
     return true;
   });
 
+  const filteredBySearchAndFilters = filteredByDate
+    .filter((p) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return (
+        p.full_name.toLowerCase().includes(term) ||
+        p.nss.includes(term) ||
+        p.curp.toLowerCase().includes(term)
+      );
+    })
+    .filter((p) => {
+      if (stageFilter === "all") return true;
+      const { stage } = getStageAndSubStage(p.status);
+      return stage === stageFilter;
+    })
+    .filter((p) => {
+      if (subStageFilter === "all") return true;
+      const { subStage } = getStageAndSubStage(p.status);
+      return subStage === subStageFilter;
+    });
+
   // Dynamic calculations based on global state
-  const enEvaluacion = filteredByDate.filter((p) =>
+  const enEvaluacion = filteredBySearchAndFilters.filter((p) =>
     ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
   );
-  const listoPresentar = filteredByDate.filter((p) =>
+  const listoPresentar = filteredBySearchAndFilters.filter((p) =>
     ["aprobado_listo", "aportacion"].includes(p.status)
   );
   
@@ -65,7 +131,7 @@ export default function DashboardAliado() {
     "firma_programada",
     "pagado_comision",
   ];
-  const proyectosActivos = filteredByDate.filter((p) => activeStatuses.includes(p.status));
+  const proyectosActivos = filteredBySearchAndFilters.filter((p) => activeStatuses.includes(p.status));
   
   // Missing docs: in evaluation but have less than 2 documents uploaded
   const faltaDocumentos = filteredByDate.filter(
@@ -216,6 +282,55 @@ export default function DashboardAliado() {
         </div>
       )}
 
+      {/* Search and Filters Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
+        {/* Search */}
+        <div className="relative w-full md:flex-1">
+          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por Nombre, NSS o CURP..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all"
+          />
+        </div>
+
+        {/* Stage Filter */}
+        <div className="w-full md:w-52 flex items-center gap-2">
+          <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <select
+            value={stageFilter}
+            onChange={(e) => {
+              setStageFilter(e.target.value);
+              setSubStageFilter("all"); // Reset sub-stage filter on stage change
+            }}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+          >
+            <option value="all">Todas las Etapas</option>
+            {STAGES_LIST.map((stage) => (
+              <option key={stage.id} value={stage.id}>{stage.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sub-stage Filter */}
+        <div className="w-full md:w-52 flex items-center gap-2">
+          <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <select
+            value={subStageFilter}
+            onChange={(e) => setSubStageFilter(e.target.value)}
+            disabled={stageFilter === "all"}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <option value="all">Todas las Subetapas</option>
+            {stageFilter !== "all" && (SUB_STAGES_BY_STAGE[stageFilter] || []).map((sub) => (
+              <option key={sub} value={sub}>{sub}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Segmented Controller Tab Selector */}
       <div className="bg-slate-200/60 p-1 rounded-2xl max-w-md flex border border-slate-200">
         <button
@@ -302,15 +417,9 @@ export default function DashboardAliado() {
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {isIncomplete ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                                <AlertCircle className="h-3 w-3" /> Falta Reporte IMSS
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
-                                Validando
-                              </span>
-                            )}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             <Link
@@ -405,15 +514,9 @@ export default function DashboardAliado() {
                             {p.simulation.roiMonths} meses
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {p.status === "aportacion" ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-600 border border-teal-100 shadow-sm">
-                                Aportación Requerida
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                Dictamen Emitido
-                              </span>
-                            )}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getStageColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             <div className="flex items-center gap-2 justify-end">
@@ -460,7 +563,7 @@ export default function DashboardAliado() {
                   <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 transition-all">
                     {/* Header Details in Horizontal Grid */}
                     <div className="pb-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 flex-1">
+                      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 flex-1">
                         <div>
                           <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Cliente</span>
                           <span className="text-xs font-extrabold text-slate-800 leading-tight block mt-0.5 flex items-center gap-1.5">
@@ -493,6 +596,14 @@ export default function DashboardAliado() {
                           <span className="text-xs text-slate-500 block mt-0.5 truncate" title={p.notes_aliado}>
                             {p.notes_aliado || <span className="text-slate-350 italic">Sin notas</span>}
                           </span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Etapa / Subetapa</span>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       

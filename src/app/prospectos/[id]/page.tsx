@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useApp, Prospect, Simulation, DocumentItem } from "@/utils/context/AppContext";
+import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
 import {
   ArrowLeft,
   FileText,
@@ -69,36 +69,10 @@ export default function ProspectoDetalle() {
   };
 
   const getStageLabel = (status: Prospect["status"]) => {
-    switch (status) {
-      case "evaluacion_pendiente":
-        return "Evaluación Pendiente";
-      case "rechazado":
-        return "Rechazado";
-      case "aprobado_listo":
-        return "Aprobado / Listo";
-      case "asesoria_agendada":
-        return "Asesoría Agendada";
-      case "doc_proceso":
-        return "Expediente en Trámite";
-      case "analisis_riesgo":
-        return "Análisis de Riesgo";
-      case "firma_programada":
-        return "Firma Programada";
-      case "pagado_comision":
-        return "Comisión Liberada";
-      case "aportacion":
-        return "Aportación";
-      case "falta_reporte":
-        return "Falta Reporte";
-      case "falta_afore":
-        return "Falta Afore";
-      case "pendiente_documentos":
-        return "Pendiente Documentos";
-      case "cerrado_perdido":
-        return "No acepta propuesta / Cerrado Perdido";
-      default:
-        return "Proceso Interno Activo";
-    }
+    const { stage, subStage } = getStageAndSubStage(status);
+    const stageObj = STAGES_LIST.find((s) => s.id === stage);
+    const stageLabel = stageObj ? stageObj.label : stage;
+    return subStage ? `${stageLabel} • ${subStage}` : stageLabel;
   };
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
@@ -1007,6 +981,21 @@ export default function ProspectoDetalle() {
     );
   }
 
+  const currentStage = getStageAndSubStage(prospect?.status || "");
+
+  const handleStageChange = async (newStageId: string) => {
+    if (!prospect) return;
+    const defaultSubStage = SUB_STAGES_BY_STAGE[newStageId]?.[0] || "";
+    const newStatus = getStatusFromStageAndSubStage(newStageId, defaultSubStage);
+    await updateProspectStatus(prospect.id, newStatus as any, `Etapa cambiada a ${newStageId}`);
+  };
+
+  const handleSubStageChange = async (newSubStage: string) => {
+    if (!prospect) return;
+    const newStatus = getStatusFromStageAndSubStage(currentStage.stage, newSubStage);
+    await updateProspectStatus(prospect.id, newStatus as any, `Subetapa cambiada a ${newSubStage}`);
+  };
+
   const handleEmitSimulation = async () => {
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
       alert("Por favor verifica los números. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero.");
@@ -1137,6 +1126,47 @@ export default function ProspectoDetalle() {
           <div>
             <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px]">Teléfono Móvil</span>
             <span className="text-slate-700 block mt-0.5">{prospect.phone}</span>
+          </div>
+        </div>
+
+        {/* Etapa y Subetapa Selectors / Badges */}
+        <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-4 text-xs font-semibold border-t md:border-t-0 md:border-l border-slate-150 pt-4 md:pt-0 md:pl-6 min-w-[220px]">
+          <div className="flex-1">
+            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Etapa</span>
+            {user?.role === "director" ? (
+              <select
+                value={currentStage.stage}
+                onChange={(e) => handleStageChange(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl py-1.5 px-3 text-xs font-bold outline-none transition-colors cursor-pointer"
+              >
+                {STAGES_LIST.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="inline-block px-3 py-1 bg-slate-100/80 text-slate-700 border border-slate-200 rounded-full text-[10px] font-black uppercase tracking-wider">
+                {STAGES_LIST.find((s) => s.id === currentStage.stage)?.label || currentStage.stage}
+              </span>
+            )}
+          </div>
+          <div className="flex-1">
+            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Subetapa</span>
+            {user?.role === "director" ? (
+              <select
+                value={currentStage.subStage}
+                onChange={(e) => handleSubStageChange(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl py-1.5 px-3 text-xs font-bold outline-none transition-colors cursor-pointer"
+              >
+                <option value="">Ninguna</option>
+                {(SUB_STAGES_BY_STAGE[currentStage.stage] || []).map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-full text-[10px] font-black uppercase tracking-wider">
+                {currentStage.subStage || "Ninguna"}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -1557,13 +1587,14 @@ export default function ProspectoDetalle() {
                 {/* Semanas Cotizadas */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Semanas Cotizadas (Auditadas)
+                    Semanas cotizadas
                   </label>
                   <input
                     type="number"
                     value={semanas}
+                    disabled={user?.role !== "director"}
                     onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all"
+                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all"
                   />
                 </div>
 
@@ -1571,7 +1602,7 @@ export default function ProspectoDetalle() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Pensión Actual
+                      Pensión actual
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1580,14 +1611,15 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionActual}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Pensión Proyectada
+                      Pensión proyectada
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1596,8 +1628,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionMejorada}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -1616,8 +1649,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={financiamiento}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setFinanciamiento(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -1632,8 +1666,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={costoGestion}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setCostoGestion(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -1643,7 +1678,7 @@ export default function ProspectoDetalle() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Afore al Pensionarse
+                      Afore al pensionarse
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1652,14 +1687,15 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={aforePensionarse}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Crédito de Nómina
+                      Credito de nomina
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -1668,8 +1704,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={creditoNomina}
+                        disabled={user?.role !== "director"}
                         onChange={(e) => setCreditoNomina(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
                     </div>
                   </div>
@@ -1678,59 +1715,51 @@ export default function ProspectoDetalle() {
                 {/* Dictamen comments */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Dictamen y Observaciones Técnicas
+                    Observaciones
                   </label>
                   <textarea
                     value={comments}
+                    disabled={user?.role !== "director"}
                     onChange={(e) => setComments(e.target.value)}
                     rows={3}
                     placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none"
+                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none"
                   />
                 </div>
               </div>
 
-              {/* Dynamic computed outputs */}
-              <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4.5 space-y-4">
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1 leading-none">
-                  <Info className="h-3.5 w-3.5 text-indigo-500" /> Resultados Calculados en Tiempo Real
+              {/* Redesigned Diagnóstico Section */}
+              <div className="border-t border-slate-150 pt-5 space-y-4">
+                <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest flex items-center gap-1.5 leading-none">
+                  Diagnostico
                 </span>
                 
-                <div className="grid grid-cols-2 gap-3.5">
-                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Total Crédito</span>
-                    <span className="text-sm font-black text-slate-800 block mt-1 leading-none">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Total Crédito Card */}
+                  <div className="bg-indigo-50/50 border border-indigo-100/80 rounded-2xl p-4 shadow-sm hover:shadow transition-shadow">
+                    <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-wider block leading-none">
+                      Total credito
+                    </span>
+                    <span className="text-lg font-black text-indigo-950 block mt-2.5 leading-none">
                       ${totalCredito.toLocaleString()}
                     </span>
                   </div>
-                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Incremento Mensual</span>
-                    <span className="text-sm font-black text-indigo-600 block mt-1 leading-none">
-                      ${incrementoMensual > 0 ? incrementoMensual.toLocaleString() : 0}
+
+                  {/* Aportación Card */}
+                  <div className={`border rounded-2xl p-4 shadow-sm hover:shadow transition-shadow ${
+                    aportacion > 0 
+                      ? "bg-amber-50/50 border-amber-100/80 text-amber-950" 
+                      : "bg-teal-50/50 border-teal-100/80 text-teal-950"
+                  }`}>
+                    <span className={`text-[9px] font-extrabold uppercase tracking-wider block leading-none ${
+                      aportacion > 0 ? "text-amber-400" : "text-teal-400"
+                    }`}>
+                      Aportacion
                     </span>
-                  </div>
-                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Afore al Pensionarse</span>
-                    <span className="text-sm font-black text-amber-600 block mt-1 leading-none">
-                      ${aforePensionarse.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="bg-white border border-slate-150 rounded-2xl p-3.5 shadow-sm">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block leading-none">Aportación</span>
-                    <span className={`text-sm font-black block mt-1 leading-none ${aportacion > 0 ? "text-teal-600" : "text-slate-500"}`}>
+                    <span className="text-lg font-black block mt-2.5 leading-none">
                       ${aportacion.toLocaleString()}
                     </span>
                   </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-md shadow-indigo-500/10">
-                  <div className="space-y-0.5">
-                    <span className="text-[7.5px] text-indigo-100 font-bold uppercase tracking-widest block leading-none">Retorno de Inversión (ROI)</span>
-                    <span className="text-[10px] text-white/90 font-semibold block leading-none mt-1">Punto de equilibrio estimado</span>
-                  </div>
-                  <span className="text-base font-black text-white bg-white/10 border border-white/20 px-3 py-1 rounded-xl">
-                    {roiMeses} Meses
-                  </span>
                 </div>
               </div>
             </div>
@@ -1740,36 +1769,38 @@ export default function ProspectoDetalle() {
       </div>
 
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] rounded-t-[32px] z-40 select-none">
-        <div className="max-w-[1700px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-          {/* Rechazar */}
-          <button
-            onClick={() => setShowRejectionModal(true)}
-            className="w-full py-4.5 bg-[#e53e3e] hover:bg-[#c53030] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-red-500/10"
-          >
-            <XCircle className="h-5 w-5 stroke-[2.5]" />
-            Rechazar
-          </button>
-          
-          {/* Condicionar */}
-          <button
-            onClick={() => setShowConditionModal(true)}
-            className="w-full py-4.5 bg-[#ecc94b] hover:bg-[#d69e2e] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-md shadow-amber-500/10"
-          >
-            <Clock className="h-5 w-5 stroke-[2.5]" />
-            Condicionar
-          </button>
+      {user?.role === "director" && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40 select-none">
+          <div className="max-w-[1700px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-5.5 w-full">
+            {/* Rechazar */}
+            <button
+              onClick={() => setShowRejectionModal(true)}
+              className="w-full py-4.5 px-6 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-red-800 flex items-center justify-center gap-2.5 shadow-md shadow-red-500/25 active:shadow-sm"
+            >
+              <XCircle className="h-5 w-5 stroke-[2.5]" />
+              Rechazar
+            </button>
+            
+            {/* Condicionar */}
+            <button
+              onClick={() => setShowConditionModal(true)}
+              className="w-full py-4.5 px-6 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-amber-700 flex items-center justify-center gap-2.5 shadow-md shadow-amber-500/25 active:shadow-sm"
+            >
+              <Clock className="h-5 w-5 stroke-[2.5]" />
+              Condicionar
+            </button>
 
-          {/* Aprobar */}
-          <button
-            onClick={handleEmitSimulation}
-            className="w-full py-4.5 bg-[#38a169] hover:bg-[#2f855a] text-white rounded-2xl text-sm font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15"
-          >
-            <CheckCircle className="h-5 w-5 stroke-[2.5]" />
-            Aprobar
-          </button>
+            {/* Aprobar */}
+            <button
+              onClick={handleEmitSimulation}
+              className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-650 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-emerald-800 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/30 active:shadow-sm"
+            >
+              <CheckCircle className="h-5 w-5 stroke-[2.5]" />
+              Aprobar
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Rejection comment modal overlay */}
       {showRejectionModal && (

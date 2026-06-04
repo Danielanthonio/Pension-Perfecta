@@ -2404,3 +2404,75 @@ export function useApp() {
   }
   return context;
 }
+
+export const STAGES_LIST = [
+  { id: "evaluacion_pendiente", label: "Evaluación pendiente" },
+  { id: "rechazado", label: "Rechazado" },
+  { id: "aprobado", label: "Aprobado" },
+  { id: "cerrado_perdido", label: "Cerrado Perdido" }
+];
+
+export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
+  evaluacion_pendiente: ["Falta Reporte", "Falta Afore", "Pendiente Documentos"],
+  rechazado: ["No aplica"],
+  aprobado: ["aportacion", "Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada", "Pagado / Cerrado"],
+  cerrado_perdido: ["No acepta propuesta"]
+};
+
+export function getStageAndSubStage(status: string): { stage: string; subStage: string } {
+  switch (status) {
+    case "falta_reporte":
+      return { stage: "evaluacion_pendiente", subStage: "Falta Reporte" };
+    case "falta_afore":
+      return { stage: "evaluacion_pendiente", subStage: "Falta Afore" };
+    case "pendiente_documentos":
+      return { stage: "evaluacion_pendiente", subStage: "Pendiente Documentos" };
+    case "evaluacion_pendiente":
+      return { stage: "evaluacion_pendiente", subStage: "" };
+    case "rechazado":
+      return { stage: "rechazado", subStage: "No aplica" };
+    case "aportacion":
+      return { stage: "aprobado", subStage: "aportacion" };
+    case "asesoria_agendada":
+      return { stage: "aprobado", subStage: "Agenda Asesoria" };
+    case "doc_proceso":
+      return { stage: "aprobado", subStage: "Firma Carta Compromiso" };
+    case "analisis_riesgo":
+      return { stage: "aprobado", subStage: "Analisis de Riesgo" };
+    case "firma_programada":
+      return { stage: "aprobado", subStage: "Cerrada Ganada" };
+    case "pagado_comision":
+      return { stage: "aprobado", subStage: "Pagado / Cerrado" };
+    case "aprobado_listo":
+      return { stage: "aprobado", subStage: "" };
+    case "cerrado_perdido":
+      return { stage: "cerrado_perdido", subStage: "No acepta propuesta" };
+    default:
+      return { stage: "evaluacion_pendiente", subStage: "" };
+  }
+}
+
+export function getStatusFromStageAndSubStage(stage: string, subStage: string): string {
+  if (stage === "evaluacion_pendiente") {
+    if (subStage === "Falta Reporte") return "falta_reporte";
+    if (subStage === "Falta Afore") return "falta_afore";
+    if (subStage === "Pendiente Documentos") return "pendiente_documentos";
+    return "evaluacion_pendiente";
+  }
+  if (stage === "rechazado") {
+    return "rechazado";
+  }
+  if (stage === "aprobado") {
+    if (subStage === "aportacion") return "aportacion";
+    if (subStage === "Agenda Asesoria") return "asesoria_agendada";
+    if (subStage === "Firma Carta Compromiso") return "doc_proceso";
+    if (subStage === "Analisis de Riesgo") return "analisis_riesgo";
+    if (subStage === "Cerrada Ganada") return "firma_programada";
+    if (subStage === "Pagado / Cerrado") return "pagado_comision";
+    return "aprobado_listo";
+  }
+  if (stage === "cerrado_perdido") {
+    return "cerrado_perdido";
+  }
+  return "evaluacion_pendiente";
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp, Prospect } from "@/utils/context/AppContext";
+import { useApp, Prospect, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import {
   FolderKanban,
@@ -25,6 +25,7 @@ export default function PipelineManager() {
   const { prospects, updateProspectStatus, deleteProspect } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [subStageFilter, setSubStageFilter] = useState<string>("all");
   const [selectedAlly, setSelectedAlly] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -53,36 +54,10 @@ export default function PipelineManager() {
   const [deleting, setDeleting] = useState(false);
 
   const getStageLabel = (status: Prospect["status"]) => {
-    switch (status) {
-      case "evaluacion_pendiente":
-        return "Evaluación Pendiente";
-      case "rechazado":
-        return "Rechazado";
-      case "aprobado_listo":
-        return "Aprobado / Listo";
-      case "asesoria_agendada":
-        return "Asesoría Agendada";
-      case "doc_proceso":
-        return "Expediente en Trámite";
-      case "analisis_riesgo":
-        return "Análisis de Riesgo";
-      case "firma_programada":
-        return "Firma Programada";
-      case "pagado_comision":
-        return "Comisión Liberada";
-      case "aportacion":
-        return "Aportación";
-      case "falta_reporte":
-        return "Falta Reporte";
-      case "falta_afore":
-        return "Falta Afore";
-      case "pendiente_documentos":
-        return "Pendiente Documentos";
-      case "cerrado_perdido":
-        return "No acepta propuesta / Cerrado Perdido";
-      default:
-        return "";
-    }
+    const { stage, subStage } = getStageAndSubStage(status);
+    const stageObj = STAGES_LIST.find((s) => s.id === stage);
+    const stageLabel = stageObj ? stageObj.label : stage;
+    return subStage ? `${stageLabel} • ${subStage}` : stageLabel;
   };
 
   const getStageColor = (status: Prospect["status"]) => {
@@ -143,7 +118,13 @@ export default function PipelineManager() {
     })
     .filter((p) => {
       if (stageFilter === "all") return true;
-      return p.status === stageFilter;
+      const { stage } = getStageAndSubStage(p.status);
+      return stage === stageFilter;
+    })
+    .filter((p) => {
+      if (subStageFilter === "all") return true;
+      const { subStage } = getStageAndSubStage(p.status);
+      return subStage === subStageFilter;
     })
     .filter((p) => {
       if (selectedAlly === "all") return true;
@@ -257,28 +238,37 @@ export default function PipelineManager() {
           />
         </div>
 
-        {/* Stage 8 options dropdown */}
+        {/* Stage Filter */}
         <div className="w-full md:w-52 flex items-center gap-2">
           <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
           <select
             value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors"
+            onChange={(e) => {
+              setStageFilter(e.target.value);
+              setSubStageFilter("all"); // Reset sub-stage filter on stage change
+            }}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors cursor-pointer"
           >
             <option value="all">Todas las Etapas</option>
-            <option value="evaluacion_pendiente">1. Evaluación Pendiente</option>
-            <option value="falta_reporte">Falta Reporte</option>
-            <option value="falta_afore">Falta Afore</option>
-            <option value="pendiente_documentos">Pendiente Documentos</option>
-            <option value="rechazado">2. Rechazado</option>
-            <option value="aprobado_listo">3. Aprobado / Listo</option>
-            <option value="aportacion">Aportación</option>
-            <option value="asesoria_agendada">4. Asesoría Agendada</option>
-            <option value="doc_proceso">5. Expediente en Trámite</option>
-            <option value="analisis_riesgo">6. Análisis de Riesgo</option>
-            <option value="firma_programada">7. Firma Programada</option>
-            <option value="pagado_comision">8. Comisión Liberada</option>
-            <option value="cerrado_perdido">No acepta propuesta / Cerrado Perdido</option>
+            {STAGES_LIST.map((stage) => (
+              <option key={stage.id} value={stage.id}>{stage.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Sub-stage Filter */}
+        <div className="w-full md:w-52 flex items-center gap-2">
+          <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <select
+            value={subStageFilter}
+            onChange={(e) => setSubStageFilter(e.target.value)}
+            disabled={stageFilter === "all"}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <option value="all">Todas las Subetapas</option>
+            {stageFilter !== "all" && (SUB_STAGES_BY_STAGE[stageFilter] || []).map((sub) => (
+              <option key={sub} value={sub}>{sub}</option>
+            ))}
           </select>
         </div>
 
@@ -393,25 +383,37 @@ export default function PipelineManager() {
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1.5 min-w-[150px]">
+                          {/* Selector de Etapa */}
                           <select
-                            value={p.status}
-                            onChange={(e) => handleStageChange(p.id, e.target.value as any)}
-                            className={`py-1.5 px-3.5 border rounded-xl text-xs font-extrabold outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${getStageColor(p.status)}`}
+                            value={getStageAndSubStage(p.status).stage}
+                            onChange={async (e) => {
+                              const newStage = e.target.value;
+                              const defaultSubStage = SUB_STAGES_BY_STAGE[newStage]?.[0] || "";
+                              const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
+                              await handleStageChange(p.id, newStatus as any);
+                            }}
+                            className={`py-1.5 px-3 border rounded-xl text-[10px] font-black outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer ${getStageColor(p.status)}`}
                           >
-                            <option value="evaluacion_pendiente">1. Evaluación Pendiente</option>
-                            <option value="falta_reporte">Falta Reporte</option>
-                            <option value="falta_afore">Falta Afore</option>
-                            <option value="pendiente_documentos">Pendiente Documentos</option>
-                            <option value="rechazado">2. Rechazado</option>
-                            <option value="aprobado_listo">3. Aprobado / Listo</option>
-                            <option value="aportacion">Aportación</option>
-                            <option value="asesoria_agendada">4. Asesoría Agendada</option>
-                            <option value="doc_proceso">5. Expediente en Trámite</option>
-                            <option value="analisis_riesgo">6. Análisis de Riesgo</option>
-                            <option value="firma_programada">7. Firma Programada</option>
-                            <option value="pagado_comision">8. Comisión Liberada</option>
-                            <option value="cerrado_perdido">No acepta propuesta / Cerrado Perdido</option>
+                            {STAGES_LIST.map((stage) => (
+                              <option key={stage.id} value={stage.id}>{stage.label}</option>
+                            ))}
+                          </select>
+
+                          {/* Selector de Subetapa */}
+                          <select
+                            value={getStageAndSubStage(p.status).subStage}
+                            onChange={async (e) => {
+                              const currentMapping = getStageAndSubStage(p.status);
+                              const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
+                              await handleStageChange(p.id, newStatus as any);
+                            }}
+                            className="py-1 px-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-[10px] font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                          >
+                            <option value="">Ninguna</option>
+                            {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
+                              <option key={sub} value={sub}>{sub}</option>
+                            ))}
                           </select>
                         </div>
                       </td>

@@ -44,12 +44,12 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
   ];
   const finAprobados = prospects
     .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
-    .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
+    .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
-  // Financiamientos Otorgados: sum of simulation.financiamiento for closed/paid projects only (pagado_comision)
+  // Financiamientos Otorgados: sum of simulation.totalCredito for closed/paid projects only (pagado_comision)
   const finOtorgados = prospects
     .filter((p) => p.status === "pagado_comision" && p.simulation)
-    .reduce((sum, p) => sum + (p.simulation?.financiamiento || 0), 0);
+    .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
   // 2. Conversion rates calculations
   const tasaEvaluacion = proyectosCount > 0 ? (enEvaluacionCount / proyectosCount) * 100 : 0;
