@@ -141,17 +141,20 @@ export default function DashboardAliado() {
     ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status)
   );
   const listoPresentar = filteredBySearchAndFilters.filter((p) =>
-    ["aprobado_listo", "aportacion"].includes(p.status)
+    ["aprobado_listo", "aportacion"].includes(p.status) ||
+    (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"))
   );
   
   const activeStatuses = [
-    "asesoria_agendada",
     "doc_proceso",
     "analisis_riesgo",
     "firma_programada",
     "pagado_comision",
   ];
-  const proyectosActivos = filteredBySearchAndFilters.filter((p) => activeStatuses.includes(p.status));
+  const proyectosActivos = filteredBySearchAndFilters.filter((p) => 
+    activeStatuses.includes(p.status) ||
+    (p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada"))
+  );
   
   // Missing docs: in evaluation but have less than 2 documents uploaded
   const faltaDocumentos = filteredByDate.filter(

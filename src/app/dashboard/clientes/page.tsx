@@ -164,16 +164,17 @@ export default function MisClientes() {
   const filteredStatus = filteredSearch.filter((p) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "evaluacion") return ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status);
-    if (statusFilter === "listo") return p.status === "aprobado_listo" || p.status === "aportacion";
+    if (statusFilter === "listo") return p.status === "aprobado_listo" || p.status === "aportacion" || (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"));
     if (statusFilter === "rechazado") return p.status === "rechazado";
     if (statusFilter === "activos") {
-      return [
-        "asesoria_agendada",
+      const activeBase = [
         "doc_proceso",
         "analisis_riesgo",
         "firma_programada",
         "pagado_comision",
       ].includes(p.status);
+      const isScheduledAsesoria = p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada");
+      return activeBase || isScheduledAsesoria;
     }
     return true;
   });
