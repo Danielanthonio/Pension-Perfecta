@@ -247,6 +247,7 @@ export async function POST(req: NextRequest) {
         requestBody: {
           name: `Temp_OCR_${Date.now()}`,
           mimeType: "application/vnd.google-apps.document", // Triggers OCR conversion
+          parents: [parentFolderId!],
         },
         media: {
           mimeType,
@@ -269,11 +270,15 @@ export async function POST(req: NextRequest) {
 
       const extractedText = exportResponse.data || "";
 
-      // Delete the temporary file
-      await drive.files.delete({
-        fileId: tempDocId,
-        supportsAllDrives: true,
-      });
+      // Delete the temporary file (wrapped in try-catch to avoid crashing on cleanup errors)
+      try {
+        await drive.files.delete({
+          fileId: tempDocId,
+          supportsAllDrives: true,
+        });
+      } catch (deleteError) {
+        console.warn(`Temporary OCR file deletion warning (id: ${tempDocId}):`, deleteError);
+      }
 
       // Parse text to extract candidate data (Name, NSS, CURP)
       const data = extractProspectData(extractedText);
@@ -309,6 +314,7 @@ function extractProspectData(text: string): { fullName: string; nss: string; cur
   // 3. Extract Name
   let fullName = "";
   const namePatterns = [
+    /(?:estimado\(a\),?\s*\n?\s*)([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{5,60})/i,
     /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{3,60})/i,
     /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*\n\s*([A-ZÁÉÍÓÚÑ\s.,]{5,60})/i,
   ];
@@ -338,10 +344,12 @@ function extractProspectData(text: string): { fullName: string; nss: string; cur
     }
   }
 
-  // 4. Extract Semanas Cotizadas
+  // 4. Extract Semanas Cotizadas (preferring total/IMSS weeks)
   const semanasPatterns = [
-    /(?:semanas\s+cotizadas|semanas\s+reconocidas|total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas|número\s+de\s+semanas\s+reconocidas)\s*:\s*([\d,]+)/i,
-    /(?:semanas\s+cotizadas|semanas\s+reconocidas|total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas|número\s+de\s+semanas\s+reconocidas)\s*\n\s*([\d,]+)/i,
+    /(?:total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas)\s*:\s*([\d,]+)/i,
+    /(?:total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas)\s*\n\s*([\d,]+)/i,
+    /(?:semanas\s+cotizadas\s+imss|semanas\s+cotizadas|semanas\s+reconocidas|número\s+de\s+semanas\s+reconocidas)\s*:\s*([\d,]+)/i,
+    /(?:semanas\s+cotizadas\s+imss|semanas\s+cotizadas|semanas\s+reconocidas|número\s+de\s+semanas\s+reconocidas)\s*\n\s*([\d,]+)/i,
     /([\d,]+)\s*(?:semanas\s+cotizadas|semanas\s+reconocidas)/i
   ];
   let semanas = "";
