@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
 import {
   ArrowLeft,
+  ArrowUpRight,
   FileText,
   CheckCircle,
   XCircle,
@@ -998,31 +999,53 @@ export default function ProspectoDetalle() {
 
                   {/* Projections summary if approved - display clean non-editable details */}
                   {isApproved && prospect.simulation && (
-                    <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-100/40 grid grid-cols-2 gap-3.5 text-slate-800">
-                      <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Mejorada</span>
-                        <span className="text-xs font-black text-emerald-600 block mt-1.5 leading-none">
-                          ${prospect.simulation.pensionMejorada.toLocaleString()} / mes
-                        </span>
+                    <div className="space-y-4">
+                      <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-100/40 grid grid-cols-2 gap-3.5 text-slate-800">
+                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Mejorada</span>
+                          <span className="text-xs font-black text-emerald-600 block mt-1.5 leading-none">
+                            ${prospect.simulation.pensionMejorada.toLocaleString()} / mes
+                          </span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Anterior</span>
+                          <span className="text-xs font-black text-slate-500 block mt-1.5 leading-none">
+                            ${prospect.simulation.pensionActual.toLocaleString()} / mes
+                          </span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Financiamiento M40</span>
+                          <span className="text-xs font-black text-slate-700 block mt-1.5 leading-none">
+                            ${prospect.simulation.financiamiento.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Incremento Neto</span>
+                          <span className="text-xs font-black text-indigo-600 block mt-1.5 leading-none">
+                            ${(prospect.simulation.pensionMejorada - prospect.simulation.pensionActual).toLocaleString()}
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Anterior</span>
-                        <span className="text-xs font-black text-slate-500 block mt-1.5 leading-none">
-                          ${prospect.simulation.pensionActual.toLocaleString()} / mes
-                        </span>
-                      </div>
-                      <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Financiamiento M40</span>
-                        <span className="text-xs font-black text-slate-700 block mt-1.5 leading-none">
-                          ${prospect.simulation.financiamiento.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                        <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Incremento Neto</span>
-                        <span className="text-xs font-black text-indigo-600 block mt-1.5 leading-none">
-                          ${(prospect.simulation.pensionMejorada - prospect.simulation.pensionActual).toLocaleString()}
-                        </span>
-                      </div>
+
+                      {/* Direct scheduling button for Aliado */}
+                      {prospect.status === "aprobado_listo" && (
+                        <div className="bg-white/95 rounded-2xl p-4 border border-indigo-150 space-y-3 shadow-sm text-center">
+                          <span className="block text-[8px] font-bold text-indigo-550 uppercase tracking-wider">Acción Requerida</span>
+                          <h4 className="text-xs font-bold text-slate-800">Agendar Asesoría Comercial</h4>
+                          <p className="text-[10px] text-slate-500 leading-normal">
+                            Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:
+                          </p>
+                          <a
+                            href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
+                          >
+                            <span>Abrir Agenda Oficial</span>
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

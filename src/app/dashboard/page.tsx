@@ -867,6 +867,28 @@ export default function DashboardAliado() {
 
               {schedulingStep === "datetime" ? (
                 <div className="space-y-4">
+                  {/* Direct Link Section */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Agendamiento Directo
+                    </span>
+                    <p className="text-[11px] text-slate-500 mb-3 leading-normal">
+                      Haz clic en el enlace para agendar directamente la sesión con el cliente:
+                    </p>
+                    <a
+                      href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
+                    >
+                      <span>Abrir Agenda Oficial</span>
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                    <span className="block text-[9px] text-slate-400 mt-2">
+                      Una vez agendada la asesoría en el enlace anterior, registra la fecha y hora a continuación para sincronizar el expediente.
+                    </span>
+                  </div>
+
                   {/* Select Date */}
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">1. Seleccionar Día</label>
@@ -916,7 +938,7 @@ export default function DashboardAliado() {
                   <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3 max-w-[280px] mx-auto text-xs font-semibold text-slate-600 space-y-1">
                     <div>Fecha: {selectedDate}</div>
                     <div>Horario: {selectedTime}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Sincronizado vía Calendly</div>
+                    <div className="text-[10px] text-slate-400 mt-1">Agendado vía LeadConnector</div>
                   </div>
                 </div>
               )}
