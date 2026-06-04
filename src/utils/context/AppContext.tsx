@@ -135,6 +135,21 @@ interface AppContextType {
     imssFile?: string | { name: string; dataUrl: string }
   ) => Promise<Prospect>;
   deleteProspect: (id: string) => Promise<void>;
+  restoreProspect: (id: string) => Promise<void>;
+  permanentlyDeleteProspect: (id: string) => Promise<void>;
+  editProspectPersonalData: (
+    id: string,
+    updates: {
+      full_name: string;
+      nss: string;
+      curp: string;
+      phone: string;
+      email: string;
+    }
+  ) => Promise<void>;
+  isProspectDeleted: (p: Prospect) => boolean;
+  isProspectPurged: (p: Prospect) => boolean;
+  getProspectDeletedAt: (p: Prospect) => Date | null;
   updateProspectStatus: (id: string, newStatus: Prospect["status"], comments?: string) => Promise<void>;
   saveSimulation: (
     id: string,
@@ -385,6 +400,20 @@ const INITIAL_NOTIFICATIONS: NotificationItem[] = [
   },
 ];
 
+export function isProspectDeleted(p: Prospect): boolean {
+  return typeof p.notes_director === "string" && p.notes_director.startsWith("[DELETED:");
+}
+
+export function isProspectPurged(p: Prospect): boolean {
+  return typeof p.notes_director === "string" && p.notes_director.startsWith("[PURGED:");
+}
+
+export function getProspectDeletedAt(p: Prospect): Date | null {
+  if (typeof p.notes_director !== "string" || !p.notes_director.startsWith("[DELETED:")) return null;
+  const match = p.notes_director.match(/^\[DELETED:([^\]]+)\]/);
+  return match ? new Date(match[1]) : null;
+}
+
 export function AppContextProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [activeRole, setActiveRole] = useState<UserRole>("aliado");
@@ -601,7 +630,27 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
 
       if (storedProspects) {
-        setProspects(JSON.parse(storedProspects));
+        const parsed = JSON.parse(storedProspects);
+        // Clean up older than 7 days or purged in demo mode
+        const now = new Date();
+        const cleaned = parsed.filter((p: any) => {
+          const notesDir = p.notes_director || "";
+          const isDeleted = notesDir.startsWith("[DELETED:");
+          const isPurged = notesDir.startsWith("[PURGED:");
+          if (isPurged) return false;
+          if (isDeleted) {
+            const match = notesDir.match(/^\[DELETED:([^\]]+)\]/);
+            if (match) {
+              const delDate = new Date(match[1]);
+              const diffTime = Math.abs(now.getTime() - delDate.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              return diffDays <= 7;
+            }
+          }
+          return true;
+        });
+        setProspects(cleaned);
+        saveToStorage("pensionflow_prospects", cleaned);
       } else {
         setProspects(INITIAL_PROSPECTS);
         localStorage.setItem("pensionflow_prospects", JSON.stringify(INITIAL_PROSPECTS));
@@ -706,7 +755,54 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
           const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
           if (dbProspects) {
-            setProspects(dbProspects.map(transformProspectFromDB));
+            const mappedProspects = dbProspects.map(transformProspectFromDB);
+            setProspects(mappedProspects);
+
+            // Clean up old soft-deleted or purged prospects in background if director/admin
+            if (currentUser && currentUser.role === "director") {
+              const now = new Date();
+              const toPurge = mappedProspects.filter((p: Prospect) => {
+                const deletedAt = getProspectDeletedAt(p);
+                const isPurged = isProspectPurged(p);
+                if (isPurged) return true;
+                if (deletedAt) {
+                  const diffTime = Math.abs(now.getTime() - deletedAt.getTime());
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  return diffDays > 7;
+                }
+                return false;
+              });
+
+              if (toPurge.length > 0) {
+                for (const p of toPurge) {
+                  const driveFolderId = p.drive_folder_id || p.google_drive_folder;
+                  if (driveFolderId) {
+                    try {
+                      await fetch("/api/drive", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "deleteFile",
+                          fileId: driveFolderId,
+                        }),
+                      });
+                    } catch (err) {
+                      console.error("Cleanup: GDrive error:", err);
+                    }
+                  }
+                  try {
+                    await client.from("prospects").delete().eq("id", p.id);
+                  } catch (err) {
+                    console.error("Cleanup: Supabase error:", err);
+                  }
+                }
+                // Refetch prospects after background purge
+                const { data: refetched } = await prospectsQuery.order("created_at", { ascending: false });
+                if (refetched) {
+                  setProspects(refetched.map(transformProspectFromDB));
+                }
+              }
+            }
           }
 
           // Fetch invitation codes
@@ -1356,8 +1452,136 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   const deleteProspect = async (id: string): Promise<void> => {
     const target = prospects.find((p) => p.id === id);
-    const driveFolderId = target?.drive_folder_id || target?.google_drive_folder;
+    if (!target) return;
 
+    const deletionMarker = `[DELETED:${new Date().toISOString()}]`;
+    const updatedNotes = `${deletionMarker}${target.notes_director || ""}`;
+
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            notes_director: updatedNotes,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Prospecto a la Papelera",
+        message: `El expediente de ${target.full_name} fue enviado a la papelera por 7 días.`,
+        type: "warning",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+    } else {
+      try {
+        const { error } = await supabase
+          .from("prospects")
+          .update({
+            notes_director: updatedNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+        
+        if (error) throw error;
+
+        setProspects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, notes_director: updatedNotes, updated_at: new Date().toISOString() } : p))
+        );
+
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Prospecto a la Papelera",
+          message: `El expediente de ${target.full_name} fue enviado a la papelera por 7 días.`,
+          type: "warning",
+          read: false,
+        });
+      } catch (error) {
+        console.error("Error soft-deleting prospect from Supabase:", error);
+        throw error;
+      }
+    }
+  };
+
+  const restoreProspect = async (id: string): Promise<void> => {
+    const target = prospects.find((p) => p.id === id);
+    if (!target) return;
+
+    let cleanNotes = target.notes_director || "";
+    if (cleanNotes.startsWith("[DELETED:")) {
+      const closingBracketIndex = cleanNotes.indexOf("]");
+      if (closingBracketIndex !== -1) {
+        cleanNotes = cleanNotes.substring(closingBracketIndex + 1);
+      }
+    }
+
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            notes_director: cleanNotes,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Prospecto Restaurado",
+        message: `El expediente de ${target.full_name} fue restaurado al pipeline activo.`,
+        type: "success",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+    } else {
+      try {
+        const { error } = await supabase
+          .from("prospects")
+          .update({
+            notes_director: cleanNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+        
+        if (error) throw error;
+
+        setProspects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, notes_director: cleanNotes, updated_at: new Date().toISOString() } : p))
+        );
+
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Prospecto Restaurado",
+          message: `El expediente de ${target.full_name} fue restaurado al pipeline activo.`,
+          type: "success",
+          read: false,
+        });
+      } catch (error) {
+        console.error("Error restoring prospect:", error);
+        throw error;
+      }
+    }
+  };
+
+  const permanentlyDeleteProspect = async (id: string): Promise<void> => {
+    const target = prospects.find((p) => p.id === id);
+    if (!target) return;
+
+    const driveFolderId = target?.drive_folder_id || target?.google_drive_folder;
     if (driveFolderId) {
       try {
         await fetch("/api/drive", {
@@ -1369,7 +1593,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }),
         });
       } catch (err) {
-        console.error("Error deleting Google Drive folder during prospect deletion:", err);
+        console.error("Error deleting Google Drive folder during permanent deletion:", err);
       }
     }
 
@@ -1378,38 +1602,98 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       setProspects(updated);
       saveToStorage("pensionflow_prospects", updated);
 
-      if (target) {
-        const newNotif: NotificationItem = {
-          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
-          title: "Prospecto Eliminado",
-          message: `El expediente de ${target.full_name} (NSS: ${target.nss}) fue eliminado permanentemente del pipeline.`,
-          type: "warning",
-          read: false,
-          created_at: new Date().toISOString(),
-        };
-        setNotifications([newNotif, ...notifications]);
-        saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
-      }
+      const newNotif: NotificationItem = {
+        id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+        title: "Expediente Eliminado Permanentemente",
+        message: `El expediente de ${target.full_name} ha sido borrado del sistema definitivamente.`,
+        type: "warning",
+        read: false,
+        created_at: new Date().toISOString(),
+      };
+      setNotifications([newNotif, ...notifications]);
+      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
     } else {
       try {
-        // Delete from prospects (cascade will handle document table entries)
-        await supabase.from("prospects").delete().eq("id", id);
+        const { error: deleteError } = await supabase.from("prospects").delete().eq("id", id);
         
-        setProspects((prev) => prev.filter((p) => p.id !== id));
-
-        // Notify user about deletion
-        if (target) {
-          await supabase.from("notifications").insert({
-            user_id: user?.id,
-            title: "Prospecto Eliminado",
-            message: `El expediente de ${target.full_name} (NSS: ${target.nss}) fue eliminado permanentemente.`,
-            type: "warning",
-            read: false,
-          });
+        if (deleteError) {
+          console.warn("Physical delete failed (expected if you are an Ally due to RLS). Falling back to [PURGED] status update:", deleteError);
+          const purgedMarker = `[PURGED:${new Date().toISOString()}]`;
+          const updatedNotes = `${purgedMarker}${target.notes_director || ""}`;
+          
+          const { error: updateError } = await supabase
+            .from("prospects")
+            .update({
+              notes_director: updatedNotes,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", id);
+            
+          if (updateError) throw updateError;
+          
+          setProspects((prev) => prev.map((p) => p.id === id ? { ...p, notes_director: updatedNotes, updated_at: new Date().toISOString() } : p));
+        } else {
+          setProspects((prev) => prev.filter((p) => p.id !== id));
         }
+
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Expediente Eliminado Permanentemente",
+          message: `El expediente de ${target.full_name} ha sido borrado definitivamente.`,
+          type: "warning",
+          read: false,
+        });
       } catch (error) {
-        console.error("Error deleting prospect from Supabase:", error);
+        console.error("Error permanently deleting prospect:", error);
         throw error;
+      }
+    }
+  };
+
+  const editProspectPersonalData = async (
+    id: string,
+    updates: {
+      full_name: string;
+      nss: string;
+      curp: string;
+      phone: string;
+      email: string;
+    }
+  ): Promise<void> => {
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            ...updates,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+    } else {
+      try {
+        const { error } = await supabase
+          .from("prospects")
+          .update({
+            full_name: updates.full_name,
+            nss: updates.nss,
+            curp: updates.curp,
+            phone: updates.phone,
+            email: updates.email,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+        if (error) throw error;
+
+        setProspects((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p))
+        );
+      } catch (err) {
+        console.error("Error editing prospect personal data:", err);
+        throw err;
       }
     }
   };
@@ -2376,6 +2660,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         switchRole,
         addProspect,
         deleteProspect,
+        restoreProspect,
+        permanentlyDeleteProspect,
+        editProspectPersonalData,
+        isProspectDeleted,
+        isProspectPurged,
+        getProspectDeletedAt,
         updateProspectStatus,
         saveSimulation,
         scheduleAssessment,

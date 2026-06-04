@@ -19,12 +19,14 @@ import {
   X,
   Layers,
   Search,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function DashboardAliado() {
-  const { prospects, scheduleAssessment } = useApp();
-  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos">("evaluacion");
+  const { prospects, scheduleAssessment, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
+  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "papelera">("evaluacion");
   
   // States for Scheduling Modal
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -78,7 +80,21 @@ export default function DashboardAliado() {
     }
   };
 
-  const filteredByDate = prospects.filter((p) => {
+  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const deletedProspects = prospects.filter((p) => isProspectDeleted(p));
+
+  const filteredDeletedBySearchAndFilters = deletedProspects
+    .filter((p) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return (
+        p.full_name.toLowerCase().includes(term) ||
+        p.nss.includes(term) ||
+        p.curp.toLowerCase().includes(term)
+      );
+    });
+
+  const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
     const createdDate = new Date(p.created_at).getTime();
     
@@ -332,7 +348,7 @@ export default function DashboardAliado() {
       </div>
 
       {/* Segmented Controller Tab Selector */}
-      <div className="bg-slate-200/60 p-1 rounded-2xl max-w-md flex border border-slate-200">
+      <div className="bg-slate-200/60 p-1 rounded-2xl max-w-xl flex border border-slate-200">
         <button
           onClick={() => setActiveTab("evaluacion")}
           className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
@@ -356,6 +372,14 @@ export default function DashboardAliado() {
           }`}
         >
           Proyectos Activos ({proyectosActivos.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("papelera")}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "papelera" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Papelera ({deletedProspects.length})
         </button>
       </div>
 
@@ -422,12 +446,25 @@ export default function DashboardAliado() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <Link
-                              href={`/prospectos/${p.id}`}
-                              className="inline-flex p-1.5 bg-slate-100 group-hover:bg-blue-50 text-slate-500 group-hover:text-blue-600 rounded-xl transition-all border border-slate-200/60"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="inline-flex p-1.5 bg-slate-100 group-hover:bg-blue-50 text-slate-500 group-hover:text-blue-600 rounded-xl transition-all border border-slate-200/60"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                    await deleteProspect(p.id);
+                                  }
+                                }}
+                                className="inline-flex p-1.5 bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-all border border-slate-200/60"
+                                title="Mover a Papelera"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -534,6 +571,17 @@ export default function DashboardAliado() {
                               >
                                 <Calendar className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                    await deleteProspect(p.id);
+                                  }
+                                }}
+                                className="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-all border border-slate-200/60"
+                                title="Mover a Papelera"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -614,12 +662,25 @@ export default function DashboardAliado() {
                             <span className="block text-xs font-extrabold text-slate-700 mt-0.5">${p.simulation.totalCredito.toLocaleString()}</span>
                           </div>
                         )}
-                        <Link
-                          href={`/prospectos/${p.id}`}
-                          className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5"
-                        >
-                          Expediente <ArrowUpRight className="h-3 w-3" />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/prospectos/${p.id}`}
+                            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-650 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5"
+                          >
+                            Expediente <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                await deleteProspect(p.id);
+                              }
+                            }}
+                            className="p-1.5 bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-colors border border-slate-200/60"
+                            title="Mover a Papelera"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -689,6 +750,97 @@ export default function DashboardAliado() {
                   </div>
                 );
               })
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: PAPELERA */}
+        {activeTab === "papelera" && (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <h3 className="text-xs font-bold text-slate-655 uppercase tracking-widest">Papelera de Reciclaje (Se eliminan permanentemente en 7 días)</h3>
+            </div>
+            
+            {filteredDeletedBySearchAndFilters.length === 0 ? (
+              <div className="py-16 text-center">
+                <Trash2 className="mx-auto h-12 w-12 text-slate-350" />
+                <h4 className="text-sm font-bold text-slate-700 mt-3">La papelera está vacía</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Los clientes que elimines aparecerán aquí por 7 días antes de borrarse definitivamente.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Fecha Eliminación</th>
+                      <th className="px-6 py-4.5">Días Restantes</th>
+                      <th className="px-6 py-4.5 text-right"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredDeletedBySearchAndFilters.map((p) => {
+                      const deletedAt = getProspectDeletedAt(p);
+                      const remainingDays = deletedAt ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 7;
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
+                            {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-700 border-amber-100"}`}>
+                              {remainingDays} {remainingDays === 1 ? "día" : "días"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Restaurar a ${p.full_name} al pipeline activo?`)) {
+                                    await restoreProspect(p.id);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition-colors flex items-center gap-1"
+                                title="Restaurar prospecto"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Restaurar
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Eliminar permanentemente a ${p.full_name}? Esta acción borrará todos sus archivos de Google Drive de forma irreversible.`)) {
+                                    await permanentlyDeleteProspect(p.id);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-655 text-[10px] font-bold rounded-xl border border-red-200 transition-colors flex items-center gap-1"
+                                title="Eliminar permanente"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Borrar
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

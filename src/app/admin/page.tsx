@@ -22,7 +22,8 @@ import {
 import Link from "next/link";
 
 export default function PipelineManager() {
-  const { prospects, updateProspectStatus, deleteProspect } = useApp();
+  const { prospects, updateProspectStatus, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
+  const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [subStageFilter, setSubStageFilter] = useState<string>("all");
@@ -30,7 +31,10 @@ export default function PipelineManager() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  const filteredByDate = prospects.filter((p) => {
+  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const deletedProspects = prospects.filter((p) => isProspectDeleted(p));
+
+  const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
     const createdDate = new Date(p.created_at).getTime();
     
@@ -125,6 +129,34 @@ export default function PipelineManager() {
       if (subStageFilter === "all") return true;
       const { subStage } = getStageAndSubStage(p.status);
       return subStage === subStageFilter;
+    })
+    .filter((p) => {
+      if (selectedAlly === "all") return true;
+      return p.aliado_name === selectedAlly;
+    });
+
+  const deletedByDate = deletedProspects.filter((p) => {
+    if (!p.created_at) return true;
+    const createdDate = new Date(p.created_at).getTime();
+    if (startDate) {
+      const start = new Date(startDate + "T00:00:00").getTime();
+      if (createdDate < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate + "T23:59:59").getTime();
+      if (createdDate > end) return false;
+    }
+    return true;
+  });
+
+  const filteredDeletedProspects = deletedByDate
+    .filter((p) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        p.full_name.toLowerCase().includes(term) ||
+        p.nss.includes(term) ||
+        p.curp.toLowerCase().includes(term)
+      );
     })
     .filter((p) => {
       if (selectedAlly === "all") return true;
@@ -290,6 +322,26 @@ export default function PipelineManager() {
         </div>
       </div>
 
+      {/* Segmented Controller Tab Selector */}
+      <div className="bg-slate-200/60 p-1 rounded-2xl max-w-xs flex border border-slate-200 select-none">
+        <button
+          onClick={() => setActiveTab("activos")}
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "activos" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Casos Activos ({filteredProspects.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("papelera")}
+          className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "papelera" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Papelera ({filteredDeletedProspects.length})
+        </button>
+      </div>
+
       {/* Kanban List Table */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
@@ -299,146 +351,240 @@ export default function PipelineManager() {
             Dictamina abriendo el Expediente
           </span>
         </div>
-
-        {filteredProspects.length === 0 ? (
-          <div className="py-20 text-center space-y-3">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
-              <FolderKanban className="h-6 w-6" />
+        {activeTab === "papelera" ? (
+          filteredDeletedProspects.length === 0 ? (
+            <div className="py-20 text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-700">La papelera está vacía</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Los expedientes eliminados aparecerán aquí por 7 días.</p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-700">Sin prospectos en este estado</h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Prueba ajustando los filtros de etapas o del asesor que capturó el caso.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
-                  <th className="px-6 py-4">Prospecto</th>
-                  <th className="px-6 py-4">NSS / CURP</th>
-                  <th className="px-6 py-4">Aliado Comercial</th>
-                  <th className="px-6 py-4">Expediente</th>
-                  <th className="px-6 py-4">Estado Interno (8 Etapas)</th>
-                  <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-150">
-                {filteredProspects.map((p) => {
-                  const hasAfore = p.documents.some((d) => d.file_type === "AFORE");
-                  const hasImss = p.documents.some((d) => d.file_type === "IMSS");
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-indigo-50/50 group-hover:text-indigo-500 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200 transition-all">
-                            {p.full_name.charAt(0)}
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                    <th className="px-6 py-4">Prospecto</th>
+                    <th className="px-6 py-4">NSS / CURP</th>
+                    <th className="px-6 py-4">Aliado Comercial</th>
+                    <th className="px-6 py-4">Fecha Eliminación</th>
+                    <th className="px-6 py-4">Días Restantes</th>
+                    <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150">
+                  {filteredDeletedProspects.map((p) => {
+                    const deletedAt = getProspectDeletedAt(p);
+                    const remainingDays = deletedAt ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 7;
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200">
+                              {p.full_name.charAt(0)}
+                            </div>
+                            <div>
+                              <span className="text-xs font-extrabold text-slate-800 block leading-tight">
+                                {p.full_name}
+                              </span>
+                              <span className="block text-[10px] text-slate-400 mt-0.5 leading-none">
+                                Tel: {p.phone}
+                              </span>
+                            </div>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
                           <div>
-                            <Link
-                              href={`/prospectos/${p.id}`}
-                              className="text-xs font-extrabold text-slate-800 block hover:text-indigo-600 hover:underline leading-tight"
-                            >
-                              {p.full_name}
-                            </Link>
-                            <span className="block text-[10px] text-slate-400 mt-0.5 leading-none">
-                              Tel: {p.phone}
-                            </span>
+                            <span>NSS: {p.nss}</span>
+                            <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-xs font-bold text-slate-700">{p.aliado_name || "Asesor Comercial"}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
+                          {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-700 border-amber-100"}`}>
+                            {remainingDays} {remainingDays === 1 ? "día" : "días"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center gap-2 justify-end">
+                            <button
+                              onClick={async () => {
+                                if (confirm(`¿Restaurar a ${p.full_name} al pipeline activo?`)) {
+                                  await restoreProspect(p.id);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition-colors"
+                            >
+                              Restaurar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`¿Eliminar permanentemente a ${p.full_name}? Esta acción borrará todos sus archivos de Google Drive de forma irreversible.`)) {
+                                  await permanentlyDeleteProspect(p.id);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-655 text-[10px] font-bold rounded-xl border border-red-200 transition-colors"
+                            >
+                              Eliminar Permanente
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          filteredProspects.length === 0 ? (
+            <div className="py-20 text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <FolderKanban className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-700">Sin prospectos en este estado</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Prueba ajustando los filtros de etapas o del asesor que capturó el caso.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                    <th className="px-6 py-4">Prospecto</th>
+                    <th className="px-6 py-4">NSS / CURP</th>
+                    <th className="px-6 py-4">Aliado Comercial</th>
+                    <th className="px-6 py-4">Expediente</th>
+                    <th className="px-6 py-4">Estado Interno (8 Etapas)</th>
+                    <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150">
+                  {filteredProspects.map((p) => {
+                    const hasAfore = p.documents.some((d) => d.file_type === "AFORE");
+                    const hasImss = p.documents.some((d) => d.file_type === "IMSS");
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-indigo-50/50 group-hover:text-indigo-500 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200 transition-all">
+                              {p.full_name.charAt(0)}
+                            </div>
+                            <div>
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="text-xs font-extrabold text-slate-800 block hover:text-indigo-600 hover:underline leading-tight"
+                              >
+                                {p.full_name}
+                              </Link>
+                              <span className="block text-[10px] text-slate-400 mt-0.5 leading-none">
+                                Tel: {p.phone}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
-                        <div>
-                          <span>NSS: {p.nss}</span>
-                          <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
-                        </div>
-                      </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <div>
+                            <span>NSS: {p.nss}</span>
+                            <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
+                          </div>
+                        </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-xs font-bold text-slate-700">{p.aliado_name || "Asesor Comercial"}</span>
-                      </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-xs font-bold text-slate-700">{p.aliado_name || "Asesor Comercial"}</span>
+                        </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          {hasAfore ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[9px] font-bold border border-emerald-100">
-                              AFORE
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 text-red-500 text-[9px] font-bold border border-red-100">
-                              No AFORE
-                            </span>
-                          )}
-                          {hasImss ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[9px] font-bold border border-emerald-100">
-                              IMSS
-                            </span>
-                          ) : (
-                            <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 text-red-500 text-[9px] font-bold border border-red-100">
-                              No IMSS
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            {hasAfore ? (
+                              <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[9px] font-bold border border-emerald-100">
+                                AFORE
+                              </span>
+                            ) : (
+                              <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 text-red-500 text-[9px] font-bold border border-red-100">
+                                No AFORE
+                              </span>
+                            )}
+                            {hasImss ? (
+                              <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[9px] font-bold border border-emerald-100">
+                                IMSS
+                              </span>
+                            ) : (
+                              <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 text-red-500 text-[9px] font-bold border border-red-100">
+                                No IMSS
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-1.5 min-w-[150px]">
-                          {/* Selector de Etapa */}
-                          <select
-                            value={getStageAndSubStage(p.status).stage}
-                            onChange={async (e) => {
-                              const newStage = e.target.value;
-                              const defaultSubStage = SUB_STAGES_BY_STAGE[newStage]?.[0] || "";
-                              const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
-                              await handleStageChange(p.id, newStatus as any);
-                            }}
-                            className={`py-1.5 px-3 border rounded-xl text-[10px] font-black outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer ${getStageColor(p.status)}`}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1.5 min-w-[150px]">
+                            {/* Selector de Etapa */}
+                            <select
+                              value={getStageAndSubStage(p.status).stage}
+                              onChange={async (e) => {
+                                const newStage = e.target.value;
+                                const defaultSubStage = SUB_STAGES_BY_STAGE[newStage]?.[0] || "";
+                                const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
+                                await handleStageChange(p.id, newStatus as any);
+                              }}
+                              className={`py-1.5 px-3 border rounded-xl text-[10px] font-black outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer ${getStageColor(p.status)}`}
+                            >
+                              {STAGES_LIST.map((stage) => (
+                                <option key={stage.id} value={stage.id}>{stage.label}</option>
+                              ))}
+                            </select>
+
+                            {/* Selector de Subetapa */}
+                            <select
+                              value={getStageAndSubStage(p.status).subStage}
+                              onChange={async (e) => {
+                                const currentMapping = getStageAndSubStage(p.status);
+                                const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
+                                await handleStageChange(p.id, newStatus as any);
+                              }}
+                              className="py-1 px-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-[10px] font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                            >
+                              <option value="">Ninguna</option>
+                              {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
+                                <option key={sub} value={sub}>{sub}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <Link
+                            href={`/prospectos/${p.id}`}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
                           >
-                            {STAGES_LIST.map((stage) => (
-                              <option key={stage.id} value={stage.id}>{stage.label}</option>
-                            ))}
-                          </select>
-
-                          {/* Selector de Subetapa */}
-                          <select
-                            value={getStageAndSubStage(p.status).subStage}
-                            onChange={async (e) => {
-                              const currentMapping = getStageAndSubStage(p.status);
-                              const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
-                              await handleStageChange(p.id, newStatus as any);
-                            }}
-                            className="py-1 px-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-[10px] font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500 transition-all cursor-pointer"
+                            Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                          </Link>
+                          <button
+                            onClick={() => openDeleteModal(p)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-red-400 hover:text-red-650 transition-colors ml-3 p-1 rounded-lg hover:bg-red-50"
+                            title="Eliminar prospecto"
                           >
-                            <option value="">Ninguna</option>
-                            {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
-                              <option key={sub} value={sub}>{sub}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <Link
-                          href={`/prospectos/${p.id}`}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
-                        >
-                          Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
-                        <button
-                          onClick={() => openDeleteModal(p)}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-red-400 hover:text-red-600 transition-colors ml-3 p-1 rounded-lg hover:bg-red-50"
-                          title="Eliminar prospecto"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
     </div>
@@ -458,8 +604,8 @@ export default function PipelineManager() {
               </h3>
               <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
                 {deleteStep === 1
-                  ? "Esta acción es irreversible y eliminará todos los datos del expediente."
-                  : "Escribe ELIMINAR para confirmar la eliminación permanente."}
+                  ? "Esta acción enviará al prospecto a la papelera por 7 días, visible para el director y aliados."
+                  : "Escribe ELIMINAR para confirmar el envío a la papelera."}
               </p>
             </div>
           </div>
@@ -508,7 +654,7 @@ export default function PipelineManager() {
               className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              {deleting ? "Eliminando..." : deleteStep === 1 ? "Sí, Eliminar" : "Confirmar Eliminación"}
+              {deleting ? "Eliminando..." : deleteStep === 1 ? "Sí, Mover a Papelera" : "Confirmar Envío"}
             </button>
           </div>
         </div>

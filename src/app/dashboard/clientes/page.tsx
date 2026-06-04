@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 
 export default function MisClientes() {
-  const { prospects } = useApp();
+  const { prospects, isProspectDeleted, isProspectPurged } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name">("recent");
@@ -120,7 +120,8 @@ export default function MisClientes() {
   };
 
   // 0. Filter by date first
-  const filteredByDate = prospects.filter((p) => {
+  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
     const createdDate = new Date(p.created_at).getTime();
     

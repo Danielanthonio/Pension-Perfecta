@@ -26,7 +26,8 @@ import {
 } from "lucide-react";
 
 export default function GestorAliados() {
-  const { prospects, profiles } = useApp();
+  const { prospects, profiles, isProspectDeleted, isProspectPurged } = useApp();
+  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAlly, setSelectedAlly] = useState<UserProfile | null>(null);
@@ -56,7 +57,7 @@ export default function GestorAliados() {
 
   // Helper to get prospects sent by a specific ally
   const getAllyProspects = (ally: UserProfile) => {
-    const list = prospects.filter(
+    const list = activeProspects.filter(
       (p) => p.aliado_id === ally.id || p.aliado_name?.toLowerCase() === ally.full_name.toLowerCase()
     );
     return filterProspectsByDate(list);
@@ -133,7 +134,7 @@ export default function GestorAliados() {
   const totalActiveAllies = allies.filter((a) => a.is_active !== false).length;
 
   // Global aggregate metrics for the date range
-  const filteredProspectsGlobal = filterProspectsByDate(prospects);
+  const filteredProspectsGlobal = filterProspectsByDate(activeProspects);
   const totalProspectsSent = filteredProspectsGlobal.length;
   
   const globalEvaluation = filteredProspectsGlobal.filter((p) => p.status === "evaluacion_pendiente").length;
