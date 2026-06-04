@@ -54,6 +54,26 @@ if (isConfigured) {
   console.warn("Google Drive credentials not found in env. Running in SIMULATION mode.");
 }
 
+export async function GET(req: NextRequest) {
+  return NextResponse.json({
+    hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    emailLength: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.length || 0,
+    hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
+    privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
+    hasParentFolderId: !!process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID,
+    parentFolderIdLength: process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID?.length || 0,
+    isConfigured,
+    driveInitialized: !!drive,
+    nodeEnv: process.env.NODE_ENV,
+    envKeys: Object.keys(process.env).filter(
+      k => !k.toLowerCase().includes("key") &&
+           !k.toLowerCase().includes("password") &&
+           !k.toLowerCase().includes("secret") &&
+           !k.toLowerCase().includes("token")
+    )
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
