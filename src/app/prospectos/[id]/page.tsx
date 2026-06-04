@@ -106,11 +106,16 @@ export default function ProspectoDetalle() {
     email: "",
   });
 
-  const handleDirectScheduleDetail = async () => {
+  const handleOpenAgendaDetail = () => {
     window.open("https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5", "_blank");
+  };
+
+  const handleConfirmScheduleDetail = async () => {
     if (prospect) {
-      await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
-      router.push(backPath);
+      if (confirm(`¿Confirmar que ya agendaste la asesoría para ${prospect.full_name}?`)) {
+        await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
+        router.push(backPath);
+      }
     }
   };
 
@@ -1040,16 +1045,25 @@ export default function ProspectoDetalle() {
                         <div className="bg-white/95 rounded-2xl p-4 border border-indigo-150 space-y-3 shadow-sm text-center">
                           <span className="block text-[8px] font-bold text-indigo-550 uppercase tracking-wider">Acción Requerida</span>
                           <h4 className="text-xs font-bold text-slate-800">Agendar Asesoría Comercial</h4>
-                          <p className="text-[10px] text-slate-500 leading-normal">
+                          <p className="text-[10px] text-slate-500 leading-normal mb-1">
                             Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:
                           </p>
-                          <button
-                            onClick={handleDirectScheduleDetail}
-                            className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
-                          >
-                            <span>Abrir Agenda Oficial</span>
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={handleOpenAgendaDetail}
+                              className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
+                            >
+                              <span>1. Abrir Agenda Oficial</span>
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={handleConfirmScheduleDetail}
+                              className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold rounded-xl text-xs transition-all shadow hover:scale-[1.01] gap-1.5"
+                            >
+                              <span>2. Confirmar Agendamiento (Avanzar)</span>
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2464,7 +2478,7 @@ export default function ProspectoDetalle() {
               {[
                 {
                   id: "asesoria_agendada",
-                  label: "Agenda Asesoría",
+                  label: "Agenda Asesoria",
                   desc: "Asesoría agendada para presentar propuesta",
                   iconColor: "text-purple-500",
                   icon: Calendar,
@@ -2478,7 +2492,7 @@ export default function ProspectoDetalle() {
                 },
                 {
                   id: "analisis_riesgo",
-                  label: "Análisis de Riesgo",
+                  label: "Analisis de Riesgo",
                   desc: "En análisis de riesgo operativo",
                   iconColor: "text-cyan-500",
                   icon: ShieldCheck,

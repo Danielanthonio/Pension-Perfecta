@@ -197,17 +197,12 @@ export default function DashboardAliado() {
   };
 
   const activeSteps = [
-    { label: "Asesoría", desc: "Reunión agendada" },
-    { label: "Documentos", desc: "Integración expediente" },
-    { label: "Riesgos", desc: "Filtros técnicos" },
-    { label: "Firma", desc: "Convenio formalizado" },
-    { label: "Liberado", desc: "Comisión pagada" },
+    { label: "Agenda Asesoria", desc: "Asesoría agendada para presentar propuesta" },
+    { label: "Firma Carta Compromiso", desc: "Carta compromiso firmada por el cliente" },
+    { label: "Analisis de Riesgo", desc: "En análisis de riesgo operativo" },
+    { label: "Cerrada Ganada", desc: "Caso cerrado y ganado" },
+    { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
   ];
-
-  const handleDirectSchedule = async (prospect: Prospect) => {
-    window.open("https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5", "_blank");
-    await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
-  };
 
   const handleOpenSchedule = (prospect: Prospect) => {
     setSelectedProspect(prospect);
@@ -563,12 +558,25 @@ export default function DashboardAliado() {
                               >
                                 <FileText className="h-4 w-4" />
                               </Link>
-                              <button
-                                onClick={() => handleDirectSchedule(p)}
-                                className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-95"
-                                title="Agendar Asesoría"
+                              <a
+                                href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
+                                title="Abrir Agenda Externa"
                               >
                                 <Calendar className="h-4 w-4" />
+                              </a>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Confirmar que ya agendaste la asesoría para ${p.full_name}?`)) {
+                                    await scheduleAssessment(p.id, "LeadConnector", "Enlace Directo");
+                                  }
+                                }}
+                                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-xl transition-all border border-emerald-250/60 flex items-center justify-center"
+                                title="Confirmar Agendado (Avanzar a Activos)"
+                              >
+                                <CheckSquare className="h-4 w-4" />
                               </button>
                               <button
                                 onClick={async () => {
