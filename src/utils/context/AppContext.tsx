@@ -411,7 +411,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     if (!profileData) return profileData;
     return {
       ...profileData,
-      role: profileData.role === "director" ? "director" : profileData.role,
+      role: profileData.role === "director" ? "admin" : profileData.role,
     };
   };
 
@@ -446,7 +446,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           full_name: fullName,
           email: email.toLowerCase(),
           phone: phone,
-          role: dbRole,
+          role: dbRole === "director" ? "admin" : dbRole,
           invitation_code_used: invitationCode
         })
         .select()
@@ -651,8 +651,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             }
           }
 
-          // Fetch fallback logged in user from localStorage if not signed in via auth
-          if (!currentUser) {
+          // Fetch fallback logged in user from localStorage if not signed in via auth (demo mode only)
+          if (isDemoMode && !currentUser) {
             const storedUser = localStorage.getItem("pensionflow_user");
             if (storedUser) {
               try {
@@ -674,8 +674,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             }
           }
 
-          // Default fallback if absolutely no user logged in
-          if (!currentUser) {
+          // Default fallback if absolutely no user logged in (demo mode only)
+          if (isDemoMode && !currentUser) {
             try {
               const { data: profile } = await client
                 .from("profiles")
@@ -1961,7 +1961,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               full_name: fullName,
               email: email.toLowerCase(),
               phone,
-              role: "director",
+              role: "admin",
             });
         } catch (profileError) {
           console.warn("Could not insert director profile immediately, self-healing will fix this upon first login:", profileError);
