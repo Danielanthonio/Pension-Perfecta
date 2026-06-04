@@ -33,7 +33,8 @@ if (isConfigured) {
       }
       formattedPrivateKey = formattedPrivateKey.trim();
     }
-    formattedPrivateKey = formattedPrivateKey.replace(/\\n/g, "\n");
+    formattedPrivateKey = formattedPrivateKey.replace(/\\+r/g, "");
+    formattedPrivateKey = formattedPrivateKey.replace(/\\+n/g, "\n");
     formattedPrivateKey = formattedPrivateKey.replace(/\\"/g, '"');
     while (
       (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) ||
