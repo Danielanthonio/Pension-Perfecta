@@ -313,24 +313,57 @@ function extractProspectData(text: string): { fullName: string; nss: string; cur
 
   // 3. Extract Name
   let fullName = "";
-  const namePatterns = [
-    /(?:estimado\(a\),?\s*\n?\s*)([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{5,60})/i,
-    /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{3,60})/i,
-    /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*\n\s*([A-ZÁÉÍÓÚÑ\s.,]{5,60})/i,
-  ];
 
-  for (const pattern of namePatterns) {
-    const match = cleanText.match(pattern);
-    if (match && match[1]) {
-      const candidate = match[1].trim();
-      if (candidate.length > 5 && !/curp|nss|rfc|afore|imss|direcc/i.test(candidate)) {
-        fullName = candidate.replace(/\s+/g, " ");
-        break;
+  // Strategy A: Look for Digital Seal Metadata (Cadena Original)
+  // Format: Apellido Paterno:OSORIO|Apellido Materno:FERNANDEZ|Nombre del Asegurado:ALEJANDRO RAFAEL|
+  const paternoMatch = cleanText.match(/Apellido\s+Paterno\s*:\s*([^|]+)/i);
+  const maternoMatch = cleanText.match(/Apellido\s+Materno\s*:\s*([^|]+)/i);
+  const nombreAseguradoMatch = cleanText.match(/Nombre\s+(?:del\s+)?Asegurado\s*:\s*([^|]+)/i);
+
+  if (paternoMatch && nombreAseguradoMatch) {
+    const paterno = paternoMatch[1].trim();
+    const materno = maternoMatch ? maternoMatch[1].trim() : "";
+    const nombre = nombreAseguradoMatch[1].trim();
+    fullName = `${paterno} ${materno} ${nombre}`.replace(/\s+/g, " ");
+  }
+
+  // Strategy B: Look for uppercase name line followed by the report date line
+  if (!fullName) {
+    const lines = cleanText.split("\n");
+    for (let i = 0; i < lines.length - 1; i++) {
+      const line = lines[i].trim();
+      const nextLine = lines[i + 1].trim();
+      
+      // Look for a line containing 10-60 uppercase letters/spaces, followed by a date like "26 / 04 / 2026..."
+      if (/^[A-ZÁÉÍÓÚÑ\s]{10,60}$/.test(line) && /^\d{2}\s*[\/\s-]\s*\d{2}\s*[\/\s-]\s*\d{4}/.test(nextLine)) {
+        if (!/ESTADO|CUENTA|DOCUMENTO|IMSS|AFORE|REPORTE|SEMANAS|COTIZADAS|SOCIAL|NSS|CURP/i.test(line)) {
+          fullName = line;
+          break;
+        }
       }
     }
   }
 
-  // Fallback: look for uppercase lines that resemble a full name
+  // Strategy C: Fallback to legacy name patterns
+  if (!fullName) {
+    const namePatterns = [
+      /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s.,]{3,60})/i,
+      /(?:nombre(?: del)? (?:trabajador|asegurado)?|trabajador|asegurado|cliente|titular)\s*\n\s*([A-ZÁÉÍÓÚÑ\s.,]{5,60})/i,
+    ];
+
+    for (const pattern of namePatterns) {
+      const match = cleanText.match(pattern);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        if (candidate.length > 5 && !/curp|nss|rfc|afore|imss|direcc/i.test(candidate)) {
+          fullName = candidate.replace(/\s+/g, " ");
+          break;
+        }
+      }
+    }
+  }
+
+  // Strategy D: Fallback to scanning lines for a name-like uppercase line
   if (!fullName) {
     const lines = cleanText.split("\n");
     for (const line of lines) {
