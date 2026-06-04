@@ -220,11 +220,11 @@ export default function SubirProspecto() {
                 clearInterval(interval);
                 setImssOcrStatus("analyzing");
                 
-                setTimeout(async () => {
-                  await runRealOCR(fileDataUrl, file.name);
+                setTimeout(() => {
+                  // No real OCR call for IMSS documents, only Afore extracts data
                   setImssOcrStatus("completed");
                   setImssUploading(false);
-                }, 1500); // 1.5s visual AI analysis delay
+                }, 1500); // 1.5s visual delay
                 
                 return 100;
               }

@@ -621,13 +621,13 @@ export default function ProspectoDetalle() {
                       </div>
                     </div>
                   ) : realFileData ? (
-                    realFileData.startsWith("data:application/pdf") ? (
+                    realFileData.startsWith("data:application/pdf") || realFileData.startsWith("http") ? (
                       <div 
                         className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[500px]"
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <iframe
-                          src={realFileData}
+                          src={realFileData.includes("drive.google.com") && !realFileData.includes("/preview") && !realFileData.includes("/embed") ? realFileData.replace(/\/view.*/, "/preview") : realFileData}
                           className="w-full h-full border-0"
                           title={selectedDocName}
                         />
