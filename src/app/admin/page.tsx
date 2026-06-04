@@ -100,7 +100,7 @@ export default function PipelineManager() {
   // Calculations for stats
   const totalCases = filteredByDate.length;
   const pendingCases = filteredByDate.filter((p) => p.status === "evaluacion_pendiente").length;
-  const approvedCases = filteredByDate.filter((p) => p.status === "aprobado_listo").length;
+  const approvedCases = filteredByDate.filter((p) => p.status === "aprobado_listo" || p.status === "aportacion").length;
   const closedCases = filteredByDate.filter((p) => p.status === "pagado_comision").length;
 
   const totalFundedAmount = filteredByDate

@@ -152,7 +152,7 @@ export default function MisClientes() {
   const filteredStatus = filteredSearch.filter((p) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "evaluacion") return p.status === "evaluacion_pendiente";
-    if (statusFilter === "listo") return p.status === "aprobado_listo";
+    if (statusFilter === "listo") return p.status === "aprobado_listo" || p.status === "aportacion";
     if (statusFilter === "rechazado") return p.status === "rechazado";
     if (statusFilter === "activos") {
       return [

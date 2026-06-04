@@ -77,6 +77,9 @@ export default function ProspectoDetalle() {
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isEditingApproved, setIsEditingApproved] = useState(false);
+
+  const isApproved = prospect?.status === "aprobado_listo" || prospect?.status === "aportacion";
 
   // Simulation calculator input states
   const [semanas, setSemanas] = useState<number>(0);
@@ -1805,7 +1808,7 @@ export default function ProspectoDetalle() {
                   <input
                     type="number"
                     value={semanas}
-                    disabled={user?.role !== "director"}
+                    disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                     onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
                     className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all"
                   />
@@ -1824,7 +1827,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionActual}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1841,7 +1844,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionMejorada}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1862,7 +1865,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={financiamiento}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setFinanciamiento(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1879,7 +1882,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={costoGestion}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setCostoGestion(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1900,7 +1903,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={aforePensionarse}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1917,7 +1920,7 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={creditoNomina}
-                        disabled={user?.role !== "director"}
+                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                         onChange={(e) => setCreditoNomina(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
                       />
@@ -1932,7 +1935,7 @@ export default function ProspectoDetalle() {
                   </label>
                   <textarea
                     value={comments}
-                    disabled={user?.role !== "director"}
+                    disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
                     onChange={(e) => setComments(e.target.value)}
                     rows={3}
                     placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
@@ -1984,34 +1987,64 @@ export default function ProspectoDetalle() {
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
       {user?.role === "director" && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40 select-none">
-          <div className="max-w-[1700px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-5.5 w-full">
-            {/* Rechazar */}
-            <button
-              onClick={() => setShowRejectionModal(true)}
-              className="w-full py-4.5 px-6 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-red-800 flex items-center justify-center gap-2.5 shadow-md shadow-red-500/25 active:shadow-sm"
-            >
-              <XCircle className="h-5 w-5 stroke-[2.5]" />
-              Rechazar
-            </button>
-            
-            {/* Condicionar */}
-            <button
-              onClick={() => setShowConditionModal(true)}
-              className="w-full py-4.5 px-6 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-amber-700 flex items-center justify-center gap-2.5 shadow-md shadow-amber-500/25 active:shadow-sm"
-            >
-              <Clock className="h-5 w-5 stroke-[2.5]" />
-              Condicionar
-            </button>
+          {isApproved && !isEditingApproved ? (
+            <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 shadow-sm">
+                <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-black text-slate-800">Expediente Aprobado</h4>
+                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">El dictamen Ley 73 ya ha sido emitido y notificado al aliado comercial.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditingApproved(true)}
+                className="py-3 px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all transform active:translate-y-[1px] shadow hover:-translate-y-[1px]"
+              >
+                Cambiar decisión
+              </button>
+            </div>
+          ) : (
+            <div className="max-w-[1700px] mx-auto space-y-3 w-full animate-fade-in">
+              {isEditingApproved && (
+                <div className="flex justify-end pr-2">
+                  <button 
+                    onClick={() => setIsEditingApproved(false)}
+                    className="text-[10px] text-slate-400 hover:text-slate-700 font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+                  >
+                    ✕ Cancelar edición
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5.5 w-full">
+                {/* Rechazar */}
+                <button
+                  onClick={() => setShowRejectionModal(true)}
+                  className="w-full py-4.5 px-6 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-red-800 flex items-center justify-center gap-2.5 shadow-md shadow-red-500/25 active:shadow-sm"
+                >
+                  <XCircle className="h-5 w-5 stroke-[2.5]" />
+                  Rechazar
+                </button>
+                
+                {/* Condicionar */}
+                <button
+                  onClick={() => setShowConditionModal(true)}
+                  className="w-full py-4.5 px-6 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-amber-700 flex items-center justify-center gap-2.5 shadow-md shadow-amber-500/25 active:shadow-sm"
+                >
+                  <Clock className="h-5 w-5 stroke-[2.5]" />
+                  Condicionar
+                </button>
 
-            {/* Aprobar */}
-            <button
-              onClick={handleEmitSimulation}
-              className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-650 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-emerald-800 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/30 active:shadow-sm"
-            >
-              <CheckCircle className="h-5 w-5 stroke-[2.5]" />
-              Aprobar
-            </button>
-          </div>
+                {/* Aprobar */}
+                <button
+                  onClick={handleEmitSimulation}
+                  className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-650 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-emerald-800 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/30 active:shadow-sm"
+                >
+                  <CheckCircle className="h-5 w-5 stroke-[2.5]" />
+                  Aprobar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
