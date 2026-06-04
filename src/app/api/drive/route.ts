@@ -13,13 +13,32 @@ const isConfigured = serviceAccountEmail && privateKey && parentFolderId;
 let drive: any = null;
 if (isConfigured) {
   try {
-    let formattedPrivateKey = privateKey!.replace(/\\n/g, "\n");
-    // Remove wrapping quotes if they exist in env
-    if (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) {
-      formattedPrivateKey = formattedPrivateKey.slice(1, -1);
+    let formattedPrivateKey = privateKey!.trim();
+    while (
+      (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) ||
+      (formattedPrivateKey.startsWith("'") && formattedPrivateKey.endsWith("'")) ||
+      (formattedPrivateKey.startsWith('\\"') && formattedPrivateKey.endsWith('\\"')) ||
+      (formattedPrivateKey.startsWith("\\'") && formattedPrivateKey.endsWith("\\'"))
+    ) {
+      if (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) {
+        formattedPrivateKey = formattedPrivateKey.slice(1, -1);
+      } else if (formattedPrivateKey.startsWith("'") && formattedPrivateKey.endsWith("'")) {
+        formattedPrivateKey = formattedPrivateKey.slice(1, -1);
+      } else if (formattedPrivateKey.startsWith('\\"') && formattedPrivateKey.endsWith('\\"')) {
+        formattedPrivateKey = formattedPrivateKey.slice(2, -2);
+      } else if (formattedPrivateKey.startsWith("\\'") && formattedPrivateKey.endsWith("\\'")) {
+        formattedPrivateKey = formattedPrivateKey.slice(2, -2);
+      }
+      formattedPrivateKey = formattedPrivateKey.trim();
     }
-    // Remove escaped double quotes if they exist
+    formattedPrivateKey = formattedPrivateKey.replace(/\\n/g, "\n");
     formattedPrivateKey = formattedPrivateKey.replace(/\\"/g, '"');
+    while (
+      (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) ||
+      (formattedPrivateKey.startsWith("'") && formattedPrivateKey.endsWith("'"))
+    ) {
+      formattedPrivateKey = formattedPrivateKey.slice(1, -1).trim();
+    }
     
     const auth = new google.auth.JWT({
       email: serviceAccountEmail,
