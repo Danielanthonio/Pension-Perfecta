@@ -293,7 +293,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function extractProspectData(text: string): { fullName: string; nss: string; curp: string } {
+function extractProspectData(text: string): { fullName: string; nss: string; curp: string; semanas: string } {
   const cleanText = text.replace(/\r/g, "");
   
   // 1. Extract CURP
@@ -338,9 +338,25 @@ function extractProspectData(text: string): { fullName: string; nss: string; cur
     }
   }
 
+  // 4. Extract Semanas Cotizadas
+  const semanasPatterns = [
+    /(?:semanas\s+cotizadas|semanas\s+reconocidas|total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas|número\s+de\s+semanas\s+reconocidas)\s*:\s*([\d,]+)/i,
+    /(?:semanas\s+cotizadas|semanas\s+reconocidas|total\s+de\s+semanas\s+cotizadas|total\s+de\s+semanas|número\s+de\s+semanas\s+reconocidas)\s*\n\s*([\d,]+)/i,
+    /([\d,]+)\s*(?:semanas\s+cotizadas|semanas\s+reconocidas)/i
+  ];
+  let semanas = "";
+  for (const pattern of semanasPatterns) {
+    const match = cleanText.match(pattern);
+    if (match && match[1]) {
+      semanas = match[1].replace(/,/g, "").trim();
+      break;
+    }
+  }
+
   return {
     fullName: fullName.toUpperCase(),
     nss,
     curp,
+    semanas,
   };
 }

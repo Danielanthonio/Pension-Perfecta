@@ -91,14 +91,18 @@ export default function SubirProspecto() {
           return;
         }
         
-        const { fullName: extractedName, nss: extractedNss, curp: extractedCurp } = resData.data;
+        const { fullName: extractedName, nss: extractedNss, curp: extractedCurp, semanas: extractedSemanas } = resData.data;
         
         if (extractedName) setFullName(extractedName);
         if (extractedNss) setNss(extractedNss);
         if (extractedCurp) setCurp(extractedCurp);
+        if (extractedSemanas) {
+          setSemanas(extractedSemanas);
+        } else {
+          setSemanas("1300");
+        }
         
         // Auto-fill Ley 73 calculation metrics matching default values
-        setSemanas("1300");
         setPensionActual("12000");
         setPensionProyectada("35000");
         setFinanciamientoM40("400000");
@@ -165,9 +169,9 @@ export default function SubirProspecto() {
   const phoneValid = phone.trim().length >= 10;
   const emailValid = email.trim().includes("@");
   
-  const hasDocuments = aforeFileName !== "" || imssFileName !== "";
+  const hasDocuments = aforeFileName !== "" && imssFileName !== "";
   const uploadsInProgress = aforeUploading || imssUploading;
-  const filesReady = (!aforeFileName || aforeFileDataUrl !== "") && (!imssFileName || imssFileDataUrl !== "");
+  const filesReady = aforeFileDataUrl !== "" && imssFileDataUrl !== "";
   const formIsValid = nameValid && nssValid && curpValid && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
 
   const simulateFileUpload = (type: "afore" | "imss", e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,11 +201,10 @@ export default function SubirProspecto() {
                 clearInterval(interval);
                 setAforeOcrStatus("analyzing");
                 
-                setTimeout(async () => {
-                  await runRealOCR(fileDataUrl, file.name);
+                setTimeout(() => {
                   setAforeOcrStatus("completed");
                   setAforeUploading(false);
-                }, 1500); // 1.5s visual AI analysis delay
+                }, 1500); // 1.5s visual delay para subir AFORE sin OCR
                 
                 return 100;
               }
@@ -220,11 +223,11 @@ export default function SubirProspecto() {
                 clearInterval(interval);
                 setImssOcrStatus("analyzing");
                 
-                setTimeout(() => {
-                  // No real OCR call for IMSS documents, only Afore extracts data
+                setTimeout(async () => {
+                  await runRealOCR(fileDataUrl, file.name);
                   setImssOcrStatus("completed");
                   setImssUploading(false);
-                }, 1500); // 1.5s visual delay
+                }, 1500); // 1.5s visual AI analysis delay para IMSS con OCR
                 
                 return 100;
               }
@@ -241,7 +244,7 @@ export default function SubirProspecto() {
     setFormSubmitted(true);
     if (!formIsValid) {
       if (!hasDocuments) {
-        setErrorMsg("Es obligatorio subir al menos un documento para enviar a evaluación técnica (AFORE o IMSS).");
+        setErrorMsg("Es obligatorio subir tanto el Reporte de Semanas IMSS como el Estado de Cuenta de AFORE para enviar a evaluación.");
       } else {
         setErrorMsg("Por favor corrige los datos del prospecto antes de continuar.");
       }
@@ -661,7 +664,7 @@ export default function SubirProspecto() {
 
             <div className="p-6 space-y-5">
               <span className="text-[10px] text-slate-400 font-medium block leading-normal">
-                Sube reportes PDF o imágenes legibles. Es **obligatorio** subir al menos uno para iniciar.
+                Sube reportes PDF o imágenes legibles. Es **obligatorio** subir primero el Reporte de Semanas IMSS para iniciar.
               </span>
 
               {/* Google Drive Status Header */}
@@ -675,57 +678,9 @@ export default function SubirProspecto() {
                 </span>
               </div>
 
-              {/* Dropzone 1: Afore */}
+              {/* Dropzone 1: IMSS */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">1. Estado de Cuenta AFORE</label>
-                <div className="relative border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-slate-100/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => simulateFileUpload("afore", e)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  {aforeFileName ? (
-                    <div className="w-full flex flex-col items-center animate-scale-in">
-                      <FileCheck className={`h-8 w-8 ${aforeOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
-                      <span className="text-[11px] font-bold text-slate-700 mt-2 truncate w-full max-w-[150px]">{aforeFileName}</span>
-                      
-                      {aforeOcrStatus === "uploading" && (
-                        <div className="w-full mt-3">
-                          <div className="w-full bg-slate-200 rounded-full h-1.5">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
-                          </div>
-                          <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo a Google Drive... {aforeProgress}%</span>
-                        </div>
-                      )}
-
-                      {aforeOcrStatus === "analyzing" && (
-                        <div className="w-full mt-3 flex flex-col items-center gap-1">
-                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
-                          <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
-                            Creando carpeta y analizando...
-                          </span>
-                        </div>
-                      )}
-
-                      {aforeOcrStatus === "completed" && (
-                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Guardado en Google Drive ✅</span>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <Cloud className="h-8 w-8 text-slate-400 mb-2 group-hover:text-blue-500 group-hover:scale-105 transition-all" />
-                      <span className="text-[11px] font-bold text-slate-700">Subir AFORE</span>
-                      <span className="text-[9px] text-slate-400 mt-0.5">PDF o imagen (.jpg, .png)</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Dropzone 2: IMSS */}
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">2. Reporte Semanas IMSS</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">1. Reporte Semanas IMSS *</label>
                 <div className="relative border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-slate-100/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group">
                   <input
                     type="file"
@@ -752,23 +707,81 @@ export default function SubirProspecto() {
                           <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-650 rounded-full w-full animate-pulse" />
                           <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
-                            Creando carpeta y analizando...
+                            Escaneando con OCR de IA...
                           </span>
                         </div>
                       )}
 
                       {imssOcrStatus === "completed" && (
-                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Guardado en Google Drive ✅</span>
+                        <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Escaneado y Guardado en Drive ✅</span>
                       )}
                     </div>
                   ) : (
                     <>
                       <Cloud className="h-8 w-8 text-slate-400 mb-2 group-hover:text-blue-500 group-hover:scale-105 transition-all" />
-                      <span className="text-[11px] font-bold text-slate-700">Subir IMSS</span>
+                      <span className="text-[11px] font-bold text-slate-700">Subir Semanas IMSS</span>
                       <span className="text-[9px] text-slate-400 mt-0.5">Reporte digital oficial</span>
                     </>
                   )}
                 </div>
+              </div>
+
+              {/* Dropzone 2: Afore */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">2. Estado de Cuenta AFORE *</label>
+                {imssOcrStatus === "completed" ? (
+                  <div className="relative border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-slate-100/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group animate-fade-in">
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => simulateFileUpload("afore", e)}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    {aforeFileName ? (
+                      <div className="w-full flex flex-col items-center animate-scale-in">
+                        <FileCheck className={`h-8 w-8 ${aforeOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
+                        <span className="text-[11px] font-bold text-slate-700 mt-2 truncate w-full max-w-[150px]">{aforeFileName}</span>
+                        
+                        {aforeOcrStatus === "uploading" && (
+                          <div className="w-full mt-3">
+                            <div className="w-full bg-slate-200 rounded-full h-1.5">
+                              <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
+                            </div>
+                            <span className="text-[9px] text-blue-600 font-bold mt-1.5 block">Subiendo a Google Drive... {aforeProgress}%</span>
+                          </div>
+                        )}
+
+                        {aforeOcrStatus === "analyzing" && (
+                          <div className="w-full mt-3 flex flex-col items-center gap-1">
+                            <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full w-full animate-pulse" />
+                            <span className="text-[9px] text-blue-600 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                              Guardando en Drive...
+                            </span>
+                          </div>
+                        )}
+
+                        {aforeOcrStatus === "completed" && (
+                          <span className="text-[9px] text-emerald-600 font-bold mt-1.5">Guardado en Google Drive ✅</span>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <Cloud className="h-8 w-8 text-slate-400 mb-2 group-hover:text-blue-500 group-hover:scale-105 transition-all" />
+                        <span className="text-[11px] font-bold text-slate-700">Subir AFORE</span>
+                        <span className="text-[9px] text-slate-400 mt-0.5">PDF o imagen (.jpg, .png)</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-200 bg-slate-100/50 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-50 select-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span className="text-[11px] font-bold text-slate-400">Cargar AFORE (Bloqueado)</span>
+                    <span className="text-[9px] text-slate-400 mt-1">Primero sube y procesa las semanas IMSS</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -780,7 +793,7 @@ export default function SubirProspecto() {
         <div className="flex items-center gap-2">
           {!hasDocuments ? (
             <span className="text-[10px] font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-full border border-red-150 flex items-center gap-1.5">
-              <AlertCircle className="h-4 w-4" /> Sube AFORE o IMSS para desbloquear
+              <AlertCircle className="h-4 w-4" /> Sube IMSS y AFORE para desbloquear
             </span>
           ) : formIsValid ? (
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-150 flex items-center gap-1.5">
