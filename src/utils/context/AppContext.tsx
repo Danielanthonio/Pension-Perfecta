@@ -700,47 +700,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             }
           }
 
-          // Fetch fallback logged in user from localStorage if not signed in via auth (demo mode only)
-          if (isDemoMode && !currentUser) {
-            const storedUser = localStorage.getItem("pensionflow_user");
-            if (storedUser) {
-              try {
-                const parsed = JSON.parse(storedUser);
-                const { data: profile } = await client
-                  .from("profiles")
-                  .select("*")
-                  .eq("email", parsed.email)
-                  .maybeSingle();
-                if (profile) {
-                  const mapped = mapProfileFromDB(profile);
-                  currentUser = mapped;
-                  setUser(mapped);
-                  setActiveRole(mapped.role);
-                }
-              } catch (err) {
-                console.error("Error loading localStorage profile:", err);
-              }
-            }
-          }
-
-          // Default fallback if absolutely no user logged in (demo mode only)
-          if (isDemoMode && !currentUser) {
-            try {
-              const { data: profile } = await client
-                .from("profiles")
-                .select("*")
-                .eq("role", "aliado")
-                .limit(1)
-                .maybeSingle();
-              if (profile) {
-                const mapped = mapProfileFromDB(profile);
-                currentUser = mapped;
-                setUser(mapped);
-                setActiveRole(mapped.role);
-              }
-            } catch (err) {
-              console.error("Error fetching fallback profile:", err);
-            }
+          // If not signed in via Supabase, clean up state and stop loading
+          if (!currentUser) {
+            setUser(null);
+            setIsLoading(false);
+            return;
           }
 
           // Fetch all profiles
@@ -1335,11 +1299,33 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return newProspect;
     } else {
       try {
+        let finalAliadoId = user?.id;
+        let finalAliadoName = user?.full_name;
+
+        if (!finalAliadoId && supabase) {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            finalAliadoId = authUser.id;
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", authUser.id)
+              .maybeSingle();
+            if (profile) {
+              finalAliadoName = profile.full_name;
+            }
+          }
+        }
+
+        if (!finalAliadoId) {
+          throw new Error("No hay una sesión activa de Supabase. Por favor, inicia sesión de nuevo.");
+        }
+
         const { data: dbProspect, error: prospectError } = await supabase
           .from("prospects")
           .insert({
-            aliado_id: user?.id || "aliado-123",
-            aliado_name: user?.full_name || "Roberto Asesor",
+            aliado_id: finalAliadoId,
+            aliado_name: finalAliadoName || "Roberto Asesor",
             full_name: prospectData.full_name,
             nss: prospectData.nss,
             curp: prospectData.curp,
@@ -1385,7 +1371,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
-              uploaded_by: user?.id,
+              uploaded_by: finalAliadoId,
             })
             .select()
             .single();
@@ -1409,7 +1395,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
-              uploaded_by: user?.id,
+              uploaded_by: finalAliadoId,
             })
             .select()
             .single();
