@@ -732,12 +732,6 @@ export default function LoginPage() {
           </AnimatePresence>
         )}
 
-        {/* Environment Indicator footer */}
-        <div className="mt-6 text-center">
-          <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-widest">
-            Entorno {isDemoMode ? "Evaluación Local • Offline" : "Producción Supabase • Online"}
-          </p>
-        </div>
       </motion.div>
     </div>
   );
