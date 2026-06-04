@@ -68,7 +68,9 @@ export interface Prospect {
     | "falta_reporte"
     | "falta_afore"
     | "pendiente_documentos"
-    | "cerrado_perdido";
+    | "cerrado_perdido"
+    | "falta_semanas"
+    | "falta_afore_cuenta";
   notes_aliado?: string;
   notes_director?: string;
   simulation?: Simulation;
@@ -152,6 +154,10 @@ interface AppContextType {
   getProspectDeletedAt: (p: Prospect) => Date | null;
   updateProspectStatus: (id: string, newStatus: Prospect["status"], comments?: string) => Promise<void>;
   saveSimulation: (
+    id: string,
+    simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
+  ) => Promise<void>;
+  saveSimulationDraft: (
     id: string,
     simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
   ) => Promise<void>;
@@ -507,7 +513,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   // Helper to transform prospect from DB format to Frontend format
   const transformProspectFromDB = (dbProspect: any): Prospect => {
-    const hasSimulation = dbProspect.semanas_imss !== null || dbProspect.pension_actual !== null;
+    const hasSimulation = dbProspect.sim_semanas !== null || dbProspect.sim_pension_actual !== null;
+    const semanas = dbProspect.sim_semanas !== null ? Number(dbProspect.sim_semanas) : 0;
+    const pensionActual = dbProspect.sim_pension_actual !== null ? Number(dbProspect.sim_pension_actual) : 0;
+    const pensionMejorada = dbProspect.sim_pension_mejorada !== null ? Number(dbProspect.sim_pension_mejorada) : 0;
+    const financiamiento = dbProspect.sim_financiamiento !== null ? Number(dbProspect.sim_financiamiento) : 0;
+    const costoGestion = dbProspect.sim_costo_gestion !== null ? Number(dbProspect.sim_costo_gestion) : 0;
+    const totalCredito = financiamiento + costoGestion;
+    const increment = pensionMejorada - pensionActual;
+    const roiMonths = increment > 0 ? Math.ceil(totalCredito / increment) : 0;
+
     return {
       id: dbProspect.id,
       aliado_id: dbProspect.aliado_id,
@@ -521,17 +536,17 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       notes_aliado: dbProspect.notes_aliado || "",
       notes_director: dbProspect.notes_director || "",
       simulation: hasSimulation ? {
-        semanas: dbProspect.semanas_imss || 0,
-        pensionActual: Number(dbProspect.pension_actual) || 0,
-        pensionMejorada: Number(dbProspect.pension_mejorada) || 0,
-        financiamiento: Number(dbProspect.monto_financiamiento) || 0,
-        costoGestion: Number(dbProspect.costo_gestion) || 0,
-        totalCredito: Number(dbProspect.total_credito) || 0,
-        roiMonths: dbProspect.roi_months || 0,
-        comments: dbProspect.simulation_comments || "",
-        aforePensionarse: Number(dbProspect.afore_pensionarse) || 0,
-        aportacion: Number(dbProspect.aportacion) || 0,
-        creditoNomina: Number(dbProspect.credito_nomina) || 0,
+        semanas,
+        pensionActual,
+        pensionMejorada,
+        financiamiento,
+        costoGestion,
+        totalCredito,
+        roiMonths,
+        comments: dbProspect.sim_comments || "",
+        aforePensionarse: dbProspect.afore_pensionarse !== null ? Number(dbProspect.afore_pensionarse) : 0,
+        aportacion: dbProspect.aportacion !== null ? Number(dbProspect.aportacion) : 0,
+        creditoNomina: dbProspect.credito_nomina !== null ? Number(dbProspect.credito_nomina) : 0,
       } : undefined,
       documents: (dbProspect.documents || []).map((doc: any) => ({
         id: doc.id,
@@ -1335,15 +1350,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             status: "evaluacion_pendiente",
             drive_folder_id: driveFolderId,
             drive_folder_url: driveFolderUrl,
-            semanas_imss: prospectData.simulation?.semanas,
-            pension_actual: prospectData.simulation?.pensionActual,
-            pension_mejorada: prospectData.simulation?.pensionMejorada,
-            monto_financiamiento: prospectData.simulation?.financiamiento,
-            costo_gestion: prospectData.simulation?.costoGestion,
-            roi_months: prospectData.simulation?.roiMonths,
-            simulation_comments: prospectData.simulation?.comments,
+            sim_semanas: prospectData.simulation?.semanas,
+            sim_pension_actual: prospectData.simulation?.pensionActual,
+            sim_pension_mejorada: prospectData.simulation?.pensionMejorada,
+            sim_financiamiento: prospectData.simulation?.financiamiento,
+            sim_costo_gestion: prospectData.simulation?.costoGestion,
+            sim_comments: prospectData.simulation?.comments,
             afore_pensionarse: prospectData.simulation?.aforePensionarse,
             aportacion: prospectData.simulation?.aportacion,
+            credito_nomina: prospectData.simulation?.creditoNomina,
           })
           .select()
           .single();
@@ -1793,6 +1808,76 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const saveSimulationDraft = async (
+    id: string,
+    simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
+  ) => {
+    const totalCredito = (simulationData.financiamiento || 0) + (simulationData.costoGestion || 0);
+    const increment = (simulationData.pensionMejorada || 0) - (simulationData.pensionActual || 0);
+    const roiMonths = increment > 0 ? Math.ceil(totalCredito / increment) : 0;
+    const aforePensionarse = simulationData.aforePensionarse || 0;
+    const creditoNomina = simulationData.creditoNomina || 0;
+    const aportacion = Math.max(0, totalCredito - aforePensionarse - creditoNomina);
+
+    const fullSimulation: Simulation = {
+      ...simulationData,
+      totalCredito,
+      roiMonths,
+      aforePensionarse,
+      aportacion,
+      creditoNomina,
+    };
+
+    if (isDemoMode || !supabase) {
+      const updated = prospects.map((p) => {
+        if (p.id === id) {
+          return {
+            ...p,
+            simulation: fullSimulation,
+            notes_director: simulationData.comments,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return p;
+      });
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+    } else {
+      try {
+        await supabase
+          .from("prospects")
+          .update({
+            sim_semanas: simulationData.semanas,
+            sim_pension_actual: simulationData.pensionActual,
+            sim_pension_mejorada: simulationData.pensionMejorada,
+            sim_financiamiento: simulationData.financiamiento,
+            sim_costo_gestion: simulationData.costoGestion,
+            sim_comments: simulationData.comments,
+            notes_director: simulationData.comments,
+            afore_pensionarse: aforePensionarse,
+            aportacion: aportacion,
+            credito_nomina: creditoNomina,
+          })
+          .eq("id", id);
+
+        setProspects((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              return {
+                ...p,
+                simulation: fullSimulation,
+                notes_director: simulationData.comments,
+              };
+            }
+            return p;
+          })
+        );
+      } catch (error) {
+        console.error("Error saving simulation draft in Supabase:", error);
+      }
+    }
+  };
+
   const saveSimulation = async (
     id: string,
     simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
@@ -1867,13 +1952,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           .from("prospects")
           .update({
             status: newStatus,
-            semanas_imss: simulationData.semanas,
-            pension_actual: simulationData.pensionActual,
-            pension_mejorada: simulationData.pensionMejorada,
-            monto_financiamiento: simulationData.financiamiento,
-            costo_gestion: simulationData.costoGestion,
-            roi_months: roiMonths,
-            simulation_comments: simulationData.comments,
+            sim_semanas: simulationData.semanas,
+            sim_pension_actual: simulationData.pensionActual,
+            sim_pension_mejorada: simulationData.pensionMejorada,
+            sim_financiamiento: simulationData.financiamiento,
+            sim_costo_gestion: simulationData.costoGestion,
+            sim_comments: simulationData.comments,
             notes_director: simulationData.comments,
             afore_pensionarse: aforePensionarse,
             aportacion: aportacion,
@@ -2654,6 +2738,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         getProspectDeletedAt,
         updateProspectStatus,
         saveSimulation,
+        saveSimulationDraft,
         scheduleAssessment,
         generateInvitationCode,
         registerAliado,
@@ -2684,6 +2769,7 @@ export function useApp() {
 export const STAGES_LIST = [
   { id: "evaluacion_pendiente", label: "Evaluación pendiente" },
   { id: "rechazado", label: "Rechazado" },
+  { id: "condicionado", label: "Condicionado" },
   { id: "aprobado", label: "Aprobado" },
   { id: "cerrado_perdido", label: "Cerrado Perdido" }
 ];
@@ -2691,7 +2777,8 @@ export const STAGES_LIST = [
 export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: ["Falta Reporte", "Falta Afore", "Pendiente Documentos"],
   rechazado: ["No aplica"],
-  aprobado: ["aportacion", "Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada", "Pagado / Cerrado"],
+  condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore"],
+  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada", "Pagado / Cerrado"],
   cerrado_perdido: ["No acepta propuesta"]
 };
 
@@ -2708,7 +2795,11 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
     case "rechazado":
       return { stage: "rechazado", subStage: "No aplica" };
     case "aportacion":
-      return { stage: "aprobado", subStage: "aportacion" };
+      return { stage: "condicionado", subStage: "Aportación" };
+    case "falta_semanas":
+      return { stage: "condicionado", subStage: "Falta detallado de semanas" };
+    case "falta_afore_cuenta":
+      return { stage: "condicionado", subStage: "Falta estado cuenta afore" };
     case "asesoria_agendada":
       return { stage: "aprobado", subStage: "Agenda Asesoria" };
     case "doc_proceso":
@@ -2738,8 +2829,13 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
   if (stage === "rechazado") {
     return "rechazado";
   }
+  if (stage === "condicionado") {
+    if (subStage === "Aportación") return "aportacion";
+    if (subStage === "Falta detallado de semanas") return "falta_semanas";
+    if (subStage === "Falta estado cuenta afore") return "falta_afore_cuenta";
+    return "aportacion";
+  }
   if (stage === "aprobado") {
-    if (subStage === "aportacion") return "aportacion";
     if (subStage === "Agenda Asesoria") return "asesoria_agendada";
     if (subStage === "Firma Carta Compromiso") return "doc_proceso";
     if (subStage === "Analisis de Riesgo") return "analisis_riesgo";

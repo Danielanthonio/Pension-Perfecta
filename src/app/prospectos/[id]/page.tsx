@@ -32,7 +32,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, profiles, saveSimulation, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData } = useApp();
+  const { user, prospects, profiles, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -60,6 +60,10 @@ export default function ProspectoDetalle() {
       case "falta_afore":
         return "bg-orange-50 text-orange-600 border-orange-100";
       case "pendiente_documentos":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_semanas":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_afore_cuenta":
         return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 text-slate-600 border-slate-200";
@@ -152,6 +156,13 @@ export default function ProspectoDetalle() {
   // Condition modal states
   const [showConditionModal, setShowConditionModal] = useState<boolean>(false);
   const [selectedConditionOption, setSelectedConditionOption] = useState<Prospect["status"] | null>(null);
+
+  // New modal states
+  const [showPendingModal, setShowPendingModal] = useState<boolean>(false);
+  const [selectedPendingOption, setSelectedPendingOption] = useState<Prospect["status"] | null>(null);
+
+  const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false);
+  const [selectedApprovalOption, setSelectedApprovalOption] = useState<Prospect["status"] | null>(null);
 
   // Ally file upload states
   const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | null>(null);
@@ -307,6 +318,54 @@ export default function ProspectoDetalle() {
       }
     }
   }, [prospects, id, selectedDoc]);
+
+  // Autosave simulation draft effect
+  useEffect(() => {
+    if (user?.role !== "director" || !prospect || (isApproved && !isEditingApproved)) return;
+
+    const sim = prospect.simulation;
+    const hasChanged =
+      !sim ||
+      semanas !== sim.semanas ||
+      pensionActual !== sim.pensionActual ||
+      pensionMejorada !== sim.pensionMejorada ||
+      financiamiento !== sim.financiamiento ||
+      costoGestion !== sim.costoGestion ||
+      aforePensionarse !== sim.aforePensionarse ||
+      creditoNomina !== sim.creditoNomina ||
+      comments !== sim.comments;
+
+    if (!hasChanged) return;
+
+    const timer = setTimeout(async () => {
+      await saveSimulationDraft(prospect.id, {
+        semanas,
+        pensionActual,
+        pensionMejorada,
+        financiamiento,
+        costoGestion,
+        aforePensionarse,
+        creditoNomina,
+        comments,
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    semanas,
+    pensionActual,
+    pensionMejorada,
+    financiamiento,
+    costoGestion,
+    aforePensionarse,
+    creditoNomina,
+    comments,
+    prospect,
+    user,
+    isApproved,
+    isEditingApproved,
+    saveSimulationDraft,
+  ]);
 
   useEffect(() => {
     if (user?.role === "director" && prospect) {
@@ -1151,6 +1210,17 @@ export default function ProspectoDetalle() {
     router.push(backPath);
   };
 
+  const handlePendingProspect = async () => {
+    if (!selectedPendingOption) {
+      alert("Por favor selecciona una subetapa para evaluación pendiente.");
+      return;
+    }
+    await updateProspectStatus(prospect.id, selectedPendingOption, "Expediente enviado a evaluación pendiente");
+    setShowPendingModal(false);
+    setSelectedPendingOption(null);
+    router.push(backPath);
+  };
+
   const handleRejectProspect = async () => {
     if (!rejectionReason.trim()) {
       alert("Por favor ingresa un motivo detallado de rechazo.");
@@ -1168,9 +1238,56 @@ export default function ProspectoDetalle() {
       return;
     }
 
-    await updateProspectStatus(prospect.id, selectedConditionOption, "Expediente condicionado por el Director");
+    if (selectedConditionOption === "aportacion") {
+      if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
+        alert("Por favor verifica los números del simulador. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero para condicionar por aportación.");
+        return;
+      }
+      await saveSimulation(prospect.id, {
+        semanas,
+        pensionActual,
+        pensionMejorada,
+        financiamiento,
+        costoGestion,
+        aforePensionarse,
+        creditoNomina,
+        comments,
+      });
+    } else {
+      await updateProspectStatus(prospect.id, selectedConditionOption, "Expediente condicionado por el Director");
+    }
+
     setShowConditionModal(false);
     setSelectedConditionOption(null);
+    router.push(backPath);
+  };
+
+  const handleApprovalProspect = async () => {
+    if (!selectedApprovalOption) {
+      alert("Por favor selecciona una subetapa de aprobación.");
+      return;
+    }
+
+    if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
+      alert("Por favor verifica los números. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero.");
+      return;
+    }
+
+    await saveSimulation(prospect.id, {
+      semanas,
+      pensionActual,
+      pensionMejorada,
+      financiamiento,
+      costoGestion,
+      aforePensionarse,
+      creditoNomina,
+      comments,
+    });
+
+    await updateProspectStatus(prospect.id, selectedApprovalOption, `Expediente aprobado en subetapa: ${selectedApprovalOption}`);
+
+    setShowApprovalModal(false);
+    setSelectedApprovalOption(null);
     router.push(backPath);
   };
 
@@ -2015,7 +2132,16 @@ export default function ProspectoDetalle() {
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5.5 w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                {/* Evaluación Pendiente */}
+                <button
+                  onClick={() => setShowPendingModal(true)}
+                  className="w-full py-4.5 px-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-blue-800 flex items-center justify-center gap-2.5 shadow-md shadow-blue-500/25 active:shadow-sm"
+                >
+                  <Clock className="h-5 w-5 stroke-[2.5]" />
+                  Evaluación Pendiente
+                </button>
+
                 {/* Rechazar */}
                 <button
                   onClick={() => setShowRejectionModal(true)}
@@ -2030,13 +2156,13 @@ export default function ProspectoDetalle() {
                   onClick={() => setShowConditionModal(true)}
                   className="w-full py-4.5 px-6 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-amber-700 flex items-center justify-center gap-2.5 shadow-md shadow-amber-500/25 active:shadow-sm"
                 >
-                  <Clock className="h-5 w-5 stroke-[2.5]" />
+                  <Info className="h-5 w-5 stroke-[2.5]" />
                   Condicionar
                 </button>
 
                 {/* Aprobar */}
                 <button
-                  onClick={handleEmitSimulation}
+                  onClick={() => setShowApprovalModal(true)}
                   className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-650 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-emerald-800 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/30 active:shadow-sm"
                 >
                   <CheckCircle className="h-5 w-5 stroke-[2.5]" />
@@ -2045,6 +2171,100 @@ export default function ProspectoDetalle() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pending selection modal overlay */}
+      {showPendingModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+          <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
+            <button
+              onClick={() => {
+                setShowPendingModal(false);
+                setSelectedPendingOption(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+
+            <div className="border-b border-slate-150 pb-4">
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Evaluación Pendiente</h3>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Selecciona la subetapa correspondiente para evaluación pendiente:
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  id: "falta_reporte",
+                  label: "Falta Reporte IMSS",
+                  desc: "Falta reporte detallado de semanas cotizadas",
+                  iconColor: "text-blue-500",
+                  icon: FileText,
+                },
+                {
+                  id: "falta_afore",
+                  label: "Falta Afore",
+                  desc: "Falta estado de cuenta de la Afore",
+                  iconColor: "text-orange-500",
+                  icon: Info,
+                },
+                {
+                  id: "pendiente_documentos",
+                  label: "Pendiente Documentos",
+                  desc: "Faltan otros documentos complementarios",
+                  iconColor: "text-amber-500",
+                  icon: Folder,
+                },
+              ].map((opt) => {
+                const isSelected = selectedPendingOption === opt.id;
+                const IconComp = opt.icon;
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => setSelectedPendingOption(opt.id as any)}
+                    className={`border p-4.5 rounded-[22px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                      isSelected
+                        ? "bg-blue-50/50 border-blue-500 ring-1 ring-blue-500/20 shadow-sm"
+                        : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`h-11 w-11 rounded-full border border-slate-100 flex items-center justify-center bg-white shadow-sm shrink-0 ${opt.iconColor}`}>
+                        <IconComp className="h-5 w-5 stroke-[2]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-none">{opt.desc}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+                        isSelected ? "border-blue-500 bg-white" : "border-slate-300"
+                      }`}>
+                        {isSelected && (
+                          <div className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-fade-in" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handlePendingProspect}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[20px] text-sm font-extrabold shadow-md shadow-blue-500/10 transition-all flex items-center justify-center gap-2"
+              >
+                <Send className="h-4.5 w-4.5 stroke-[2.5]" />
+                Confirmar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2113,39 +2333,32 @@ export default function ProspectoDetalle() {
             <div className="border-b border-slate-150 pb-4">
               <h3 className="text-lg font-black text-slate-800 tracking-tight">Condicionar Expediente</h3>
               <p className="text-xs text-slate-400 font-semibold mt-1">
-                Selecciona el motivo por el cual se condiciona el expediente:
+                Selecciona la subetapa de condicionamiento:
               </p>
             </div>
 
             <div className="space-y-3">
               {[
                 {
-                  id: "evaluacion_pendiente",
-                  label: "Evaluación Pendiente",
-                  desc: "Falta información o evaluación por completar",
-                  iconColor: "text-orange-500",
+                  id: "aportacion",
+                  label: "Aportación",
+                  desc: "Se requiere aportación del cliente (calculada en simulador)",
+                  iconColor: "text-teal-600",
+                  icon: DollarSign,
+                },
+                {
+                  id: "falta_semanas",
+                  label: "Falta Detallado de Semanas",
+                  desc: "Inconsistencia o falta de desglose de semanas cotizadas",
+                  iconColor: "text-amber-500",
                   icon: Clock,
                 },
                 {
-                  id: "asesoria_agendada",
-                  label: "Asesoría Agendada",
-                  desc: "El cliente tiene una asesoría programada",
-                  iconColor: "text-amber-500",
-                  icon: Calendar,
-                },
-                {
-                  id: "doc_proceso",
-                  label: "Expediente en Trámite",
-                  desc: "El expediente se encuentra en proceso",
-                  iconColor: "text-blue-500",
-                  icon: Folder,
-                },
-                {
-                  id: "analisis_riesgo",
-                  label: "Análisis de Riesgo",
-                  desc: "En evaluación por el área de riesgos",
-                  iconColor: "text-purple-500",
-                  icon: ShieldCheck,
+                  id: "falta_afore_cuenta",
+                  label: "Falta Estado Cuenta Afore",
+                  desc: "Requiere documento oficial de saldo afore",
+                  iconColor: "text-amber-600",
+                  icon: FileText,
                 },
               ].map((opt) => {
                 const isSelected = selectedConditionOption === opt.id;
@@ -2156,7 +2369,7 @@ export default function ProspectoDetalle() {
                     onClick={() => setSelectedConditionOption(opt.id as any)}
                     className={`border p-4.5 rounded-[22px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
                       isSelected
-                        ? "bg-[#ecc94b]/5 border-[#ecc94b] ring-1 ring-[#ecc94b]/20 shadow-sm"
+                        ? "bg-amber-50/50 border-amber-500 ring-1 ring-amber-500/20 shadow-sm"
                         : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
                     }`}
                   >
@@ -2172,10 +2385,10 @@ export default function ProspectoDetalle() {
                     
                     <div className="flex items-center">
                       <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
-                        isSelected ? "border-[#ecc94b] bg-white" : "border-slate-300"
+                        isSelected ? "border-amber-500 bg-white" : "border-slate-300"
                       }`}>
                         {isSelected && (
-                          <div className="h-2.5 w-2.5 rounded-full bg-[#ecc94b] animate-fade-in" />
+                          <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-fade-in" />
                         )}
                       </div>
                     </div>
@@ -2187,10 +2400,118 @@ export default function ProspectoDetalle() {
             <div className="pt-2">
               <button
                 onClick={handleConditionProspect}
-                className="w-full py-4 bg-[#ecc94b] hover:bg-[#d69e2e] text-slate-800 rounded-[20px] text-sm font-extrabold shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-900 rounded-[20px] text-sm font-extrabold shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2"
               >
                 <Send className="h-4.5 w-4.5 stroke-[2.5]" />
-                Enviar
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approval selection modal overlay */}
+      {showApprovalModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+          <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
+            <button
+              onClick={() => {
+                setShowApprovalModal(false);
+                setSelectedApprovalOption(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <XCircle className="h-5 w-5" />
+            </button>
+
+            <div className="border-b border-slate-150 pb-4">
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Aprobar Expediente</h3>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Selecciona la subetapa de aprobación (se guardarán los valores del simulador):
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  id: "asesoria_agendada",
+                  label: "Agenda Asesoría",
+                  desc: "Asesoría agendada para presentar propuesta",
+                  iconColor: "text-purple-500",
+                  icon: Calendar,
+                },
+                {
+                  id: "doc_proceso",
+                  label: "Firma Carta Compromiso",
+                  desc: "Carta compromiso firmada por el cliente",
+                  iconColor: "text-blue-500",
+                  icon: FileCheck,
+                },
+                {
+                  id: "analisis_riesgo",
+                  label: "Análisis de Riesgo",
+                  desc: "En análisis de riesgo operativo",
+                  iconColor: "text-cyan-500",
+                  icon: ShieldCheck,
+                },
+                {
+                  id: "firma_programada",
+                  label: "Cerrada Ganada",
+                  desc: "Caso cerrado y ganado",
+                  iconColor: "text-indigo-500",
+                  icon: CheckCircle,
+                },
+                {
+                  id: "pagado_comision",
+                  label: "Pagado / Cerrado",
+                  desc: "Comisión liberada y cobrada",
+                  iconColor: "text-emerald-500",
+                  icon: DollarSign,
+                },
+              ].map((opt) => {
+                const isSelected = selectedApprovalOption === opt.id;
+                const IconComp = opt.icon;
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => setSelectedApprovalOption(opt.id as any)}
+                    className={`border p-4 rounded-[20px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                      isSelected
+                        ? "bg-emerald-50/50 border-emerald-500 ring-1 ring-emerald-500/20 shadow-sm"
+                        : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`h-10 w-10 rounded-full border border-slate-100 flex items-center justify-center bg-white shadow-sm shrink-0 ${opt.iconColor}`}>
+                        <IconComp className="h-4.5 w-4.5 stroke-[2]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
+                        <p className="text-[9px] text-slate-400 font-semibold mt-0.5 leading-none">{opt.desc}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+                        isSelected ? "border-emerald-500 bg-white" : "border-slate-300"
+                      }`}>
+                        {isSelected && (
+                          <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-fade-in" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleApprovalProspect}
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[20px] text-sm font-extrabold shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-2"
+              >
+                <Send className="h-4.5 w-4.5 stroke-[2.5]" />
+                Confirmar Aprobación
               </button>
             </div>
           </div>

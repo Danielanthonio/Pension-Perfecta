@@ -73,6 +73,10 @@ export default function DashboardAliado() {
         return "bg-orange-50 text-orange-600 border-orange-100";
       case "pendiente_documentos":
         return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_semanas":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_afore_cuenta":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 text-slate-600 border-slate-200";
       default:
@@ -134,7 +138,7 @@ export default function DashboardAliado() {
 
   // Dynamic calculations based on global state
   const enEvaluacion = filteredBySearchAndFilters.filter((p) =>
-    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status)
   );
   const listoPresentar = filteredBySearchAndFilters.filter((p) =>
     ["aprobado_listo", "aportacion"].includes(p.status)
@@ -410,7 +414,7 @@ export default function DashboardAliado() {
                       <th className="px-6 py-4.5">Email</th>
                       <th className="px-6 py-4.5">Notas</th>
                       <th className="px-6 py-4.5">Fecha Registro</th>
-                      <th className="px-6 py-4.5">Estatus</th>
+                      <th className="px-6 py-4.5">Estado</th>
                       <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
@@ -500,10 +504,8 @@ export default function DashboardAliado() {
                       <th className="px-6 py-4.5">Teléfono</th>
                       <th className="px-6 py-4.5">Email</th>
                       <th className="px-6 py-4.5">Notas</th>
-                      <th className="px-6 py-4.5">Pensión Ley 73</th>
                       <th className="px-6 py-4.5">Crédito Total</th>
-                      <th className="px-6 py-4.5">Retorno ROI</th>
-                      <th className="px-6 py-4.5">Estatus</th>
+                      <th className="px-6 py-4.5">Estado</th>
                       <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
@@ -534,21 +536,10 @@ export default function DashboardAliado() {
                             {p.notes_aliado || <span className="text-slate-300 italic font-normal">Sin notas</span>}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-500">${p.simulation.pensionActual.toLocaleString()}</span>
-                              <span className="text-slate-400">→</span>
-                              <span className="text-xs font-extrabold text-emerald-600">${p.simulation.pensionMejorada.toLocaleString()}</span>
-                              <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-1 rounded">+{gainPercent}%</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <span className="block text-xs font-bold text-slate-700">${p.simulation.totalCredito.toLocaleString()}</span>
                               <span className="block text-[9px] text-slate-400">M40 + Gestión</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-700">
-                            {p.simulation.roiMonths} meses
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getStageColor(p.status)}`}>

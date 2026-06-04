@@ -90,6 +90,10 @@ export default function PipelineManager() {
         return "bg-orange-50 text-orange-600 border-orange-100";
       case "pendiente_documentos":
         return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_semanas":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "falta_afore_cuenta":
+        return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 text-slate-600 border-slate-200";
       default:

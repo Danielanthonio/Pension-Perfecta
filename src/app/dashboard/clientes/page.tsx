@@ -104,8 +104,20 @@ export default function MisClientes() {
         );
       case "pendiente_documentos":
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
             Pendiente Documentos
+          </span>
+        );
+      case "falta_semanas":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
+            Falta Semanas
+          </span>
+        );
+      case "falta_afore_cuenta":
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
+            Falta Cta Afore
           </span>
         );
       case "cerrado_perdido":
@@ -151,7 +163,7 @@ export default function MisClientes() {
   // 2. Status Grouping Filter
   const filteredStatus = filteredSearch.filter((p) => {
     if (statusFilter === "all") return true;
-    if (statusFilter === "evaluacion") return p.status === "evaluacion_pendiente";
+    if (statusFilter === "evaluacion") return ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status);
     if (statusFilter === "listo") return p.status === "aprobado_listo" || p.status === "aportacion";
     if (statusFilter === "rechazado") return p.status === "rechazado";
     if (statusFilter === "activos") {
