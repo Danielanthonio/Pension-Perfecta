@@ -11,8 +11,6 @@ const isConfigured = serviceAccountEmail && privateKey && parentFolderId;
 
 // Initialize Google Drive client if configured
 let drive: any = null;
-let globalFormattedPrivateKey = "";
-
 if (isConfigured) {
   try {
     let formattedPrivateKey = privateKey!.trim();
@@ -42,7 +40,6 @@ if (isConfigured) {
     ) {
       formattedPrivateKey = formattedPrivateKey.slice(1, -1).trim();
     }
-    globalFormattedPrivateKey = formattedPrivateKey;
     
     const auth = new google.auth.JWT({
       email: serviceAccountEmail,
@@ -56,25 +53,6 @@ if (isConfigured) {
   }
 } else {
   console.warn("Google Drive credentials not found in env. Running in SIMULATION mode.");
-}
-
-export async function GET(req: NextRequest) {
-  return NextResponse.json({
-    hasEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    emailLength: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.length || 0,
-    hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
-    privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
-    privateKeyStart: process.env.GOOGLE_PRIVATE_KEY?.slice(0, 40),
-    privateKeyEnd: process.env.GOOGLE_PRIVATE_KEY?.slice(-40),
-    formattedKeyLength: globalFormattedPrivateKey.length,
-    formattedKeyStart: globalFormattedPrivateKey.slice(0, 40),
-    formattedKeyEnd: globalFormattedPrivateKey.slice(-40),
-    hasParentFolderId: !!process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID,
-    parentFolderIdLength: process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID?.length || 0,
-    isConfigured,
-    driveInitialized: !!drive,
-    nodeEnv: process.env.NODE_ENV,
-  });
 }
 
 export async function POST(req: NextRequest) {
