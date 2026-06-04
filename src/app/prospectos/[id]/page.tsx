@@ -33,7 +33,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, profiles, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData } = useApp();
+  const { user, prospects, profiles, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -105,6 +105,14 @@ export default function ProspectoDetalle() {
     phone: "",
     email: "",
   });
+
+  const handleDirectScheduleDetail = async () => {
+    window.open("https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5", "_blank");
+    if (prospect) {
+      await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
+      router.push(backPath);
+    }
+  };
 
   const handleStartEdit = () => {
     if (prospect) {
@@ -1035,15 +1043,13 @@ export default function ProspectoDetalle() {
                           <p className="text-[10px] text-slate-500 leading-normal">
                             Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:
                           </p>
-                          <a
-                            href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={handleDirectScheduleDetail}
                             className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
                           >
                             <span>Abrir Agenda Oficial</span>
                             <ArrowUpRight className="h-3.5 w-3.5" />
-                          </a>
+                          </button>
                         </div>
                       )}
                     </div>

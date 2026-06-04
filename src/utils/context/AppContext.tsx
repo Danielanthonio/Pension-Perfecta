@@ -2012,12 +2012,17 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   };
 
   const scheduleAssessment = async (id: string, date: string, time: string) => {
+    const notesText = date === "LeadConnector"
+      ? "Asesoría agendada vía LeadConnector"
+      : `Asesoría agendada para el día ${date} a las ${time} hrs.`;
+
     if (isDemoMode || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
             ...p,
             status: "asesoria_agendada" as const,
+            notes_aliado: notesText,
             updated_at: new Date().toISOString(),
           };
         }
@@ -2032,7 +2037,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const newNotif: NotificationItem = {
           id: `notif-${Math.random().toString(36).substr(2, 9)}`,
           title: "Asesoría Agendada 📅",
-          message: `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+          message: date === "LeadConnector"
+            ? `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
+            : `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
           type: "info",
           read: false,
           created_at: new Date().toISOString(),
@@ -2041,7 +2048,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
 
         triggerPushNotification(
-          `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
+          date === "LeadConnector"
+            ? `✉️ Confirmación de Asesoría: Se notificó al Director Eduardo de Operaciones que se agendó la asesoría para ${target.full_name} vía LeadConnector.`
+            : `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
           "email",
           target.full_name
         );
@@ -2052,12 +2061,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           .from("prospects")
           .update({
             status: "asesoria_agendada",
-            notes_aliado: `Asesoría agendada para el día ${date} a las ${time} hrs.`,
+            notes_aliado: notesText,
           })
           .eq("id", id);
 
         setProspects((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: "asesoria_agendada" as const } : p))
+          prev.map((p) => (p.id === id ? { ...p, status: "asesoria_agendada" as const, notes_aliado: notesText } : p))
         );
 
         const target = prospects.find((p) => p.id === id);
@@ -2068,14 +2077,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             await supabase.from("notifications").insert({
               user_id: dir.id,
               title: "Asesoría Agendada 📅",
-              message: `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+              message: date === "LeadConnector"
+                ? `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
+                : `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
               type: "info",
               read: false,
             });
           }
 
           triggerPushNotification(
-            `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
+            date === "LeadConnector"
+              ? `✉️ Confirmación de Asesoría: Se notificó al Director Eduardo de Operaciones que se agendó la asesoría para ${target.full_name} vía LeadConnector.`
+              : `✉️ Confirmación de Asesoría: Se ha enviado un correo electrónico a ${target.email} con la invitación de zoom de Calendly para el ${date} a las ${time} y se notificó al Director Eduardo de Operaciones.`,
             "email",
             target.full_name
           );

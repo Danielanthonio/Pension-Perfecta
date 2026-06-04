@@ -204,6 +204,11 @@ export default function DashboardAliado() {
     { label: "Liberado", desc: "Comisión pagada" },
   ];
 
+  const handleDirectSchedule = async (prospect: Prospect) => {
+    window.open("https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5", "_blank");
+    await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
+  };
+
   const handleOpenSchedule = (prospect: Prospect) => {
     setSelectedProspect(prospect);
     setSelectedDate("");
@@ -559,7 +564,7 @@ export default function DashboardAliado() {
                                 <FileText className="h-4 w-4" />
                               </Link>
                               <button
-                                onClick={() => handleOpenSchedule(p)}
+                                onClick={() => handleDirectSchedule(p)}
                                 className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-95"
                                 title="Agendar Asesoría"
                               >
