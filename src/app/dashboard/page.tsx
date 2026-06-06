@@ -223,8 +223,8 @@ export default function DashboardAliado() {
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Mi Panel Comercial</h1>
-          <p className="text-slate-500 text-sm mt-1">Registra prospectos, presenta propuestas y monitorea tus comisiones Ley 73.</p>
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Mi Panel Comercial</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Registra prospectos, presenta propuestas y monitorea tus comisiones Ley 73.</p>
         </div>
         <Link
           href="/dashboard/nuevo"
@@ -236,32 +236,32 @@ export default function DashboardAliado() {
       </div>
 
       {/* Date Filter Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
           <div>
-            <h4 className="text-xs font-bold text-slate-800">Filtrar por Fecha</h4>
-            <p className="text-[10px] text-slate-400 mt-0.5">Filtra el embudo y listados por fecha de registro.</p>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtrar por Fecha</h4>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra el embudo y listados por fecha de registro.</p>
           </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Desde:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
             />
           </div>
           <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Hasta:</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
             />
           </div>
           {(startDate || endDate) && (
@@ -270,7 +270,7 @@ export default function DashboardAliado() {
                 setStartDate("");
                 setEndDate("");
               }}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-655 dark:text-slate-300 rounded-xl text-xs font-bold transition-all"
             >
               Limpiar
             </button>
@@ -306,60 +306,60 @@ export default function DashboardAliado() {
       )}
 
       {/* Search and Filters Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
         {/* Search */}
         <div className="relative w-full md:flex-1">
-          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por Nombre, NSS o CURP..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
           />
         </div>
 
         {/* Stage Filter */}
         <div className="w-full md:w-52 flex items-center gap-2">
-          <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <Layers className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
           <select
             value={stageFilter}
             onChange={(e) => {
               setStageFilter(e.target.value);
               setSubStageFilter("all"); // Reset sub-stage filter on stage change
             }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors cursor-pointer dark:text-slate-300"
           >
-            <option value="all">Todas las Etapas</option>
+            <option value="all" className="dark:bg-slate-900">Todas las Etapas</option>
             {STAGES_LIST.map((stage) => (
-              <option key={stage.id} value={stage.id}>{stage.label}</option>
+              <option key={stage.id} value={stage.id} className="dark:bg-slate-900">{stage.label}</option>
             ))}
           </select>
         </div>
 
         {/* Sub-stage Filter */}
         <div className="w-full md:w-52 flex items-center gap-2">
-          <Layers className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <Layers className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
           <select
             value={subStageFilter}
             onChange={(e) => setSubStageFilter(e.target.value)}
             disabled={stageFilter === "all"}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer dark:text-slate-300"
           >
-            <option value="all">Todas las Subetapas</option>
+            <option value="all" className="dark:bg-slate-900">Todas las Subetapas</option>
             {stageFilter !== "all" && (SUB_STAGES_BY_STAGE[stageFilter] || []).map((sub) => (
-              <option key={sub} value={sub}>{sub}</option>
+              <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
             ))}
           </select>
         </div>
       </div>
 
       {/* Segmented Controller Tab Selector */}
-      <div className="bg-slate-200/60 p-1 rounded-2xl max-w-xl flex border border-slate-200">
+      <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xl flex border border-slate-200 dark:border-slate-800">
         <button
           onClick={() => setActiveTab("evaluacion")}
           className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "evaluacion" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            activeTab === "evaluacion" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
           }`}
         >
           En Evaluación ({enEvaluacion.length})
@@ -367,7 +367,7 @@ export default function DashboardAliado() {
         <button
           onClick={() => setActiveTab("listo")}
           className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "listo" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            activeTab === "listo" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
           }`}
         >
           Listo para Presentar ({listoPresentar.length})
@@ -375,7 +375,7 @@ export default function DashboardAliado() {
         <button
           onClick={() => setActiveTab("activos")}
           className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "activos" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            activeTab === "activos" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
           }`}
         >
           Proyectos Activos ({proyectosActivos.length})
@@ -383,7 +383,7 @@ export default function DashboardAliado() {
         <button
           onClick={() => setActiveTab("papelera")}
           className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "papelera" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            activeTab === "papelera" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
           }`}
         >
           Papelera ({deletedProspects.length})
@@ -394,22 +394,22 @@ export default function DashboardAliado() {
       <div className="space-y-6">
         {/* TAB 1: EN EVALUACIÓN */}
         {activeTab === "evaluacion" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">En Evaluación Técnica</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-bold text-slate-655 dark:text-slate-400 uppercase tracking-widest">En Evaluación Técnica</h3>
             </div>
             
             {enEvaluacion.length === 0 ? (
               <div className="py-16 text-center">
-                <Clock className="mx-auto h-12 w-12 text-slate-300" />
-                <h4 className="text-sm font-bold text-slate-700 mt-3">No hay prospectos en evaluación</h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.</p>
+                <Clock className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos en evaluación</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -421,30 +421,30 @@ export default function DashboardAliado() {
                       <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {enEvaluacion.map((p) => {
                       const isIncomplete = p.documents.length < 2;
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
                             {p.full_name}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.phone}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.email}
                           </td>
-                          <td className="px-6 py-4 max-w-[200px] truncate text-xs text-slate-500 font-medium" title={p.notes_aliado}>
-                            {p.notes_aliado || <span className="text-slate-300 italic font-normal">Sin notas</span>}
+                          <td className="px-6 py-4 max-w-[200px] truncate text-xs text-slate-500 dark:text-slate-400 font-medium" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-300 dark:text-slate-600 italic font-normal">Sin notas</span>}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -456,7 +456,7 @@ export default function DashboardAliado() {
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="inline-flex p-1.5 bg-slate-100 group-hover:bg-blue-50 text-slate-500 group-hover:text-blue-600 rounded-xl transition-all border border-slate-200/60"
+                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/20 text-slate-500 dark:text-slate-450 group-hover:text-blue-600 dark:group-hover:text-blue-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </Link>
@@ -466,7 +466,7 @@ export default function DashboardAliado() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="inline-flex p-1.5 bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-all border border-slate-200/60"
+                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-450 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -485,22 +485,22 @@ export default function DashboardAliado() {
 
         {/* TAB 2: LISTO PARA PRESENTAR (PROPUESSTAS EMITIDAS) */}
         {activeTab === "listo" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-bold text-slate-655 dark:text-slate-400 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
             </div>
 
             {listoPresentar.length === 0 ? (
               <div className="py-16 text-center">
-                <CheckSquare className="mx-auto h-12 w-12 text-slate-300" />
-                <h4 className="text-sm font-bold text-slate-700 mt-3">Ninguna simulación aprobada aún</h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.</p>
+                <CheckSquare className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Ninguna simulación aprobada aún</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -512,36 +512,36 @@ export default function DashboardAliado() {
                       <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {listoPresentar.map((p) => {
                       if (!p.simulation) return null;
                       const gainPercent = Math.round(
                         ((p.simulation.pensionMejorada - p.simulation.pensionActual) / p.simulation.pensionActual) * 100
                       );
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
                             {p.full_name}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.phone}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.email}
                           </td>
-                          <td className="px-6 py-4 max-w-[150px] truncate text-xs text-slate-500 font-medium" title={p.notes_aliado}>
-                            {p.notes_aliado || <span className="text-slate-300 italic font-normal">Sin notas</span>}
+                          <td className="px-6 py-4 max-w-[150px] truncate text-xs text-slate-500 dark:text-slate-400 font-medium" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-300 dark:text-slate-600 italic font-normal">Sin notas</span>}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
-                              <span className="block text-xs font-bold text-slate-700">${p.simulation.totalCredito.toLocaleString()}</span>
-                              <span className="block text-[9px] text-slate-400">M40 + Gestión</span>
+                              <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">${p.simulation.totalCredito.toLocaleString()}</span>
+                              <span className="block text-[9px] text-slate-400 dark:text-slate-500">M40 + Gestión</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -553,7 +553,7 @@ export default function DashboardAliado() {
                             <div className="flex items-center gap-2 justify-end">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors border border-slate-200/60"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-205 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-750"
                                 title="Ver Expediente"
                               >
                                 <FileText className="h-4 w-4" />
@@ -573,7 +573,7 @@ export default function DashboardAliado() {
                                     await scheduleAssessment(p.id, "LeadConnector", "Enlace Directo");
                                   }
                                 }}
-                                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-xl transition-all border border-emerald-250/60 flex items-center justify-center"
+                                className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
                                 title="Confirmar Agendado (Avanzar a Activos)"
                               >
                                 <CheckSquare className="h-4 w-4" />
@@ -584,7 +584,7 @@ export default function DashboardAliado() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-all border border-slate-200/60"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-450 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -605,55 +605,55 @@ export default function DashboardAliado() {
         {activeTab === "activos" && (
           <div className="space-y-6">
             {proyectosActivos.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
-                <Folder className="mx-auto h-12 w-12 text-slate-300" />
-                <h4 className="text-sm font-bold text-slate-700 mt-3">Sin proyectos activos en curso</h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Una vez que agendes la reunión de presentación de simulación, el caso se moverá automáticamente aquí para seguimiento.</p>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm py-16 text-center">
+                <Folder className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Sin proyectos activos en curso</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Una vez que agendes la reunión de presentación de simulación, el caso se moverá automáticamente aquí para seguimiento.</p>
               </div>
             ) : (
               proyectosActivos.map((p) => {
                 const activeIndex = getActiveStageIndex(p.status);
                 const isPaid = p.status === "pagado_comision";
                 return (
-                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 transition-all">
+                  <div key={p.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                     {/* Header Details in Horizontal Grid */}
-                    <div className="pb-4 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 flex-1">
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Cliente</span>
-                          <span className="text-xs font-extrabold text-slate-800 leading-tight block mt-0.5 flex items-center gap-1.5">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
+                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight block mt-0.5 flex items-center gap-1.5">
                             {p.full_name}
                             {isPaid && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
                                 ★
                               </span>
                             )}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">NSS</span>
-                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.nss}</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">NSS</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.nss}</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">CURP</span>
-                          <span className="text-xs font-semibold text-slate-600 block mt-0.5 uppercase">{p.curp}</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">CURP</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 uppercase">{p.curp}</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Teléfono</span>
-                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.phone}</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Teléfono</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.phone}</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Email</span>
-                          <span className="text-xs font-semibold text-slate-600 block mt-0.5">{p.email}</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Email</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.email}</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Notas</span>
-                          <span className="text-xs text-slate-500 block mt-0.5 truncate" title={p.notes_aliado}>
-                            {p.notes_aliado || <span className="text-slate-350 italic">Sin notas</span>}
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Notas</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5 truncate" title={p.notes_aliado}>
+                            {p.notes_aliado || <span className="text-slate-350 dark:text-slate-600 italic">Sin notas</span>}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Etapa / Subetapa</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Etapa / Subetapa</span>
                           <div className="mt-1">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageColor(p.status)}`}>
                               {getStageLabel(p.status)}
@@ -662,17 +662,17 @@ export default function DashboardAliado() {
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between xl:justify-end gap-6 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100">
+                      <div className="flex items-center justify-between xl:justify-end gap-6 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100 dark:border-slate-800">
                         {p.simulation && (
-                          <div className="text-left xl:text-right xl:border-r xl:pr-4 xl:border-slate-100">
-                            <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Crédito Total</span>
-                            <span className="block text-xs font-extrabold text-slate-700 mt-0.5">${p.simulation.totalCredito.toLocaleString()}</span>
+                          <div className="text-left xl:text-right xl:border-r xl:pr-4 xl:border-slate-100 dark:xl:border-slate-800">
+                            <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Crédito Total</span>
+                            <span className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mt-0.5">${p.simulation.totalCredito.toLocaleString()}</span>
                           </div>
                         )}
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/prospectos/${p.id}`}
-                            className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-650 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-650 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1.5"
                           >
                             Expediente <ArrowUpRight className="h-3 w-3" />
                           </Link>
@@ -682,7 +682,7 @@ export default function DashboardAliado() {
                                 await deleteProspect(p.id);
                               }
                             }}
-                            className="p-1.5 bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition-colors border border-slate-200/60"
+                            className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-450 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
                             title="Mover a Papelera"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -696,7 +696,7 @@ export default function DashboardAliado() {
                       <div className="relative">
                         {/* Connecting Track */}
                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                          <div className="w-full border-t-2 border-slate-200" />
+                          <div className="w-full border-t-2 border-slate-200 dark:border-slate-800" />
                         </div>
                         {/* Completed/Active Progress Fill */}
                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -718,15 +718,15 @@ export default function DashboardAliado() {
                                     isCompleted
                                       ? "bg-emerald-500 border-emerald-600 text-white shadow-sm shadow-emerald-500/20"
                                       : isActive
-                                        ? "bg-blue-600 border-blue-700 text-white shadow-md ring-4 ring-blue-500/10 scale-110"
-                                        : "bg-slate-100 border-slate-200 text-slate-400"
+                                        ? "bg-blue-600 border-blue-700 text-white shadow-md ring-4 ring-blue-500/10 dark:ring-blue-500/5 scale-110"
+                                        : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
                                   }`}
                                 >
                                   {isCompleted ? <CheckCircle2 className="h-4 w-4 text-white" /> : idx + 1}
                                 </div>
                                 <span
                                   className={`text-[9px] font-bold mt-2 text-center transition-colors uppercase tracking-wider hidden sm:block ${
-                                    isActive ? "text-blue-600" : isCompleted ? "text-emerald-600" : "text-slate-400"
+                                    isActive ? "text-blue-600 dark:text-blue-400" : isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
                                   }`}
                                 >
                                   {step.label}
@@ -740,17 +740,17 @@ export default function DashboardAliado() {
 
                     {/* Congratulations Banner / Commission status */}
                     {isPaid && p.simulation && (
-                      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                      <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between shadow-inner">
                         <div className="flex items-center gap-3">
                           <span className="text-xl">💸</span>
                           <div>
-                            <h4 className="text-xs font-bold text-emerald-900">¡Comisión Pagada con éxito!</h4>
-                            <p className="text-[10px] text-emerald-600 mt-0.5">La comisión acordada por capturar y coordinar este proyecto ha sido liberada por dirección.</p>
+                            <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300">¡Comisión Pagada con éxito!</h4>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-450 mt-0.5">La comisión acordada por capturar y coordinar este proyecto ha sido liberada por dirección.</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="block text-[8px] text-emerald-500 font-bold uppercase tracking-wider">Tu Comisión</span>
-                          <span className="block text-sm font-black text-emerald-600">${p.simulation.costoGestion.toLocaleString()}</span>
+                          <span className="block text-[8px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-wider">Tu Comisión</span>
+                          <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400">${p.simulation.costoGestion.toLocaleString()}</span>
                         </div>
                       </div>
                     )}
@@ -763,22 +763,22 @@ export default function DashboardAliado() {
 
         {/* TAB 4: PAPELERA */}
         {activeTab === "papelera" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-              <h3 className="text-xs font-bold text-slate-655 uppercase tracking-widest">Papelera de Reciclaje (Se eliminan permanentemente en 7 días)</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
+              <h3 className="text-xs font-bold text-slate-655 dark:text-slate-400 uppercase tracking-widest">Papelera de Reciclaje (Se eliminan permanentemente en 7 días)</h3>
             </div>
             
             {filteredDeletedBySearchAndFilters.length === 0 ? (
               <div className="py-16 text-center">
-                <Trash2 className="mx-auto h-12 w-12 text-slate-350" />
-                <h4 className="text-sm font-bold text-slate-700 mt-3">La papelera está vacía</h4>
-                <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Los clientes que elimines aparecerán aquí por 7 días antes de borrarse definitivamente.</p>
+                <Trash2 className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-600" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">La papelera está vacía</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Los clientes que elimines aparecerán aquí por 7 días antes de borrarse definitivamente.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -788,29 +788,29 @@ export default function DashboardAliado() {
                       <th className="px-6 py-4.5 text-right"><span className="sr-only">Acciones</span></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredDeletedBySearchAndFilters.map((p) => {
                       const deletedAt = getProspectDeletedAt(p);
                       const remainingDays = deletedAt ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 7;
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800">
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
                             {p.full_name}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.phone}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100" : "bg-amber-50 text-amber-700 border-amber-100"}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-655 dark:text-red-400 border-red-100 dark:border-red-800/40" : "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/40"}`}>
                               {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
@@ -822,7 +822,7 @@ export default function DashboardAliado() {
                                     await restoreProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-xl border border-emerald-200 transition-colors flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-450 text-[10px] font-bold rounded-xl border border-emerald-200 dark:border-emerald-800 transition-colors flex items-center gap-1"
                                 title="Restaurar prospecto"
                               >
                                 <RotateCcw className="h-3 w-3" />
@@ -834,7 +834,7 @@ export default function DashboardAliado() {
                                     await permanentlyDeleteProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-655 text-[10px] font-bold rounded-xl border border-red-200 transition-colors flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-red-50 dark:bg-red-955/15 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-655 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800 transition-colors flex items-center gap-1"
                                 title="Eliminar permanente"
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -855,17 +855,17 @@ export default function DashboardAliado() {
 
       {/* Interactive Scheduling Modal */}
       {selectedProspect && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[999] p-6 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 max-w-md w-full overflow-hidden transform transition-all animate-scale-in">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-[999] p-6 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 max-w-md w-full overflow-hidden transform transition-all animate-scale-in">
             {/* Header */}
-            <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
               <div>
                 <span className="text-[9px] text-blue-500 font-bold uppercase tracking-widest block">Calendario Integrado</span>
-                <h3 className="text-sm font-extrabold text-slate-800 mt-0.5">Agendar Presentación</h3>
+                <h3 className="text-sm font-extrabold text-slate-800 dark:text-white mt-0.5">Agendar Presentación</h3>
               </div>
               <button
                 onClick={() => setSelectedProspect(null)}
-                className="p-1.5 bg-slate-200/50 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+                className="p-1.5 bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -873,22 +873,22 @@ export default function DashboardAliado() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-6">
-              <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
+              <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-4">
                 <span className="text-[9px] text-blue-500 font-bold uppercase tracking-wider block">Prospecto</span>
-                <h4 className="text-xs font-extrabold text-slate-800 mt-0.5">{selectedProspect.full_name}</h4>
+                <h4 className="text-xs font-extrabold text-slate-800 dark:text-white mt-0.5">{selectedProspect.full_name}</h4>
                 {selectedProspect.simulation && (
-                  <p className="text-[10px] text-slate-500 mt-1">Pensión Mejorada: ${selectedProspect.simulation.pensionMejorada.toLocaleString()} • ROI: {selectedProspect.simulation.roiMonths} meses</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Pensión Mejorada: ${selectedProspect.simulation.pensionMejorada.toLocaleString()} • ROI: {selectedProspect.simulation.roiMonths} meses</p>
                 )}
               </div>
 
               {schedulingStep === "datetime" ? (
                 <div className="space-y-4">
                   {/* Direct Link Section */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center">
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
                       Agendamiento Directo
                     </span>
-                    <p className="text-[11px] text-slate-500 mb-3 leading-normal">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-normal">
                       Haz clic en el enlace para agendar directamente la sesión con el cliente:
                     </p>
                     <a
@@ -900,26 +900,26 @@ export default function DashboardAliado() {
                       <span>Abrir Agenda Oficial</span>
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </a>
-                    <span className="block text-[9px] text-slate-400 mt-2">
+                    <span className="block text-[9px] text-slate-400 dark:text-slate-500 mt-2">
                       Una vez agendada la asesoría en el enlace anterior, registra la fecha y hora a continuación para sincronizar el expediente.
                     </span>
                   </div>
 
                   {/* Select Date */}
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">1. Seleccionar Día</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">1. Seleccionar Día</label>
                     <input
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
                       min={new Date().toISOString().split("T")[0]}
-                      className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 transition-all"
+                      className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 border border-slate-205 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 transition-all dark:text-slate-205"
                     />
                   </div>
 
                   {/* Select Time slot */}
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">2. Seleccionar Horario</label>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">2. Seleccionar Horario</label>
                     <div className="grid grid-cols-3 gap-2">
                       {["09:00 AM", "11:00 AM", "01:00 PM", "04:00 PM", "06:00 PM"].map((time) => {
                         const isSelected = selectedTime === time;
@@ -930,7 +930,7 @@ export default function DashboardAliado() {
                             className={`py-2 text-[10px] font-bold rounded-xl border transition-all ${
                               isSelected
                                 ? "bg-blue-600 border-blue-700 text-white shadow-sm shadow-blue-500/10"
-                                : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                : "bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-655 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800"
                             }`}
                           >
                             {time}
@@ -942,29 +942,29 @@ export default function DashboardAliado() {
                 </div>
               ) : (
                 <div className="space-y-4 text-center py-4">
-                  <div className="h-12 w-12 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-500 flex items-center justify-center mx-auto text-xl animate-bounce">
+                  <div className="h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-500 flex items-center justify-center mx-auto text-xl animate-bounce">
                     📅
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-700">Confirmación de Invitación</h4>
-                    <p className="text-[11px] text-slate-400 mt-1 max-w-[280px] mx-auto">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">Confirmación de Invitación</h4>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                       Se agendará una sesión de presentación vía Zoom. Al confirmar, el sistema enviará correos de invitación automáticos y avanzará el caso a **Proyectos Activos**.
                     </p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-3 max-w-[280px] mx-auto text-xs font-semibold text-slate-600 space-y-1">
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-800 rounded-2xl p-3 max-w-[280px] mx-auto text-xs font-semibold text-slate-600 dark:text-slate-300 space-y-1">
                     <div>Fecha: {selectedDate}</div>
                     <div>Horario: {selectedTime}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Agendado vía LeadConnector</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Agendado vía LeadConnector</div>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+            <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex gap-3">
               <button
                 onClick={() => setSelectedProspect(null)}
-                className="flex-1 py-2.5 text-xs font-bold bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-slate-700 transition-colors"
+                className="flex-1 py-2.5 text-xs font-bold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-705 dark:text-slate-205 transition-colors"
               >
                 Cancelar
               </button>

@@ -24,7 +24,7 @@ interface UserSettingsModalProps {
 }
 
 export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
-  const { user, updateUserProfile, triggerPushNotification } = useApp();
+  const { user, updateUserProfile, triggerPushNotification, profiles } = useApp();
 
   const [activeTab, setActiveTab] = useState<"personal" | "subscription" | "display" | "help">("personal");
 
@@ -62,6 +62,41 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
   }, [isOpen]);
 
   if (!isOpen || !user) return null;
+
+  // Role based premium styling
+  const isAM = user.role === "account_manager";
+  const isDirector = user.role === "director";
+  const isAlly = user.role === "aliado";
+
+  const primaryBg = isAM
+    ? "bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 disabled:bg-blue-400"
+    : isDirector
+    ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10 disabled:bg-emerald-400"
+    : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 disabled:bg-indigo-400";
+
+  const activeTabClass = isAM
+    ? "bg-blue-600 text-white shadow-md shadow-blue-600/10"
+    : isDirector
+    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/10"
+    : "bg-indigo-600 text-white shadow-md shadow-indigo-600/10";
+
+  const textColor = isAM
+    ? "text-blue-600 dark:text-blue-400"
+    : isDirector
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-indigo-600 dark:text-indigo-400";
+
+  const focusBorder = isAM
+    ? "focus:border-blue-500"
+    : isDirector
+    ? "focus:border-emerald-500"
+    : "focus:border-indigo-500";
+
+  const avatarBg = isAM
+    ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+    : isDirector
+    ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
+    : "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400";
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +181,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
                       isActive
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/10"
+                        ? activeTabClass
                         : "text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-850 hover:text-slate-800 dark:hover:text-white"
                     }`}
                   >
@@ -160,7 +195,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
           <div className="hidden md:block">
             <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-2">
-              <div className="h-7.5 w-7.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black shrink-0">
+              <div className={`h-7.5 w-7.5 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${avatarBg}`}>
                 {user.full_name.charAt(0)}
               </div>
               <div className="min-w-0">
@@ -206,7 +241,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                         type="text"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors"
+                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
                       />
                     </div>
                   </div>
@@ -221,7 +256,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                         type="text"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors"
+                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
                       />
                     </div>
                   </div>
@@ -248,13 +283,39 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       Perfil
                     </label>
                     <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
-                      <Shield className="h-4.5 w-4.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                        {user.role === "director" ? "Director de Operaciones" : "Aliado Comercial"}
+                      <Shield className={`h-4.5 w-4.5 shrink-0 ${textColor}`} />
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+                        {user.role === "director" ? "Director de Operaciones" : user.role === "account_manager" ? "Account Manager" : "Aliado Comercial"}
                       </span>
                     </div>
                   </div>
                 </div>
+
+                {/* Account Manager Asignado for Allies */}
+                {isAlly && (
+                  <div className="pt-2">
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                      Account Manager Asignado
+                    </label>
+                    <div className="flex items-center gap-2.5 px-3.5 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                        profiles?.find((p) => p.id === user.account_manager_id)?.role === "account_manager"
+                          ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                      }`}>
+                        {profiles?.find((p) => p.id === user.account_manager_id)?.full_name.charAt(0) || "?"}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
+                          {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Pendiente de asignación"}
+                        </span>
+                        <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                          {profiles?.find((p) => p.id === user.account_manager_id) ? "Asesor de pensiones asignado" : "Espera a ser asignado por el director"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 flex items-center justify-between gap-4">
                   {updateSuccess ? (
@@ -270,7 +331,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                   <button
                     type="submit"
                     disabled={isUpdating}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-extrabold rounded-xl text-xs shadow-md shadow-indigo-600/10 transition-all flex items-center gap-2 active:scale-95"
+                    className={`px-6 py-2.5 ${primaryBg} text-white font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 active:scale-95`}
                   >
                     {isUpdating ? "Guardando..." : "Actualizar Datos"}
                   </button>
@@ -313,7 +374,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                 </div>
 
                 <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${avatarBg}`}>
                     <Lock className="h-4.5 w-4.5" />
                   </div>
                   <div>
@@ -347,7 +408,11 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                           onClick={() => handleLanguageChange(lang.id)}
                           className={`p-3.5 border rounded-2xl cursor-pointer text-center text-xs font-bold transition-all ${
                             isSelected
-                              ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 dark:text-indigo-400"
+                              ? isAM
+                                ? "border-blue-600 bg-blue-50/20 text-blue-700 dark:text-blue-450"
+                                : isDirector
+                                ? "border-emerald-600 bg-emerald-50/20 text-emerald-700 dark:text-emerald-450"
+                                : "border-indigo-600 bg-indigo-50/20 text-indigo-700 dark:text-indigo-450"
                               : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300 hover:bg-slate-50/30"
                           }`}
                         >
@@ -370,7 +435,11 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       onClick={() => handleThemeChange("light")}
                       className={`p-4 border rounded-2xl cursor-pointer flex flex-col items-center gap-2 transition-all ${
                         theme === "light"
-                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 dark:text-indigo-400"
+                          ? isAM
+                            ? "border-blue-600 bg-blue-50/20 text-blue-700 dark:text-blue-450"
+                            : isDirector
+                            ? "border-emerald-600 bg-emerald-50/20 text-emerald-700 dark:text-emerald-450"
+                            : "border-indigo-600 bg-indigo-50/20 text-indigo-700 dark:text-indigo-450"
                           : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300"
                       }`}
                     >
@@ -383,11 +452,15 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       onClick={() => handleThemeChange("dark")}
                       className={`p-4 border rounded-2xl cursor-pointer flex flex-col items-center gap-2 transition-all ${
                         theme === "dark"
-                          ? "border-indigo-600 bg-indigo-50/20 text-indigo-700 dark:text-indigo-400"
+                          ? isAM
+                            ? "border-blue-600 bg-blue-50/20 text-blue-750 dark:text-blue-400"
+                            : isDirector
+                            ? "border-emerald-600 bg-emerald-50/20 text-emerald-750 dark:text-emerald-400"
+                            : "border-indigo-600 bg-indigo-50/20 text-indigo-750 dark:text-indigo-400"
                           : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300"
                       }`}
                     >
-                      <Moon className="h-5 w-5 text-indigo-500" />
+                      <Moon className={`h-5 w-5 ${isAM ? "text-blue-500" : isDirector ? "text-emerald-500" : "text-indigo-500"}`} />
                       <span className="text-xs font-extrabold">Tema Oscuro</span>
                     </div>
 
@@ -401,7 +474,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
             {activeTab === "help" && (
               <div className="space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 p-4.5 rounded-2xl flex items-center gap-3">
-                  <MessageSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <MessageSquare className={`h-5 w-5 shrink-0 ${textColor}`} />
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-semibold">
                     ¿Tienes dudas operativas sobre el simulador Ley 73 o problemas con algún expediente? Escríbenos directamente y te daremos soporte prioritario.
                   </p>
@@ -417,7 +490,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       value={helpSubject}
                       onChange={(e) => setHelpSubject(e.target.value)}
                       placeholder="Ej. Error al subir visor AFORE o discrepancia en semanas..."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 outline-none rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
                     />
                   </div>
 
@@ -430,7 +503,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       onChange={(e) => setHelpMessage(e.target.value)}
                       rows={3}
                       placeholder="Escribe paso a paso lo que sucede o la duda técnica..."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 outline-none rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors resize-none"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors resize-none`}
                     />
                   </div>
 
@@ -448,7 +521,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                     <button
                       type="submit"
                       disabled={helpSent || !helpSubject.trim() || !helpMessage.trim()}
-                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:dark:bg-slate-800 disabled:text-slate-400 font-extrabold rounded-xl text-xs transition-colors flex items-center gap-2 active:scale-95 text-white"
+                      className={`px-5 py-2 ${primaryBg} text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-2 active:scale-95`}
                     >
                       <Send className="h-3.5 w-3.5" />
                       Enviar Soporte
@@ -457,7 +530,6 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                 </form>
               </div>
             )}
-
           </div>
         </div>
       </div>

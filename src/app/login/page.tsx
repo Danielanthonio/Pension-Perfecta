@@ -136,7 +136,7 @@ export default function LoginPage() {
       const realRole = await login(emailInput, selectedRole, passwordInput);
       setSuccessMsg("¡Acceso concedido! Redirigiendo a tu panel...");
       setTimeout(() => {
-        if (realRole === "director") {
+        if (realRole === "director" || realRole === "account_manager") {
           router.push("/admin");
         } else {
           router.push("/dashboard");
@@ -148,7 +148,7 @@ export default function LoginPage() {
       if (errMsg.includes("PENDING_CONFIRMATION")) {
         setViewState("CONFIRMATION_PENDING");
       } else if (errMsg.includes("Acceso Inválido")) {
-        setErrorMsg("Acceso Inválido: Tu cuenta no tiene permisos para ingresar como " + (selectedRole === "aliado" ? "Aliado" : "Director") + ".");
+        setErrorMsg("Acceso Inválido: Tu cuenta no tiene permisos para ingresar como " + (selectedRole === "aliado" ? "Aliado" : selectedRole === "account_manager" ? "Account Manager" : "Director") + ".");
       } else {
         setErrorMsg("Credenciales incorrectas o correo no confirmado. Verifica tus datos.");
       }
@@ -309,6 +309,21 @@ export default function LoginPage() {
                   </motion.button>
 
                   <motion.button
+                    onClick={() => handleRoleSelect("account_manager")}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-between px-6 py-4.5 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-blue-500/[0.06] hover:to-blue-500/[0.02] border border-white/5 hover:border-blue-500/20 text-white rounded-2xl transition-all duration-300 group/btn shadow-lg"
+                  >
+                    <div className="text-left">
+                      <span className="block font-bold text-base text-slate-100 group-hover/btn:text-blue-400 transition-colors">Entrar como Account Manager</span>
+                      <span className="block text-[11px] text-slate-400 mt-1">Supervisión de aliados asignados y prospectos</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white/5 group-hover/btn:bg-blue-500/10 flex items-center justify-center transition-colors">
+                      <ArrowRight className="h-4 w-4 text-blue-400 group-hover/btn:translate-x-0.5 transition-transform" />
+                    </div>
+                  </motion.button>
+
+                  <motion.button
                     onClick={() => handleRoleSelect("director")}
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
@@ -354,7 +369,7 @@ export default function LoginPage() {
                   </button>
                   <div>
                     <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-                      Acceso: {selectedRole === "aliado" ? "Aliado Comercial" : "Director"}
+                      Acceso: {selectedRole === "aliado" ? "Aliado Comercial" : selectedRole === "account_manager" ? "Account Manager" : "Director"}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
                       Por favor, ingresa tus credenciales

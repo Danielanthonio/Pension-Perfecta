@@ -194,41 +194,41 @@ export default function MisClientes() {
   });
 
   return (
-    <div className="max-w-[1700px] mx-auto space-y-6 select-none animate-fade-in">
+    <div className="max-w-[1700px] mx-auto space-y-6 select-none animate-fade-in text-slate-800 dark:text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Expedientes de Prospectos</h1>
-          <p className="text-slate-500 text-sm mt-1">Busca, filtra y audita el historial de todos tus clientes registrados.</p>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Expedientes de Prospectos</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Busca, filtra y audita el historial de todos tus clientes registrados.</p>
         </div>
       </div>
 
       {/* Date Filter Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
           <div>
-            <h4 className="text-xs font-bold text-slate-800">Filtrar por Fecha</h4>
-            <p className="text-[10px] text-slate-400 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtrar por Fecha</h4>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
           </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Desde:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Desde:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
             />
           </div>
           <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Hasta:</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Hasta:</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto"
+              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
             />
           </div>
           {(startDate || endDate) && (
@@ -237,7 +237,7 @@ export default function MisClientes() {
                 setStartDate("");
                 setEndDate("");
               }}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-655 dark:text-slate-300 rounded-xl text-xs font-bold transition-all"
             >
               Limpiar
             </button>
@@ -249,10 +249,10 @@ export default function MisClientes() {
       <SalesFunnel prospects={filteredByDate} />
 
       {/* Query Search Matrix bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
         {/* Text Search Input */}
         <div className="relative w-full md:flex-1">
-          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
             <Search className="h-4.5 w-4.5" />
           </span>
           <input
@@ -260,58 +260,58 @@ export default function MisClientes() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por Nombre, NSS o CURP..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 transition-all dark:text-slate-200"
           />
         </div>
 
         {/* Status Dropdown */}
         <div className="w-full md:w-44 flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <SlidersHorizontal className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors"
+            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors dark:text-slate-300"
           >
-            <option value="all">Todos los Estados</option>
-            <option value="evaluacion">En Evaluación</option>
-            <option value="listo">Listo para Presentar</option>
-            <option value="activos">Proyectos Activos</option>
-            <option value="rechazado">Rechazados</option>
+            <option value="all" className="dark:bg-slate-900">Todos los Estados</option>
+            <option value="evaluacion" className="dark:bg-slate-900">En Evaluación</option>
+            <option value="listo" className="dark:bg-slate-900">Listo para Presentar</option>
+            <option value="activos" className="dark:bg-slate-900">Proyectos Activos</option>
+            <option value="rechazado" className="dark:bg-slate-900">Rechazados</option>
           </select>
         </div>
 
         {/* Sorting Dropdown */}
         <div className="w-full md:w-44 flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <ArrowUpDown className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors"
+            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors dark:text-slate-300"
           >
-            <option value="recent">Más recientes</option>
-            <option value="oldest">Más antiguos</option>
-            <option value="name">Nombre A-Z</option>
+            <option value="recent" className="dark:bg-slate-900">Más recientes</option>
+            <option value="oldest" className="dark:bg-slate-900">Más antiguos</option>
+            <option value="name" className="dark:bg-slate-900">Nombre A-Z</option>
           </select>
         </div>
       </div>
 
       {/* Main Results Table container */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden">
         {sortedProspects.length === 0 ? (
-          <div className="py-20 text-center space-y-3">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+          <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
+            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
               <Search className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-700">Sin resultados coincidentes</h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-[280px] mx-auto">Prueba ajustando los términos de búsqueda o los filtros aplicados en las pestañas.</p>
+              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-305">Sin resultados coincidentes</h4>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Prueba ajustando los términos de búsqueda o los filtros aplicados en las pestañas.</p>
             </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
                   <th className="px-6 py-4.5 w-1/3">Cliente</th>
                   <th className="px-6 py-4.5">NSS / CURP</th>
                   <th className="px-6 py-4.5">Fecha de Subida</th>
@@ -319,23 +319,23 @@ export default function MisClientes() {
                   <th className="px-6 py-4.5 relative"><span className="sr-only">Expediente</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {sortedProspects.map((p) => {
                   return (
                     <tr
                       key={p.id}
-                      className="hover:bg-slate-50/40 transition-colors group cursor-pointer"
+                      className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 group-hover:bg-blue-50/50 group-hover:text-blue-500 text-slate-500 flex items-center justify-center text-xs font-bold border border-slate-200 transition-colors">
+                          <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500 dark:group-hover:text-blue-400 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors">
                             {p.full_name.charAt(0)}
                           </div>
                           <div>
-                            <span className="block text-xs font-extrabold text-slate-800 leading-tight group-hover:text-blue-600 transition-colors">
+                            <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               {p.full_name}
                             </span>
-                            <span className="block text-[10px] text-slate-400 mt-0.5 leading-none">
+                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none">
                               Contacto: {p.phone}
                             </span>
                           </div>
@@ -344,16 +344,16 @@ export default function MisClientes() {
 
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <span className="block text-[11px] font-semibold text-slate-600 leading-tight">
+                          <span className="block text-[11px] font-semibold text-slate-600 dark:text-slate-350 leading-tight">
                             NSS: {p.nss}
                           </span>
-                          <span className="block text-[9px] text-slate-400 font-medium mt-0.5 uppercase tracking-wide leading-none">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium mt-0.5 uppercase tracking-wide leading-none">
                             CURP: {p.curp}
                           </span>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-555 dark:text-slate-400">
                         {formatDate(p.created_at)}
                       </td>
 
@@ -364,7 +364,7 @@ export default function MisClientes() {
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <Link
                           href={`/prospectos/${p.id}`}
-                          className="inline-flex p-1.5 bg-slate-100/60 hover:bg-blue-50 text-slate-400 hover:text-blue-500 rounded-xl transition-all border border-slate-200 group-hover:scale-105"
+                          className="inline-flex p-1.5 bg-slate-100/60 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-slate-400 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-200 dark:border-slate-700 group-hover:scale-105"
                         >
                           <ChevronRight className="h-4 w-4" />
                         </Link>

@@ -182,7 +182,7 @@ export default function ProspectoDetalle() {
   const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const canDeleteDoc = user?.role === "director" || (prospect && prospect.aliado_id === user?.id);
+  const canDeleteDoc = user?.role === "director" || user?.role === "account_manager" || (prospect && prospect.aliado_id === user?.id);
 
   const handleDeleteSelectedDoc = async () => {
     if (!prospect || !selectedDoc) return;
@@ -219,6 +219,15 @@ export default function ProspectoDetalle() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!prospect) return;
+
+    if (type === "AFORE") {
+      const hasImss = prospect.documents?.some((d) => d.file_type === "IMSS");
+      if (!hasImss) {
+        alert("Atención: Primero debes subir el Certificado de Semanas Cotizadas (IMSS) antes de poder subir el expediente de AFORE.");
+        e.target.value = "";
+        return;
+      }
+    }
 
     const allowedExtensions = ["pdf", "png", "jpg", "jpeg"];
     const fileExtension = file.name.split(".").pop()?.toLowerCase() || "";
@@ -335,7 +344,7 @@ export default function ProspectoDetalle() {
 
   // Autosave simulation draft effect
   useEffect(() => {
-    if (user?.role !== "director" || !prospect || (isApproved && !isEditingApproved)) return;
+    if ((user?.role !== "director" && user?.role !== "account_manager") || !prospect || (isApproved && !isEditingApproved)) return;
 
     const sim = prospect.simulation;
     const hasChanged =
@@ -382,7 +391,7 @@ export default function ProspectoDetalle() {
   ]);
 
   useEffect(() => {
-    if (user?.role === "director" && prospect) {
+    if ((user?.role === "director" || user?.role === "account_manager") && prospect) {
       const initialStatuses = ["pendiente_documentos", "falta_reporte", "falta_afore"];
       if (initialStatuses.includes(prospect.status)) {
         updateProspectStatus(prospect.id, "evaluacion_pendiente");
@@ -416,13 +425,13 @@ export default function ProspectoDetalle() {
 
   if (!prospect) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 select-none">
-        <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-md w-full text-center space-y-4 shadow-sm">
-          <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto border border-red-150">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 select-none">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 max-w-md w-full text-center space-y-4 shadow-sm">
+          <div className="h-12 w-12 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 flex items-center justify-center mx-auto border border-red-150 dark:border-red-900/30">
             <AlertCircle className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-800">Expediente no encontrado</h3>
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">Expediente no encontrado</h3>
             <p className="text-xs text-slate-400 mt-1">El identificador de este prospecto no coincide con los registros activos en la base de datos.</p>
           </div>
           <button
@@ -471,21 +480,21 @@ export default function ProspectoDetalle() {
       switch (status) {
         case "aprobado":
           return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm leading-none">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-450 border border-emerald-100 dark:border-emerald-900/30 shadow-sm leading-none">
               <CheckCircle className="h-3 w-3 stroke-[2.5]" />
               Aprobado
             </span>
           );
         case "cargado":
           return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100 shadow-sm leading-none">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-450 border border-blue-100 dark:border-blue-900/30 shadow-sm leading-none">
               <Clock className="h-3 w-3 stroke-[2.5] animate-pulse" />
               En Revisión
             </span>
           );
         case "rechazado":
           return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-red-50 text-red-600 border border-red-100 shadow-sm leading-none">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-450 border border-red-100 dark:border-red-900/30 shadow-sm leading-none">
               <XCircle className="h-3 w-3 stroke-[2.5]" />
               Rechazado
             </span>
@@ -493,7 +502,7 @@ export default function ProspectoDetalle() {
         case "pendiente":
         default:
           return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-slate-50 text-slate-400 border border-slate-200 border-dashed leading-none">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-[9px] font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 border-dashed leading-none">
               <Upload className="h-3 w-3 stroke-[2]" />
               Pendiente
             </span>
@@ -502,13 +511,13 @@ export default function ProspectoDetalle() {
     };
 
     return (
-      <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-24 animate-fade-in">
+      <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-24 animate-fade-in text-slate-800 dark:text-slate-100">
         {/* Navigation Bar */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => router.push("/dashboard")}
-              className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm active:scale-95"
+              className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-all shadow-sm active:scale-95"
             >
               <ArrowLeft className="h-4 w-4" />
               Volver a la Consola
@@ -552,9 +561,9 @@ export default function ProspectoDetalle() {
         </div>
 
         {/* Client Profile Header Banner */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
           <div className="flex items-center gap-4 flex-1">
-            <div className="h-14 w-14 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-black shrink-0">
+            <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-xl font-black shrink-0">
               {editForm.full_name ? editForm.full_name.charAt(0) : prospect.full_name.charAt(0)}
             </div>
             <div className="space-y-1.5 flex-1">
@@ -563,11 +572,11 @@ export default function ProspectoDetalle() {
                   type="text"
                   value={editForm.full_name}
                   onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                  className="text-lg font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 outline-none focus:border-indigo-500 w-full sm:w-80"
+                  className="text-lg font-black text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-1 outline-none focus:border-indigo-500 w-full sm:w-80"
                   placeholder="Nombre Completo"
                 />
               ) : (
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">{prospect.full_name}</h2>
+                <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight leading-tight">{prospect.full_name}</h2>
               )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-semibold">
                 {isEditing ? (
@@ -674,13 +683,13 @@ export default function ProspectoDetalle() {
           <div className="lg:col-span-7 space-y-6 flex flex-col">
             
             {/* Documents Upload Center */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-5">
               <div>
-                <h3 className="text-sm font-black text-slate-800 tracking-tight">Expediente Digital Comercial</h3>
-                <p className="text-[10px] text-slate-400 font-semibold mt-1">Carga, audita y valida los documentos oficiales del prospecto en tiempo real.</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight">Expediente Digital Comercial</h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-1">Carga, audita y valida los documentos oficiales del prospecto en tiempo real.</p>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {(["IMSS", "AFORE", "OTROS"] as const).map((type) => {
                   const status = getDocStatus(type);
                   const doc = prospect.documents.find((d) => d.file_type === type);
@@ -703,12 +712,12 @@ export default function ProspectoDetalle() {
                     <div key={type} className="py-4.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2.5">
-                          <span className="text-xs font-black text-slate-800">{label}</span>
+                          <span className="text-xs font-black text-slate-800 dark:text-white">{label}</span>
                           {renderDocBadge(status)}
                         </div>
-                        <p className="text-[10px] text-slate-400 font-semibold max-w-md">{description}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold max-w-md">{description}</p>
                         {doc && (
-                          <span className="inline-block text-[9px] font-mono font-bold text-slate-400 mt-1 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 font-sans">
+                          <span className="inline-block text-[9px] font-mono font-bold text-slate-400 dark:text-slate-350 mt-1 bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 rounded px-1.5 py-0.5 font-sans">
                             {doc.file_name}
                           </span>
                         )}
@@ -732,8 +741,8 @@ export default function ProspectoDetalle() {
                             }}
                             className={`px-3 py-2 border rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm flex items-center gap-1.5 ${
                               selectedDoc?.id === doc.id
-                                ? "bg-indigo-50 border-indigo-200 text-indigo-600 font-extrabold"
-                                : "bg-white hover:bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-800"
+                                ? "bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-extrabold"
+                                : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white"
                             }`}
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -747,7 +756,7 @@ export default function ProspectoDetalle() {
                           className={`px-3.5 py-2 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm flex items-center gap-1.5 text-white ${
                             status === "pendiente"
                               ? "bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/10"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                              : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                           }`}
                         >
                           <Upload className="h-3.5 w-3.5" />
@@ -761,8 +770,8 @@ export default function ProspectoDetalle() {
 
               {/* Progress bar loader while uploading */}
               {uploadingType && (
-                <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-2 animate-pulse">
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 leading-none">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-800 rounded-2xl p-4 space-y-2 animate-pulse">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-none">
                     <span>Subiendo expediente de tipo {uploadingType}...</span>
                     <span>{uploadProgress}%</span>
                   </div>
@@ -778,7 +787,7 @@ export default function ProspectoDetalle() {
 
             {/* Gorgeous visual PDF display canvas */}
             {selectedDocType !== null && (
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[600px] h-[500px] transition-all">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[600px] h-[500px] transition-all">
                 {/* PDF Chrome Bar */}
                 <div className="h-11 bg-slate-800 text-slate-200 px-4 flex items-center justify-between border-b border-slate-700 shrink-0 text-xs">
                   <div className="flex items-center gap-2 font-mono truncate max-w-[150px] sm:max-w-xs text-[10px]">
@@ -819,17 +828,17 @@ export default function ProspectoDetalle() {
                 {/* PDF Document Viewer Canvas */}
                 <div className="flex-1 bg-slate-600 p-4 sm:p-6 overflow-y-auto flex items-start justify-center animate-fade-in">
                   {loadingFile ? (
-                    <div className="w-full max-w-[400px] bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4 shadow-xl self-center">
+                    <div className="w-full max-w-[400px] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4 shadow-xl self-center">
                       <div className="h-10 w-10 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto" />
                       <div>
-                        <h4 className="text-xs font-bold text-slate-700">Cargando Documento</h4>
-                        <p className="text-[10px] text-slate-400 mt-1">Recuperando el expediente en alta resolución...</p>
+                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Cargando Documento</h4>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Recuperando el expediente en alta resolución...</p>
                       </div>
                     </div>
                   ) : realFileData ? (
                     realFileData.startsWith("data:application/pdf") || realFileData.startsWith("http") ? (
                       <div 
-                        className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[500px]"
+                        className="w-full bg-white dark:bg-slate-900 shadow-2xl border border-slate-350 dark:border-slate-800 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[500px]"
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <iframe
@@ -840,7 +849,7 @@ export default function ProspectoDetalle() {
                       </div>
                     ) : (
                       <div 
-                        className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform origin-top p-4"
+                        className="w-full bg-white dark:bg-slate-900 shadow-2xl border border-slate-350 dark:border-slate-800 rounded-lg overflow-hidden flex items-center justify-center transition-all duration-300 transform origin-top p-4"
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <img
@@ -853,7 +862,7 @@ export default function ProspectoDetalle() {
                   ) : (
                     /* High-Fidelity simulated secure page sheets if real base64 file data is fallback */
                     <div 
-                      className="w-full bg-white shadow-2xl border border-slate-300 rounded-xl p-6 sm:p-8 font-mono text-[9px] text-slate-700 relative overflow-hidden transition-all duration-300 transform origin-top"
+                      className="w-full bg-white dark:bg-slate-900 shadow-2xl border border-slate-300 dark:border-slate-800 rounded-xl p-6 sm:p-8 font-mono text-[9px] text-slate-700 dark:text-slate-300 relative overflow-hidden transition-all duration-300 transform origin-top"
                       style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "680px" }}
                     >
                       {/* Dynamic Watermark */}
@@ -878,12 +887,12 @@ export default function ProspectoDetalle() {
                             </span>
                           </div>
 
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 text-slate-800 leading-normal font-sans text-[9px]">
-                            <div><span className="text-slate-400">ASEGURADO:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
-                            <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
-                            <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
-                            <div><span className="text-slate-400">EMISIÓN:</span> <span className="font-bold text-slate-900">{new Date(prospect.created_at).toLocaleDateString()}</span></div>
-                            <div><span className="text-slate-400">ESTADO:</span> <span className="font-bold text-emerald-600">VIGENTE / LEY 73</span></div>
+                          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-1 text-slate-800 dark:text-slate-200 leading-normal font-sans text-[9px]">
+                            <div><span className="text-slate-400 dark:text-slate-500">ASEGURADO:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.full_name.toUpperCase()}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">N.S.S.:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.nss}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">C.U.R.P.:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.curp.toUpperCase()}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">EMISIÓN:</span> <span className="font-bold text-slate-900 dark:text-white">{new Date(prospect.created_at).toLocaleDateString()}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">ESTADO:</span> <span className="font-bold text-emerald-600 dark:text-emerald-450">VIGENTE / LEY 73</span></div>
                           </div>
 
                           <div className="space-y-2">
@@ -927,11 +936,11 @@ export default function ProspectoDetalle() {
                             </span>
                           </div>
 
-                          <div className="bg-slate-50 border border-slate-200 rounded p-3 space-y-1 text-slate-800 leading-normal font-sans text-[9px]">
-                            <div><span className="text-slate-400">TITULAR:</span> <span className="font-black text-slate-900">{prospect.full_name.toUpperCase()}</span></div>
-                            <div><span className="text-slate-400">N.S.S.:</span> <span className="font-black text-slate-900">{prospect.nss}</span></div>
-                            <div><span className="text-slate-400">C.U.R.P.:</span> <span className="font-black text-slate-900">{prospect.curp.toUpperCase()}</span></div>
-                            <div><span className="text-slate-400">PERIODO:</span> <span className="font-bold text-slate-900">1er Trimestre 2026</span></div>
+                          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded p-3 space-y-1 text-slate-800 dark:text-slate-200 leading-normal font-sans text-[9px]">
+                            <div><span className="text-slate-400 dark:text-slate-500">TITULAR:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.full_name.toUpperCase()}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">N.S.S.:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.nss}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">C.U.R.P.:</span> <span className="font-black text-slate-900 dark:text-white">{prospect.curp.toUpperCase()}</span></div>
+                            <div><span className="text-slate-400 dark:text-slate-500">PERIODO:</span> <span className="font-bold text-slate-900 dark:text-white">1er Trimestre 2026</span></div>
                           </div>
 
                           <div className="bg-indigo-950 text-white p-3 rounded-2xl flex items-center justify-between border border-indigo-900/50 shadow-md font-sans">
@@ -988,24 +997,24 @@ export default function ProspectoDetalle() {
               }
 
               return (
-                <div className={`border rounded-[28px] p-6 space-y-4 ${cardStyles}`}>
+                <div className={`border rounded-[28px] p-6 space-y-4 ${cardStyles} dark:bg-slate-900/40 dark:border-slate-800`}>
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-inner shrink-0">
+                    <div className="p-2 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-inner shrink-0">
                       {icon}
                     </div>
                     <div>
                       <h4 className="text-xs font-black tracking-tight uppercase leading-none">{title}</h4>
-                      <span className="block text-[8px] font-bold text-slate-450 uppercase tracking-widest mt-1">Mensaje del Director</span>
+                      <span className="block text-[8px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest mt-1">Mensaje del Director</span>
                     </div>
                   </div>
 
-                  <p className="text-[11px] font-semibold leading-relaxed text-slate-600">
+                  <p className="text-[11px] font-semibold leading-relaxed text-slate-600 dark:text-slate-300">
                     {description}
                   </p>
 
-                  <div className="bg-white/95 rounded-2xl p-4 border border-slate-100 space-y-1 shadow-sm">
-                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-wider">Comentarios y Observaciones Técnicas:</span>
-                    <p className="text-[11px] font-bold text-slate-700 leading-normal whitespace-pre-line italic">
+                  <div className="bg-white/95 dark:bg-slate-950 rounded-2xl p-4 border border-slate-100 dark:border-slate-850 space-y-1 shadow-sm">
+                    <span className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Comentarios y Observaciones Técnicas:</span>
+                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-normal whitespace-pre-line italic">
                       “{prospect.notes_director || "Sin comentarios adicionales registrados por el Director.”"}
                     </p>
                   </div>
@@ -1013,28 +1022,28 @@ export default function ProspectoDetalle() {
                   {/* Projections summary if approved - display clean non-editable details */}
                   {isApproved && prospect.simulation && (
                     <div className="space-y-4">
-                      <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-100/40 grid grid-cols-2 gap-3.5 text-slate-800">
-                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Mejorada</span>
-                          <span className="text-xs font-black text-emerald-600 block mt-1.5 leading-none">
+                      <div className="bg-emerald-500/5 dark:bg-emerald-950/10 rounded-2xl p-4 border border-emerald-100/40 dark:border-emerald-900/20 grid grid-cols-2 gap-3.5 text-slate-800 dark:text-slate-200">
+                        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Pensión Mejorada</span>
+                          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 block mt-1.5 leading-none">
                             ${prospect.simulation.pensionMejorada.toLocaleString()} / mes
                           </span>
                         </div>
-                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Pensión Anterior</span>
-                          <span className="text-xs font-black text-slate-500 block mt-1.5 leading-none">
+                        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Pensión Anterior</span>
+                          <span className="text-xs font-black text-slate-500 dark:text-slate-400 block mt-1.5 leading-none">
                             ${prospect.simulation.pensionActual.toLocaleString()} / mes
                           </span>
                         </div>
-                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Financiamiento M40</span>
-                          <span className="text-xs font-black text-slate-700 block mt-1.5 leading-none">
+                        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Financiamiento M40</span>
+                          <span className="text-xs font-black text-slate-700 dark:text-slate-300 block mt-1.5 leading-none">
                             ${prospect.simulation.financiamiento.toLocaleString()}
                           </span>
                         </div>
-                        <div className="bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Incremento Neto</span>
-                          <span className="text-xs font-black text-indigo-600 block mt-1.5 leading-none">
+                        <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Incremento Neto</span>
+                          <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block mt-1.5 leading-none">
                             ${(prospect.simulation.pensionMejorada - prospect.simulation.pensionActual).toLocaleString()}
                           </span>
                         </div>
@@ -1042,10 +1051,10 @@ export default function ProspectoDetalle() {
 
                       {/* Direct scheduling button for Aliado */}
                       {prospect.status === "aprobado_listo" && (
-                        <div className="bg-white/95 rounded-2xl p-4 border border-indigo-150 space-y-3 shadow-sm text-center">
-                          <span className="block text-[8px] font-bold text-indigo-550 uppercase tracking-wider">Acción Requerida</span>
-                          <h4 className="text-xs font-bold text-slate-800">Agendar Asesoría Comercial</h4>
-                          <p className="text-[10px] text-slate-500 leading-normal mb-1">
+                        <div className="bg-white/95 dark:bg-slate-900 rounded-2xl p-4 border border-indigo-150 dark:border-indigo-900/50 space-y-3 shadow-sm text-center">
+                          <span className="block text-[8px] font-bold text-indigo-550 dark:text-indigo-400 uppercase tracking-wider">Acción Requerida</span>
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-white">Agendar Asesoría Comercial</h4>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal mb-1">
                             Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:
                           </p>
                           <div className="flex flex-col gap-2">
@@ -1073,10 +1082,10 @@ export default function ProspectoDetalle() {
             })()}
 
             {/* Timeline Historial del Expediente */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex-1 flex flex-col">
-              <div className="border-b border-slate-100 pb-3 mb-5 flex-shrink-0">
-                <h3 className="text-xs font-black text-slate-800 tracking-tight uppercase">Historial del Expediente</h3>
-                <span className="block text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Trazabilidad comercial del cliente</span>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex-1 flex flex-col">
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 flex-shrink-0">
+                <h3 className="text-xs font-black text-slate-800 dark:text-white tracking-tight uppercase">Historial del Expediente</h3>
+                <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">Trazabilidad comercial del cliente</span>
               </div>
 
               {/* Timeline Tree Wrapper */}
@@ -1335,13 +1344,13 @@ export default function ProspectoDetalle() {
   };
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-40 animate-fade-in">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-40 animate-fade-in text-slate-800 dark:text-slate-100">
       {/* Return button header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => router.push(backPath)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:border-slate-300 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 rounded-xl transition-all shadow-sm active:scale-95"
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-350 hover:text-slate-800 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-all shadow-sm active:scale-95"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver a la Consola
@@ -1375,14 +1384,18 @@ export default function ProspectoDetalle() {
                 <span className={`inline-block text-[8px] font-extrabold rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans border ${
                   user.role === "director"
                     ? "text-teal-600 bg-teal-50 border-teal-100"
+                    : user.role === "account_manager"
+                    ? "text-blue-600 bg-blue-50 border-blue-100"
                     : "text-emerald-600 bg-emerald-50 border-emerald-100"
                 }`}>
-                  {user.role === "director" ? "Director" : "Aliado"}
+                  {user.role === "director" ? "Director" : user.role === "account_manager" ? "Account Manager" : "Aliado"}
                 </span>
               </div>
               <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
                 user.role === "director"
                   ? "bg-gradient-to-br from-teal-500 to-emerald-600 border-teal-400/20"
+                  : user.role === "account_manager"
+                  ? "bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-400/20"
                   : "bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/20"
               }`}>
                 {user.full_name.charAt(0)}
@@ -1393,9 +1406,9 @@ export default function ProspectoDetalle() {
       </div>
 
       {/* Profile banner */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
         <div className="flex items-center gap-4 flex-1">
-          <div className="h-14 w-14 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-xl font-black shrink-0">
+          <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-xl font-black shrink-0">
             {editForm.full_name ? editForm.full_name.charAt(0) : prospect.full_name.charAt(0)}
           </div>
           <div className="space-y-1.5 flex-1">
@@ -1404,11 +1417,11 @@ export default function ProspectoDetalle() {
                 type="text"
                 value={editForm.full_name}
                 onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                className="text-lg font-black text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 outline-none focus:border-indigo-500 w-full sm:w-80"
+                className="text-lg font-black text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-1 outline-none focus:border-indigo-500 w-full sm:w-80"
                 placeholder="Nombre Completo"
               />
             ) : (
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">{prospect.full_name}</h2>
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight leading-tight">{prospect.full_name}</h2>
             )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-semibold">
               {isEditing ? (
@@ -1436,52 +1449,52 @@ export default function ProspectoDetalle() {
                 </div>
               ) : (
                 <>
-                  <span>NSS: <span className="font-extrabold text-slate-700">{prospect.nss}</span></span>
+                  <span>NSS: <span className="font-extrabold text-slate-700 dark:text-slate-350">{prospect.nss}</span></span>
                   <span>•</span>
-                  <span>CURP: <span className="font-extrabold text-slate-700">{prospect.curp}</span></span>
+                  <span>CURP: <span className="font-extrabold text-slate-700 dark:text-slate-350">{prospect.curp}</span></span>
                 </>
               )}
               <span>•</span>
-              <span>Asesor: <span className="font-extrabold text-indigo-650">{prospect.aliado_name}</span></span>
+              <span>Asesor: <span className="font-extrabold text-indigo-650 dark:text-indigo-400">{prospect.aliado_name}</span></span>
             </div>
           </div>
         </div>
 
         {/* Contact info list */}
-        <div className="grid grid-cols-2 gap-4 text-xs font-semibold border-t md:border-t-0 md:border-l border-slate-150 pt-4 md:pt-0 md:pl-6 min-w-[280px]">
+        <div className="grid grid-cols-2 gap-4 text-xs font-semibold border-t md:border-t-0 md:border-l border-slate-150 dark:border-slate-800 pt-4 md:pt-0 md:pl-6 min-w-[280px]">
           <div>
-            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px]">Correo Electrónico</span>
+            <span className="text-slate-400 dark:text-slate-500 block font-bold uppercase tracking-wider text-[9px]">Correo Electrónico</span>
             {isEditing ? (
               <input
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 mt-1 outline-none focus:border-indigo-500 text-xs font-semibold text-slate-700 w-full"
+                className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg px-2 py-0.5 mt-1 outline-none focus:border-indigo-500 text-xs font-semibold text-slate-700 dark:text-white w-full"
               />
             ) : (
-              <span className="text-slate-700 block mt-0.5">{prospect.email}</span>
+              <span className="text-slate-700 dark:text-slate-300 block mt-0.5">{prospect.email}</span>
             )}
           </div>
           <div>
-            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px]">Teléfono Móvil</span>
+            <span className="text-slate-400 dark:text-slate-500 block font-bold uppercase tracking-wider text-[9px]">Teléfono Móvil</span>
             {isEditing ? (
               <input
                 type="text"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 mt-1 outline-none focus:border-indigo-500 text-xs font-semibold text-slate-700 w-full"
+                className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg px-2 py-0.5 mt-1 outline-none focus:border-indigo-500 text-xs font-semibold text-slate-700 dark:text-white w-full"
               />
             ) : (
-              <span className="text-slate-700 block mt-0.5">{prospect.phone}</span>
+              <span className="text-slate-700 dark:text-slate-300 block mt-0.5">{prospect.phone}</span>
             )}
           </div>
         </div>
 
         {/* Etapa y Subetapa Selectors / Badges */}
-        <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-4 text-xs font-semibold border-t md:border-t-0 md:border-l border-slate-150 pt-4 md:pt-0 md:pl-6 min-w-[220px]">
+        <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row gap-4 text-xs font-semibold border-t md:border-t-0 md:border-l border-slate-150 dark:border-slate-800 pt-4 md:pt-0 md:pl-6 min-w-[220px]">
           <div className="flex-1">
             <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Etapa</span>
-            {user?.role === "director" ? (
+            {user?.role === "director" || user?.role === "account_manager" ? (
               <select
                 value={currentStage.stage}
                 onChange={(e) => handleStageChange(e.target.value)}
@@ -1499,7 +1512,7 @@ export default function ProspectoDetalle() {
           </div>
           <div className="flex-1">
             <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Subetapa</span>
-            {user?.role === "director" ? (
+            {user?.role === "director" || user?.role === "account_manager" ? (
               <select
                 value={currentStage.subStage}
                 onChange={(e) => handleSubStageChange(e.target.value)}
@@ -1944,14 +1957,14 @@ export default function ProspectoDetalle() {
 
         {/* Columna Derecha: Simulador Ley 73 (~33%) */}
         <div className="w-full lg:w-[33%] flex flex-col shrink-0">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-auto transition-all">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-auto transition-all">
             {/* Header title */}
-            <div className="px-5 py-4 border-b border-slate-150 bg-slate-50 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-4 border-b border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Calculator className="h-4.5 w-4.5 text-indigo-500" />
+                <Calculator className="h-4.5 w-4.5 text-indigo-500 dark:text-indigo-400" />
                 <div>
-                  <h3 className="text-xs font-black text-slate-800">Simulador Ley 73</h3>
-                  <span className="block text-[9px] text-slate-400 font-semibold">Emisión de dictamen financiero</span>
+                  <h3 className="text-xs font-black text-slate-800 dark:text-white">Simulador Ley 73</h3>
+                  <span className="block text-[9px] text-slate-400 dark:text-slate-550 font-semibold">Emisión de dictamen financiero</span>
                 </div>
               </div>
             </div>
@@ -1962,15 +1975,15 @@ export default function ProspectoDetalle() {
               <div className="space-y-4">
                 {/* Semanas Cotizadas */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Semanas cotizadas
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
+                    Semanas Reconocidas IMSS
                   </label>
                   <input
                     type="number"
                     value={semanas}
-                    disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                    disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                     onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all dark:text-white"
                   />
                 </div>
 
@@ -1987,9 +2000,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionActual}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2004,9 +2017,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={pensionMejorada}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2025,9 +2038,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={financiamiento}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setFinanciamiento(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2042,9 +2055,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={costoGestion}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setCostoGestion(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2063,9 +2076,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={aforePensionarse}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2080,9 +2093,9 @@ export default function ProspectoDetalle() {
                       <input
                         type="number"
                         value={creditoNomina}
-                        disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setCreditoNomina(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all"
+                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -2095,11 +2108,11 @@ export default function ProspectoDetalle() {
                   </label>
                   <textarea
                     value={comments}
-                    disabled={user?.role !== "director" || (isApproved && !isEditingApproved)}
+                    disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                     onChange={(e) => setComments(e.target.value)}
                     rows={3}
                     placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
-                    className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white disabled:bg-slate-100/60 disabled:cursor-not-allowed border border-slate-200 focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none"
+                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none dark:text-white"
                   />
                 </div>
               </div>
@@ -2145,7 +2158,7 @@ export default function ProspectoDetalle() {
       </div>
 
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
-      {user?.role === "director" && (
+      {(user?.role === "director" || user?.role === "account_manager") && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40 select-none">
           {isApproved && !isEditingApproved ? (
             <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 w-full">

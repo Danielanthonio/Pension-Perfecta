@@ -5,7 +5,7 @@ import { saveFile, getFile } from "@/utils/db";
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-export type UserRole = "aliado" | "director";
+export type UserRole = "aliado" | "director" | "account_manager";
 
 export interface UserProfile {
   id: string;
@@ -16,6 +16,7 @@ export interface UserProfile {
   invitation_code_used?: string;
   created_at: string;
   is_active?: boolean;
+  account_manager_id?: string | null;
 }
 
 export interface DocumentItem {
@@ -185,6 +186,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     role: "aliado",
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: true,
+    account_manager_id: "am-789", // Assigned to Sofia!
   },
   {
     id: "director-456",
@@ -195,6 +197,25 @@ const INITIAL_PROFILES: UserProfile[] = [
     created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: true,
   },
+  {
+    id: "am-789",
+    full_name: "Sofía Account Manager",
+    email: "sofia@pensionflow.com",
+    phone: "5511223344",
+    role: "account_manager",
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
+  },
+  {
+    id: "aliado-unassigned",
+    full_name: "Pedro Asesor Nuevo",
+    email: "pedro@asesores.com",
+    phone: "5587654321",
+    role: "aliado",
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    is_active: true,
+    account_manager_id: null,
+  }
 ];
 
 const INITIAL_PROSPECTS: Prospect[] = [
@@ -437,7 +458,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     if (!dbProfile) return dbProfile;
     return {
       ...dbProfile,
-      role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : dbProfile.role,
+      role: dbProfile.role === "account_manager" ? "account_manager" : (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : dbProfile.role,
       is_active: dbProfile.is_active !== false,
     };
   };
@@ -727,10 +748,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
           setProfiles(mappedProfiles);
 
-          // Fetch prospects (filtered by role if user is aliado)
+          // Fetch prospects (filtered by role if user is aliado or account_manager)
           let prospectsQuery = client.from("prospects").select("*, documents(*)");
           if (currentUser && currentUser.role === "aliado") {
             prospectsQuery = prospectsQuery.eq("aliado_id", currentUser.id);
+          } else if (currentUser && currentUser.role === "account_manager") {
+            const assignedAllyIds = mappedProfiles
+              .filter(p => p.role === "aliado" && p.account_manager_id === currentUser.id)
+              .map(p => p.id);
+            if (assignedAllyIds.length > 0) {
+              prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+            } else {
+              prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+            }
           }
           const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
           if (dbProspects) {
@@ -1121,6 +1151,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
           if (profile.role === "aliado") {
             prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
+          } else if (profile.role === "account_manager") {
+            const { data: dbProfiles } = await supabase.from("profiles").select("id, role, account_manager_id");
+            const assignedAllyIds = (dbProfiles || [])
+              .filter((p: any) => p.role === "aliado" && p.account_manager_id === profile.id)
+              .map((p: any) => p.id);
+            if (assignedAllyIds.length > 0) {
+              prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+            } else {
+              prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+            }
           }
           const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
           if (dbProspects) {
@@ -2618,6 +2658,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
         if (updates.role !== undefined) dbUpdates.role = dbRole;
         if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
+        if (updates.account_manager_id !== undefined) dbUpdates.account_manager_id = updates.account_manager_id;
 
         const { error } = await supabase
           .from("profiles")
@@ -2721,15 +2762,42 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     });
   };
 
+  const exposedProfiles = React.useMemo(() => {
+    if (!user) return [];
+    if (user.role === "director") return profiles;
+    if (user.role === "account_manager") {
+      return profiles.filter(p => p.id === user.id || (p.role === "aliado" && p.account_manager_id === user.id));
+    }
+    if (user.role === "aliado") {
+      return profiles.filter(p => p.id === user.id || p.id === user.account_manager_id);
+    }
+    return [];
+  }, [user, profiles]);
+
+  const exposedProspects = React.useMemo(() => {
+    if (!user) return [];
+    if (user.role === "director") return prospects;
+    if (user.role === "account_manager") {
+      const assignedAllyIds = profiles
+        .filter(p => p.role === "aliado" && p.account_manager_id === user.id)
+        .map(p => p.id);
+      return prospects.filter(p => assignedAllyIds.includes(p.aliado_id));
+    }
+    if (user.role === "aliado") {
+      return prospects.filter(p => p.aliado_id === user.id);
+    }
+    return [];
+  }, [user, prospects, profiles]);
+
   return (
     <AppContext.Provider
       value={{
         user,
         activeRole,
-        prospects,
+        prospects: exposedProspects,
         invitationCodes,
         notifications,
-        profiles,
+        profiles: exposedProfiles,
         toast,
         isDemoMode,
         isLoading,

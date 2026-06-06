@@ -51,19 +51,19 @@ export default function DashboardLayout({
     if (mounted) {
       if (!user) {
         router.push("/login");
-      } else if (user.role === "director") {
+      } else if (user.role === "director" || user.role === "account_manager") {
         router.push("/admin");
       }
     }
   }, [user, mounted, router]);
 
-  if (!mounted || !user || user.role === "director") {
+  if (!mounted || !user || user.role === "director" || user.role === "account_manager") {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
-            {user?.role === "director" ? "Redireccionando..." : "Cargando Portal..."}
+            {(user?.role === "director" || user?.role === "account_manager") ? "Redireccionando..." : "Cargando Portal..."}
           </span>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white transition-colors duration-200">
       {/* Impersonation Floating Bar */}
       {isDemoMode && (
         <div className="w-full bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold relative z-45">
@@ -166,14 +166,14 @@ export default function DashboardLayout({
       </header>
 
       {/* Horizontal Navigation Menu Bar */}
-      <div className="bg-white border-b border-slate-200 flex items-center px-6 sm:px-10 shadow-sm flex-shrink-0 z-10">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-850 flex items-center px-6 sm:px-10 shadow-sm flex-shrink-0 z-10 transition-colors duration-205">
         <nav className="flex flex-row overflow-x-auto gap-2 py-2.5 w-full no-scrollbar select-none whitespace-nowrap">
           <Link
             href="/dashboard"
             className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
               isDashboard
-                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
-                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <LayoutDashboard className="mr-2 h-4 w-4 stroke-[2]" />
@@ -184,8 +184,8 @@ export default function DashboardLayout({
             href="/dashboard/clientes"
             className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
               isClientes
-                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
-                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <Folder className="mr-2 h-4 w-4 stroke-[2]" />
@@ -196,8 +196,8 @@ export default function DashboardLayout({
             href="/dashboard/nuevo"
             className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
               isNuevo
-                ? "bg-slate-50 border-slate-200/80 text-slate-800 shadow-sm"
-                : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
             }`}
           >
             <Plus className="mr-2 h-4 w-4 stroke-[2]" />
@@ -207,7 +207,7 @@ export default function DashboardLayout({
       </div>
 
       {/* Dynamic App Route Content */}
-      <main className="flex-grow overflow-y-auto p-6 sm:p-10 bg-[#f8fafc]">
+      <main className="flex-grow overflow-y-auto p-6 sm:p-10 bg-[#f8fafc] dark:bg-slate-900 transition-colors duration-200">
         <div className="max-w-[1700px] mx-auto w-full">
           {children}
         </div>
@@ -226,21 +226,21 @@ export default function DashboardLayout({
           />
 
           {/* Drawer Panel */}
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col z-10 border-l border-slate-200 transform transition-transform duration-300">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col z-10 border-l border-slate-200 dark:border-slate-800 transform transition-transform duration-300">
             {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-800">Notificaciones</h3>
+                <Bell className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-base font-bold text-slate-800 dark:text-white">Notificaciones</h3>
                 {unreadNotifsCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
                     {unreadNotifsCount} nuevas
                   </span>
                 )}
               </div>
               <button
                 onClick={() => setNotifDrawerOpen(false)}
-                className="p-1.5 bg-slate-200/50 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors"
+                className="p-1.5 bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -248,10 +248,10 @@ export default function DashboardLayout({
 
             {/* Notification Actions */}
             {unreadNotifsCount > 0 && (
-              <div className="px-6 py-3 border-b border-slate-100 flex justify-end">
+              <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-end">
                 <button
                   onClick={markAllNotificationsRead}
-                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5"
+                  className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 flex items-center gap-1.5"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Marcar todas como leídas
@@ -263,12 +263,12 @@ export default function DashboardLayout({
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {notifications.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                  <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
                     <CheckCircle className="h-6 w-6" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-700">Sin notificaciones</h4>
-                    <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-350">Sin notificaciones</h4>
+                    <p className="text-xs text-slate-400 dark:text-slate-550 mt-1 max-w-[200px]">
                       Te avisaremos por aquí cuando ocurran eventos importantes en tu pipeline.
                     </p>
                   </div>
@@ -281,8 +281,8 @@ export default function DashboardLayout({
                       onClick={() => markNotificationRead(notif.id)}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-3 relative ${
                         notif.read
-                          ? "bg-slate-50/50 border-slate-100 hover:bg-slate-50"
-                          : "bg-emerald-50/20 border-emerald-100 hover:bg-emerald-50/40"
+                          ? "bg-slate-50/50 dark:bg-slate-950/20 border-slate-100 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-950/40"
+                          : "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20"
                       }`}
                     >
                       {/* Unread Glow Pin */}
@@ -295,12 +295,12 @@ export default function DashboardLayout({
                         <div
                           className={`h-9 w-9 rounded-xl flex items-center justify-center ${
                             notif.type === "success"
-                              ? "bg-emerald-50 text-emerald-500 border border-emerald-100"
+                              ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30"
                               : notif.type === "alert"
-                                ? "bg-red-50 text-red-500 border border-red-100"
+                                ? "bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 border border-red-100 dark:border-red-900/30"
                                 : notif.type === "warning"
-                                  ? "bg-amber-50 text-amber-500 border border-amber-100"
-                                  : "bg-teal-50 text-teal-500 border border-teal-100"
+                                  ? "bg-amber-50 dark:bg-amber-950/30 text-amber-500 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30"
+                                  : "bg-teal-50 dark:bg-teal-950/30 text-teal-500 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30"
                           }`}
                         >
                           {notif.type === "success" ? (
@@ -315,14 +315,14 @@ export default function DashboardLayout({
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold text-slate-800 leading-tight">
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
                           {notif.title}
                         </h4>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed leading-normal">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
                           {notif.message}
                         </p>
-                        <span className="text-[9px] text-slate-400 font-semibold mt-2 block flex items-center gap-1.5">
-                          <Clock className="h-3 w-3 text-slate-300" />
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-2 block flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-slate-300 dark:text-slate-600" />
                           {new Date(notif.created_at).toLocaleString("es-MX", {
                             hour: "2-digit",
                             minute: "2-digit",

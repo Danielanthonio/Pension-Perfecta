@@ -327,6 +327,30 @@ function extractProspectData(text: string): { fullName: string; nss: string; cur
     fullName = `${paterno} ${materno} ${nombre}`.replace(/\s+/g, " ");
   }
 
+  // Strategy A-2: Look for name below "Estimado(a)" or similar prefix
+  if (!fullName) {
+    const lines = cleanText.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (/estimado\s*\(a\)|estimada\s*\(o\)|estimado\/a|estimado|estimada/i.test(line)) {
+        // Try same line after prefix first
+        const cleanLine = line.replace(/estimado\s*\(a\)|estimada\s*\(o\)|estimado\/a|estimado|estimada/i, "").replace(/^[:,\s]+/, "").trim();
+        if (cleanLine.length > 5 && !/curp|nss|rfc|afore|imss|direcc|informamos|presente/i.test(cleanLine)) {
+          fullName = cleanLine;
+          break;
+        }
+        // Try next line
+        if (i < lines.length - 1) {
+          const nextLine = lines[i + 1].trim();
+          if (nextLine.length > 5 && !/curp|nss|rfc|afore|imss|direcc|informamos|presente|documento/i.test(nextLine)) {
+            fullName = nextLine;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // Strategy B: Look for uppercase name line followed by the report date line
   if (!fullName) {
     const lines = cleanText.split("\n");
