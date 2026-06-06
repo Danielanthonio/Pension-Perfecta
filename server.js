@@ -23,6 +23,30 @@ if (fs.existsSync(envPath)) {
   console.log('Environment variables loaded from .env file.')
 }
 
+// Hot DDL Migration to add password_provisional to profiles table
+if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  const { Client } = require('pg');
+  const connectionString = 'postgresql://postgres:Villouta2026.@db.gxovfywzftiirdpcskbc.supabase.co:5432/postgres';
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  client.connect()
+    .then(() => {
+      console.log('Connected to Supabase PostgreSQL for DDL check...');
+      return client.query('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS password_provisional TEXT;');
+    })
+    .then(() => {
+      console.log('DDL check completed: profiles.password_provisional is verified/created.');
+      return client.end();
+    })
+    .catch(err => {
+      console.error('DDL check failed:', err);
+    });
+}
+
+
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'

@@ -63,6 +63,7 @@ export default function GestionUsuarios() {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"aliado" | "director" | "account_manager">("aliado");
   const [isActive, setIsActive] = useState(true);
+  const [passwordProvisional, setPasswordProvisional] = useState("");
 
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,6 +93,7 @@ export default function GestionUsuarios() {
     setPhone("");
     setRole("aliado");
     setIsActive(true);
+    setPasswordProvisional("");
     setFormSubmitted(false);
     setErrorMsg("");
     setCreatedUser(null);
@@ -106,6 +108,7 @@ export default function GestionUsuarios() {
     setEmail(u.email);
     setIsActive(u.is_active !== false);
     setRole(u.role);
+    setPasswordProvisional(u.password_provisional || "");
     setFormSubmitted(false);
     setErrorMsg("");
     setCreatedUser(null);
@@ -146,6 +149,7 @@ export default function GestionUsuarios() {
           phone: fullPhoneNumber,
           role,
           is_active: isActive,
+          password_provisional: passwordProvisional || undefined,
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: true });
@@ -156,6 +160,7 @@ export default function GestionUsuarios() {
         setPhone("");
         setRole("aliado");
         setIsActive(true);
+        setPasswordProvisional("");
         setFormSubmitted(false);
         setIsModalOpen(false);
       } else if (modalMode === "edit" && editingUserId) {
@@ -165,6 +170,7 @@ export default function GestionUsuarios() {
           phone: fullPhoneNumber,
           role,
           is_active: isActive,
+          password_provisional: passwordProvisional || null,
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: false });
@@ -911,6 +917,30 @@ export default function GestionUsuarios() {
                     <ShieldCheck className="h-4 w-4" /> Director Operativo
                   </button>
                 </div>
+              </div>
+
+              {/* Contraseña Provisoria */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  Contraseña Provisoria <span className="text-slate-400 dark:text-slate-500 font-normal normal-case">(opcional – permite acceso directo sin verificar correo)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                    <Key className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={passwordProvisional}
+                    onChange={(e) => setPasswordProvisional(e.target.value)}
+                    placeholder="ej: MiPass2026"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-205"
+                  />
+                </div>
+                {passwordProvisional && (
+                  <span className="text-[9px] text-amber-500 dark:text-amber-400 font-semibold mt-1.5 block flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Esta contraseña permitirá al usuario iniciar sesión sin confirmar su correo electrónico.
+                  </span>
+                )}
               </div>
 
               {/* Activation Switch */}

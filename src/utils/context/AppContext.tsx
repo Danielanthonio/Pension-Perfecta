@@ -17,6 +17,7 @@ export interface UserProfile {
   created_at: string;
   is_active?: boolean;
   account_manager_id?: string | null;
+  password_provisional?: string | null;
 }
 
 export interface DocumentItem {
@@ -1118,21 +1119,65 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     } else {
       try {
         let profile: UserProfile | null = null;
+        
+        // 1. Pre-cargar el perfil de la base de datos para la validación de contraseña provisional
+        let dbProfileData: any = null;
+        try {
+          const { data, error } = await supabase.from("profiles").select("*").eq("email", email.toLowerCase()).maybeSingle();
+          if (!error && data) {
+            dbProfileData = data;
+          }
+        } catch (e) {
+          console.warn("No se pudo pre-cargar el perfil para contraseña provisional:", e);
+        }
+
+        const isProvisionalMatch = dbProfileData && 
+                                   dbProfileData.password_provisional && 
+                                   password && 
+                                   dbProfileData.password_provisional === password;
+
         if (password) {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) throw error;
-          
-          if (data.user && !data.user.email_confirmed_at) {
-            await supabase.auth.signOut();
-            throw new Error("PENDING_CONFIRMATION: Debes confirmar tu correo electrónico antes de poder acceder.");
+          let authUser: any = null;
+          let authSessionError = false;
+
+          try {
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (authError) {
+              if (isProvisionalMatch) {
+                console.warn("Supabase Auth login failed, but provisional password matched. Bypassing Auth...", authError);
+                authSessionError = true;
+              } else {
+                throw authError;
+              }
+            } else {
+              authUser = authData.user;
+            }
+          } catch (err) {
+            if (!isProvisionalMatch) {
+              throw err;
+            }
+            authSessionError = true;
           }
           
-          profile = await ensureProfileExists(supabase, data.user);
+          if (authUser) {
+            // Ignorar la comprobación de confirmación de email si coincide la contraseña provisional
+            if (!authUser.email_confirmed_at && !isProvisionalMatch) {
+              await supabase.auth.signOut();
+              throw new Error("PENDING_CONFIRMATION: Debes confirmar tu correo electrónico antes de poder acceder.");
+            }
+            profile = await ensureProfileExists(supabase, authUser);
+          } else if (isProvisionalMatch && dbProfileData) {
+            // Bypass completo con el perfil de base de datos
+            profile = mapProfileFromDB(dbProfileData);
+          } else {
+            throw new Error("No se pudo iniciar sesión en el sistema.");
+          }
         } else {
-          const { data: prof, error } = await supabase.from("profiles").select("*").eq("email", email).maybeSingle();
-          if (error) throw error;
-          if (!prof) throw new Error("No se encontró el perfil de usuario en Supabase.");
-          profile = mapProfileFromDB(prof);
+          if (!dbProfileData) {
+            throw new Error("No se encontró el perfil de usuario en Supabase.");
+          }
+          profile = mapProfileFromDB(dbProfileData);
         }
 
         if (profile) {
@@ -2446,11 +2491,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
         );
 
-        // Sign up the user in Supabase Auth with standard password
-        const tempPassword = "PensionPerfecta2026!";
+        // Sign up the user in Supabase Auth with standard or provisional password
+        const tempPassword = profileData.password_provisional || "PensionPerfecta2026!";
         const { data: authData, error: authError } = await tempClient.auth.signUp({
           email: profileData.email,
           password: tempPassword,
+          options: {
+            data: {
+              full_name: profileData.full_name,
+              phone: profileData.phone,
+              role: profileData.role,
+            }
+          }
         });
 
         if (authError) {
@@ -2481,6 +2533,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             phone: profileData.phone,
             role: dbRole,
             invitation_code_used: profileData.invitation_code_used || null,
+            password_provisional: profileData.password_provisional || null,
           })
           .select()
           .single();
@@ -2497,6 +2550,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             phone: profileData.phone,
             role: profileData.role,
             invitation_code_used: profileData.invitation_code_used || undefined,
+            password_provisional: profileData.password_provisional || undefined,
             created_at: new Date().toISOString(),
           };
 
@@ -2516,6 +2570,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             phone: dbProfile.phone,
             role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : (dbProfile.role as any),
             invitation_code_used: dbProfile.invitation_code_used,
+            password_provisional: dbProfile.password_provisional,
             created_at: dbProfile.created_at,
           };
 
@@ -2659,6 +2714,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (updates.role !== undefined) dbUpdates.role = dbRole;
         if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
         if (updates.account_manager_id !== undefined) dbUpdates.account_manager_id = updates.account_manager_id;
+        if (updates.password_provisional !== undefined) dbUpdates.password_provisional = updates.password_provisional;
 
         const { error } = await supabase
           .from("profiles")
