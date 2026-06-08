@@ -219,7 +219,7 @@ export default function DashboardAliado() {
   };
 
   return (
-    <div className="space-y-8 select-none max-w-[1700px] mx-auto">
+    <div className="space-y-8 max-w-[1700px] mx-auto">
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -236,7 +236,7 @@ export default function DashboardAliado() {
       </div>
 
       {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
           <div>
@@ -306,7 +306,7 @@ export default function DashboardAliado() {
       )}
 
       {/* Search and Filters Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Search */}
         <div className="relative w-full md:flex-1">
           <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />

@@ -1,414 +1,341 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useApp, UserProfile } from "@/utils/context/AppContext";
+import React from "react";
+import { useApp, Prospect } from "@/utils/context/AppContext";
 import {
   Users,
+  TrendingUp,
+  Award,
+  Layers,
+  ArrowDown,
+  DollarSign,
+  Briefcase,
+  Percent,
   UserCheck,
   UserX,
-  Search,
-  Sparkles,
-  CheckCircle,
-  HelpCircle,
-  Clock,
-  Shield,
-  ArrowRight,
 } from "lucide-react";
 
 export default function GestionAccountManagers() {
-  const {
-    profiles,
-    prospects,
-    updateProfileAdmin,
-    triggerPushNotification,
-    isDemoMode,
-  } = useApp();
+  const { profiles, prospects } = useApp();
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">("all");
-  const [selectedAMFilter, setSelectedAMFilter] = useState<string>("all");
-  
-  // Loading states for individual rows
-  const [updatingRow, setUpdatingRow] = useState<string | null>(null);
-  const [successRow, setSuccessRow] = useState<string | null>(null);
-
-  // Filter lists of users
-  // Note: we want to get ALL allies and ALL AMs.
-  // Because in the context, profiles are already filtered based on logged-in role,
-  // but if the logged-in user is a Director, they see all profiles anyway.
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
 
-  // Handle assignment change
-  const handleAssignAM = async (allyId: string, accountManagerId: string | null) => {
-    setUpdatingRow(allyId);
-    setSuccessRow(null);
-    try {
-      const parsedAMId = accountManagerId === "" ? null : accountManagerId;
-      await updateProfileAdmin(allyId, { account_manager_id: parsedAMId });
-      
-      const ally = allies.find(a => a.id === allyId);
-      const am = accountManagers.find(m => m.id === parsedAMId);
-      
-      if (ally) {
-        const msg = parsedAMId 
-          ? `💼 Asignación Comercial: El aliado ${ally.full_name} ha sido asignado al Account Manager ${am?.full_name || "Desconocido"}.`
-          : `⚠️ Aliado Desasignado: El aliado ${ally.full_name} ha sido retirado de su Account Manager y queda en espera en la mesa del Director.`;
-        
-        triggerPushNotification(msg, "whatsapp", ally.full_name);
-      }
-      
-      setSuccessRow(allyId);
-      setTimeout(() => setSuccessRow(null), 3000);
-    } catch (e) {
-      console.error(e);
-      alert("Error al guardar la asignación del Account Manager");
-    } finally {
-      setUpdatingRow(null);
-    }
+  // Currency helper formatting
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(val);
   };
 
-  // Helper to count active prospects of an ally
-  const getProspectCount = (allyId: string) => {
-    return prospects.filter(p => p.aliado_id === allyId).length;
+  // Helper to compute metrics for a list of ally IDs
+  const getMetricsForAllies = (allyIds: string[]) => {
+    const groupProspects = prospects.filter((p) => allyIds.includes(p.aliado_id));
+    const totalCount = groupProspects.length;
+
+    const enEvaluacion = groupProspects.filter((p) =>
+      ["evaluacion_pendiente", "analisis_riesgo", "doc_proceso"].includes(p.status)
+    ).length;
+
+    const aprobados = groupProspects.filter((p) =>
+      ["aprobado_listo", "asesoria_agendada", "firma_programada", "aportacion"].includes(p.status)
+    ).length;
+
+    const condicionados = groupProspects.filter((p) =>
+      ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+    ).length;
+
+    const rechazados = groupProspects.filter((p) =>
+      ["rechazado", "cerrado_perdido"].includes(p.status)
+    ).length;
+
+    const otorgados = groupProspects.filter((p) => p.status === "pagado_comision").length;
+
+    // Financial Volumes
+    const approvedStatuses = [
+      "aprobado_listo",
+      "aportacion",
+      "asesoria_agendada",
+      "doc_proceso",
+      "analisis_riesgo",
+      "firma_programada",
+      "pagado_comision",
+    ];
+    const finAprobados = groupProspects
+      .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
+      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+
+    const finOtorgados = groupProspects
+      .filter((p) => p.status === "pagado_comision" && p.simulation)
+      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+
+    // Rates
+    const tasaEvaluacion = totalCount > 0 ? (enEvaluacion / totalCount) * 100 : 0;
+    const tasaAprobacion = enEvaluacion > 0 ? (aprobados / enEvaluacion) * 100 : 0;
+    const tasaCierre = aprobados > 0 ? (otorgados / aprobados) * 100 : 0;
+
+    return {
+      totalCount,
+      enEvaluacion,
+      aprobados,
+      condicionados,
+      rechazados,
+      otorgados,
+      finAprobados,
+      finOtorgados,
+      tasaEvaluacion,
+      tasaAprobacion,
+      tasaCierre,
+    };
   };
 
-  // Filters
-  const filteredAllies = allies
-    .filter((a) => {
-      const term = searchTerm.toLowerCase();
-      return (
-        a.full_name.toLowerCase().includes(term) ||
-        a.email.toLowerCase().includes(term) ||
-        (a.phone && a.phone.toLowerCase().includes(term))
-      );
-    })
-    .filter((a) => {
-      if (assignmentFilter === "assigned") return a.account_manager_id !== null && a.account_manager_id !== undefined;
-      if (assignmentFilter === "unassigned") return a.account_manager_id === null || a.account_manager_id === undefined;
-      return true;
-    })
-    .filter((a) => {
-      if (selectedAMFilter === "all") return true;
-      return a.account_manager_id === selectedAMFilter;
-    });
+  // Build the list of columns to compare: Account Managers + Director's Direct Portfolio
+  const columns = [
+    ...accountManagers.map((am) => {
+      const amAllies = allies.filter((a) => a.account_manager_id === am.id);
+      const amAllyIds = amAllies.map((a) => a.id);
+      return {
+        id: am.id,
+        name: am.full_name,
+        email: am.email,
+        type: "account_manager" as const,
+        alliesCount: amAllies.length,
+        metrics: getMetricsForAllies(amAllyIds),
+      };
+    }),
+    {
+      id: "director_direct",
+      name: "Gestión Directa (Director)",
+      email: "Operaciones Centrales",
+      type: "director" as const,
+      alliesCount: allies.filter((a) => !a.account_manager_id).length,
+      metrics: getMetricsForAllies(allies.filter((a) => !a.account_manager_id).map((a) => a.id)),
+    },
+  ];
 
-  // Stats
+  // Global metrics for overview
   const totalAllies = allies.length;
-  const assignedCount = allies.filter(a => a.account_manager_id !== null && a.account_manager_id !== undefined).length;
-  const unassignedCount = totalAllies - assignedCount;
   const totalAMs = accountManagers.length;
+  const totalProspectsCount = prospects.length;
 
   return (
-    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
+    <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       
-      {/* Top Banner */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-850 pb-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Gestión Account Manager</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Asigna aliados comerciales recién registrados a sus respectivos Account Managers para habilitar su visibilidad operativa.
+            Compara métricas clave, volúmenes de financiamiento y embudos de conversión de supervisores lado a lado.
           </p>
         </div>
       </div>
 
-      {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Comerciales</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-              Total en sistema
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Sin Asignar</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-amber-600 dark:text-amber-500">{unassignedCount}</span>
-            <span className="text-[9px] bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">
-              Requieren Atención
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Asignados</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-500">{assignedCount}</span>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">
-              Bajo Gestión de AM
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
+      {/* Global Highlights Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-24 relative overflow-hidden transition-colors">
           <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Managers</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Supervisores en Sistema</span>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400">{totalAMs}</span>
-            <span className="text-[9px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">
-              Supervisores
+            <span className="text-2xl font-black text-slate-800 dark:text-white">{totalAMs} AMs</span>
+            <span className="text-[10px] text-slate-550 dark:text-slate-400 font-bold">
+              Asignación Comercial
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-24 relative overflow-hidden transition-colors">
+          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Cartera Total de Aliados</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-500">{totalAllies} B2B</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+              Aliados Registrados
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-24 relative overflow-hidden transition-colors">
+          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Expedientes en Embudo</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-black text-amber-600 dark:text-amber-500">{totalProspectsCount} Casos</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+              Prospectos Totales
             </span>
           </div>
         </div>
       </div>
 
-      {/* Main Content Layout: Assignment Matrix + AM Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Left Area (2/3 width): Ally List & Assignment dropdowns */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
-            
-            {/* Search and Filters Bar */}
-            <div className="p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-850 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest block">Matriz de Asignaciones</span>
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-1 block">Asigna de forma instantánea a cada aliado. Los cambios se guardan automáticamente.</span>
+      {/* Comparative Columns Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-stretch">
+        {columns.map((col) => {
+          const m = col.metrics;
+          return (
+            <div 
+              key={col.id} 
+              className={`bg-white dark:bg-slate-900 rounded-3xl border shadow-sm p-6 flex flex-col justify-between transition-all hover:shadow-md ${
+                col.type === "director" 
+                  ? "border-emerald-200/60 dark:border-emerald-950/40 bg-emerald-50/[0.02]" 
+                  : "border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              {/* Card Header */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-black border ${
+                    col.type === "director"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-250/20"
+                      : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-250/20"
+                  }`}>
+                    {col.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tight">{col.name}</h3>
+                    <p className="text-[10px] text-slate-400 font-semibold truncate leading-normal uppercase mt-0.5">{col.email}</p>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-850">
+                  <div className="text-center">
+                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-extrabold uppercase">Aliados</span>
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-300 mt-0.5 block">{col.alliesCount} B2B</span>
+                  </div>
+                  <div className="text-center border-l border-slate-200/50 dark:border-slate-850">
+                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-extrabold uppercase">Clientes</span>
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-300 mt-0.5 block">{m.totalCount} Casos</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vertical Funnel Comparison */}
+              <div className="my-6 space-y-3">
+                <span className="text-[9px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Embudo Operativo Vertical</span>
                 
-                <div className="relative w-full sm:w-64">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Search className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Buscar por nombre, correo o celular..."
-                    className="pl-9 pr-4 py-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-600 transition-colors shadow-sm text-slate-800 dark:text-slate-100"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                {/* Segmented Controller for Assignment State */}
-                <div className="bg-slate-200/55 dark:bg-slate-900 p-1 rounded-xl flex border border-slate-250/70 dark:border-slate-800 shadow-inner w-full sm:w-auto">
-                  <button
-                    onClick={() => setAssignmentFilter("all")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "all" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
-                    }`}
-                  >
-                    Todos ({totalAllies})
-                  </button>
-                  <button
-                    onClick={() => setAssignmentFilter("unassigned")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "unassigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
-                    }`}
-                  >
-                    Sin Asignar ({unassignedCount})
-                  </button>
-                  <button
-                    onClick={() => setAssignmentFilter("assigned")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "assigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
-                    }`}
-                  >
-                    Asignados ({assignedCount})
-                  </button>
-                </div>
-
-                {/* Filter by Specific AM */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase">Account Manager:</span>
-                  <select
-                    value={selectedAMFilter}
-                    onChange={(e) => setSelectedAMFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Todos los AM</option>
-                    {accountManagers.map((am) => (
-                      <option key={am.id} value={am.id}>{am.full_name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Allies Assignment Table */}
-            {filteredAllies.length === 0 ? (
-              <div className="py-20 text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-850 flex items-center justify-center text-slate-400 mx-auto">
-                  <UserX className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">No se encontraron aliados</h4>
-                  <p className="text-xs text-slate-400 mt-1">Modifica los filtros de búsqueda o registra nuevos aliados.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Aliado Comercial</th>
-                      <th className="px-6 py-4">Información de Contacto</th>
-                      <th className="px-6 py-4 text-center">Prospectos Activos</th>
-                      <th className="px-6 py-4">Asignar Account Manager</th>
-                      <th className="px-6 py-4 text-center">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
-                    {filteredAllies.map((a) => {
-                      const isAssigned = a.account_manager_id !== null && a.account_manager_id !== undefined;
-                      const currentProspects = getProspectCount(a.id);
-                      const isUpdating = updatingRow === a.id;
-                      const isSuccess = successRow === a.id;
-
-                      return (
-                        <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-black border border-emerald-250/25">
-                                {a.full_name.charAt(0)}
-                              </div>
-                              <div>
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{a.full_name}</span>
-                                <span className="text-[10px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">
-                                  Registrado: {new Date(a.created_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-300 block">{a.email}</span>
-                            <span className="text-[10px] text-slate-400 block mt-0.5">{a.phone || "Sin Celular"}</span>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold rounded-full">
-                              {currentProspects} {currentProspects === 1 ? "prospecto" : "prospectos"}
-                            </span>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <select
-                              value={a.account_manager_id || ""}
-                              onChange={(e) => handleAssignAM(a.id, e.target.value)}
-                              disabled={isUpdating}
-                              className={`text-xs font-semibold rounded-xl px-2.5 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
-                                isAssigned 
-                                  ? "border-emerald-200/50 bg-emerald-50/10 text-slate-700 dark:text-slate-200" 
-                                  : "border-amber-250/50 bg-amber-50/10 text-amber-700 dark:text-amber-400"
-                              }`}
-                            >
-                              <option value="" className="text-slate-500 dark:bg-slate-900">⚠️ Sin Asignar (Director)</option>
-                              {accountManagers.map((am) => (
-                                <option key={am.id} value={am.id} className="text-slate-800 dark:bg-slate-900">
-                                  👤 {am.full_name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-xs font-bold">
-                            {isUpdating ? (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
-                                <span className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                                Guardando...
-                              </span>
-                            ) : isSuccess ? (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 animate-pulse">
-                                <CheckCircle className="h-3.5 w-3.5" />
-                                Guardado
-                              </span>
-                            ) : isAssigned ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
-                                <UserCheck className="h-3 w-3" /> Asignado
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900">
-                                <Clock className="h-3 w-3" /> En Espera
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Area (1/3 width): AM Workload Overview */}
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4 transition-colors">
-            <div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Cartera de Supervisores</span>
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400 block mt-0.5">Distribución de aliados comerciales asignados por Account Manager.</span>
-            </div>
-
-            <div className="space-y-3">
-              {accountManagers.length === 0 ? (
-                <div className="text-center py-8 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl text-slate-400 text-xs">
-                  No hay Account Managers registrados. Crea uno en la sección "Gestión de Usuarios".
-                </div>
-              ) : (
-                accountManagers.map((am) => {
-                  const assignedAllies = allies.filter(a => a.account_manager_id === am.id);
-                  const totalProspects = assignedAllies.reduce((sum, a) => sum + getProspectCount(a.id), 0);
-
-                  return (
-                    <div key={am.id} className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-250/25">
-                            {am.full_name.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-bold text-slate-850 dark:text-slate-200 block truncate">{am.full_name}</span>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">
-                              {am.email}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Workload Stats */}
-                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-850">
-                        <div className="text-center p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-850">
-                          <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-extrabold uppercase">Aliados</span>
-                          <span className="block text-sm font-black text-indigo-600 dark:text-indigo-400 mt-1">
-                            {assignedAllies.length}
-                          </span>
-                        </div>
-                        <div className="text-center p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-850">
-                          <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-extrabold uppercase">Clientes</span>
-                          <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                            {totalProspects}
-                          </span>
-                        </div>
-                      </div>
+                <div className="space-y-2">
+                  {/* Proyectos */}
+                  <div className="p-2.5 bg-slate-50/70 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 dark:text-slate-350">
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="h-3.5 w-3.5 text-slate-450" /> Proyectos
+                      </span>
+                      <span>{m.totalCount}</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-slate-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? "100%" : "0%" }} />
+                    </div>
+                  </div>
 
-          {/* Allocation Tip banner */}
-          <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/15 dark:border-emerald-500/10 rounded-3xl p-6 relative overflow-hidden">
-            <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
-            <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block">Proceso de Registro</span>
-            <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Mesa del Director</h4>
-            <p className="text-[11px] text-slate-550 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
-              Cuando un aliado se registra usando un código B2B, es ingresado directamente al sistema, pero **queda en un limbo de visibilidad**. El Director debe asignarlo a un Account Manager en esta tabla para que este último pueda ver su historial e iniciar la dictaminación de prospectos.
-            </p>
-          </div>
-        </div>
+                  {/* En Evaluación */}
+                  <div className="p-2.5 bg-blue-50/20 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                      <span className="flex items-center gap-1">
+                        <Layers className="h-3.5 w-3.5" /> En Evaluación
+                      </span>
+                      <span>{m.enEvaluacion}</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-blue-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? `${(m.enEvaluacion / m.totalCount) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+
+                  {/* Aprobados */}
+                  <div className="p-2.5 bg-emerald-50/20 dark:bg-emerald-950/10 border border-emerald-100/50 dark:border-emerald-900/20 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1">
+                        <Award className="h-3.5 w-3.5" /> Aprobados
+                      </span>
+                      <span>{m.aprobados}</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? `${(m.aprobados / m.totalCount) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+
+                  {/* Condicionados */}
+                  <div className="p-2.5 bg-amber-50/20 dark:bg-amber-955/10 border border-amber-100/50 dark:border-amber-900/20 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                      <span className="flex items-center gap-1">
+                        <Layers className="h-3.5 w-3.5" /> Condicionados
+                      </span>
+                      <span>{m.condicionados}</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-amber-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? `${(m.condicionados / m.totalCount) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+
+                  {/* Rechazados */}
+                  <div className="p-2.5 bg-rose-50/20 dark:bg-rose-955/10 border border-rose-100/50 dark:border-rose-900/20 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-rose-600 dark:text-rose-450">
+                      <span className="flex items-center gap-1">
+                        <UserX className="h-3.5 w-3.5" /> Rechazados
+                      </span>
+                      <span>{m.rechazados}</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-rose-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? `${(m.rechazados / m.totalCount) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+
+                  {/* Otorgados */}
+                  <div className="p-2.5 bg-teal-50/20 dark:bg-teal-955/10 border border-teal-100/50 dark:border-teal-900/20 rounded-xl">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-teal-650 dark:text-teal-400">
+                      <span className="flex items-center gap-1">
+                        <UserCheck className="h-3.5 w-3.5" /> Otorgados
+                      </span>
+                      <span>{m.otorgados}</span>
+                    </div>
+                    <div className="w-full bg-slate-200/60 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                      <div className="bg-teal-500 h-full rounded-full" style={{ width: m.totalCount > 0 ? `${(m.otorgados / m.totalCount) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial & KPIs Footer Section */}
+              <div className="space-y-4 pt-4 border-t border-slate-150 dark:border-slate-850">
+                {/* Financial Boxes */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center bg-indigo-50/30 dark:bg-indigo-950/10 p-2 rounded-xl border border-indigo-100/30">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-indigo-500" /> Fin. Aprobado
+                    </span>
+                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-400">{formatCurrency(m.finAprobados)}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-955/10 p-2 rounded-xl border border-emerald-100/30">
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-emerald-500" /> Fin. Otorgado
+                    </span>
+                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(m.finOtorgados)}</span>
+                  </div>
+                </div>
+
+                {/* Conversion KPIs */}
+                <div className="grid grid-cols-3 gap-2 bg-slate-50/50 dark:bg-slate-950/20 p-2 rounded-xl text-center text-slate-600 dark:text-slate-400">
+                  <div>
+                    <span className="block text-[7px] text-slate-400 font-bold uppercase leading-none">T. Eval</span>
+                    <span className="text-[10px] font-black mt-1.5 block leading-none">{m.tasaEvaluacion.toFixed(0)}%</span>
+                  </div>
+                  <div className="border-l border-slate-200/50 dark:border-slate-800">
+                    <span className="block text-[7px] text-slate-400 font-bold uppercase leading-none">T. Aprob</span>
+                    <span className="text-[10px] font-black mt-1.5 block leading-none">{m.tasaAprobacion.toFixed(0)}%</span>
+                  </div>
+                  <div className="border-l border-slate-200/50 dark:border-slate-800">
+                    <span className="block text-[7px] text-slate-400 font-bold uppercase leading-none">T. Cierre</span>
+                    <span className="text-[10px] font-black mt-1.5 block leading-none">{m.tasaCierre.toFixed(0)}%</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          );
+        })}
       </div>
+
     </div>
   );
 }

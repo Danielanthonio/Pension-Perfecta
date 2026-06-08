@@ -25,8 +25,35 @@ import {
   Upload,
   ChevronRight,
   Trash2,
+  Copy,
+  Check,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
+import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`p-1 rounded bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-405 hover:text-white transition-all cursor-pointer inline-flex items-center justify-center h-6 w-6 ml-2 no-print`}
+      title="Copiar"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={3} /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
 
 export default function ProspectoDetalle() {
   const params = useParams();
@@ -95,6 +122,81 @@ export default function ProspectoDetalle() {
   const [aforePensionarse, setAforePensionarse] = useState<number>(0);
   const [creditoNomina, setCreditoNomina] = useState<number>(0);
   const [comments, setComments] = useState<string>("");
+
+  const [auditResult, setAuditResult] = useState<any>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const handleAuditImssPdf = async () => {
+    if (!realFileData) {
+      alert("No hay ningún archivo cargado para auditar.");
+      return;
+    }
+    setAuditLoading(true);
+    setAuditError(null);
+    try {
+      let fileUrl = realFileData;
+
+      // If it is a Google Drive file, download the real binary from our proxy
+      if (selectedDoc?.drive_file_id) {
+        const res = await fetch("/api/drive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "downloadFile",
+            fileId: selectedDoc.drive_file_id,
+          }),
+        });
+        const resData = await res.json();
+        if (!resData.success) {
+          throw new Error(resData.error || "No se pudo descargar el archivo desde Google Drive.");
+        }
+        fileUrl = resData.fileDataUrl;
+      }
+
+      let arrayBuffer: ArrayBuffer;
+      if (fileUrl.startsWith("data:") && fileUrl.includes(";base64,")) {
+        const base64Str = fileUrl.split(",")[1];
+        const binaryStr = window.atob(base64Str);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        arrayBuffer = bytes.buffer;
+      } else if (fileUrl.startsWith("http") || fileUrl.startsWith("/")) {
+        const response = await fetch(fileUrl);
+        arrayBuffer = await response.arrayBuffer();
+      } else {
+        throw new Error("Formato de archivo no soportado.");
+      }
+
+      const { extractTextFromPdf } = await import("@/lib/imss/pdfExtractor");
+      const { parseImssPdfToLaborBlocks } = await import("@/lib/imss/parser");
+      const { calculateLast250WeeksAverage } = await import("@/lib/imss/calculateLast250WeeksAverage");
+
+      const text = await extractTextFromPdf(arrayBuffer);
+      const parsedData = parseImssPdfToLaborBlocks(text);
+
+      if (parsedData.laborBlocks.length === 0) {
+        throw new Error("No se encontraron bloques laborales en el PDF. Asegúrate de que el documento es una Constancia de Semanas Cotizadas del IMSS oficial.");
+      }
+
+      const calculationResult = calculateLast250WeeksAverage(parsedData.laborBlocks, {
+        strategy: "higher_salary_priority"
+      });
+
+      setAuditResult({ parsedData, calculationResult });
+      setAuditOpen(true);
+    } catch (err: any) {
+      console.error(err);
+      setAuditError(err.message || "Ocurrió un error al procesar el PDF.");
+      alert(err.message || "Error al procesar el PDF.");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   // Editing personal data states
   const [isEditing, setIsEditing] = useState(false);
@@ -308,6 +410,14 @@ export default function ProspectoDetalle() {
           return;
         }
 
+        if (user?.role === "account_manager") {
+          const allyProfile = profiles.find((p) => p.id === found.aliado_id);
+          if (!allyProfile || allyProfile.account_manager_id !== user.id) {
+            router.push("/admin");
+            return;
+          }
+        }
+
         setProspect(found);
         
         // Pre-populate calculator from existing simulation if available, otherwise sensible defaults
@@ -340,7 +450,7 @@ export default function ProspectoDetalle() {
         }
       }
     }
-  }, [prospects, id, selectedDoc]);
+  }, [prospects, id, selectedDoc, user, profiles, router]);
 
   // Autosave simulation draft effect
   useEffect(() => {
@@ -425,7 +535,7 @@ export default function ProspectoDetalle() {
 
   if (!prospect) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 select-none">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 max-w-md w-full text-center space-y-4 shadow-sm">
           <div className="h-12 w-12 rounded-full bg-red-50 dark:bg-red-950/20 text-red-500 flex items-center justify-center mx-auto border border-red-150 dark:border-red-900/30">
             <AlertCircle className="h-6 w-6" />
@@ -511,7 +621,7 @@ export default function ProspectoDetalle() {
     };
 
     return (
-      <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-24 animate-fade-in text-slate-800 dark:text-slate-100">
+      <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 pb-24 animate-fade-in text-slate-800 dark:text-slate-100">
         {/* Navigation Bar */}
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3.5">
@@ -561,7 +671,7 @@ export default function ProspectoDetalle() {
         </div>
 
         {/* Client Profile Header Banner */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
           <div className="flex items-center gap-4 flex-1">
             <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-xl font-black shrink-0">
               {editForm.full_name ? editForm.full_name.charAt(0) : prospect.full_name.charAt(0)}
@@ -815,6 +925,17 @@ export default function ProspectoDetalle() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {selectedDocType === "IMSS" && (
+                      <button
+                        onClick={handleAuditImssPdf}
+                        disabled={auditLoading}
+                        className="mr-2 flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold transition-all text-[10px] cursor-pointer"
+                        title="Auditar Semanas Cotizadas con Creditia"
+                      >
+                        <Calculator className="h-3 w-3" />
+                        <span>{auditLoading ? "Auditando..." : "Auditar Semanas"}</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => triggerPushNotification(`📥 Descarga Exitosa: El archivo '${selectedDocName}' ha sido descargado en tu carpeta local de forma segura bajo cifrado SSL.`, "email", user?.email || "")}
                       className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
@@ -1344,7 +1465,7 @@ export default function ProspectoDetalle() {
   };
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 select-none pb-40 animate-fade-in text-slate-800 dark:text-slate-100">
+    <div className="max-w-[1700px] mx-auto px-4 sm:px-6 md:px-8 space-y-6 pb-40 animate-fade-in text-slate-800 dark:text-slate-100">
       {/* Return button header */}
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3.5">
@@ -1390,6 +1511,11 @@ export default function ProspectoDetalle() {
                 }`}>
                   {user.role === "director" ? "Director" : user.role === "account_manager" ? "Account Manager" : "Aliado"}
                 </span>
+                {user.account_manager_id && (
+                  <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
+                    AM: {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Asignado"}
+                  </span>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
                 user.role === "director"
@@ -1406,7 +1532,7 @@ export default function ProspectoDetalle() {
       </div>
 
       {/* Profile banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
         <div className="flex items-center gap-4 flex-1">
           <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-xl font-black shrink-0">
             {editForm.full_name ? editForm.full_name.charAt(0) : prospect.full_name.charAt(0)}
@@ -1646,7 +1772,7 @@ export default function ProspectoDetalle() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
+              <div className="flex-1 flex flex-col h-full overflow-hidden">
                 {/* PDF Chrome Bar */}
                 <div className="h-11 bg-slate-800 text-slate-200 px-4 flex items-center justify-between border-b border-slate-700 shrink-0 text-xs">
                   <div className="flex items-center gap-2 font-mono truncate max-w-[150px] sm:max-w-xs text-[10px]">
@@ -1679,6 +1805,17 @@ export default function ProspectoDetalle() {
 
                   {/* Download & Print actions */}
                   <div className="flex items-center gap-2">
+                    {selectedDocType === "IMSS" && (
+                      <button
+                        onClick={handleAuditImssPdf}
+                        disabled={auditLoading}
+                        className="mr-2 flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold transition-all text-[10px] cursor-pointer animate-pulse"
+                        title="Auditar Semanas Cotizadas con Creditia"
+                      >
+                        <Calculator className="h-3 w-3" />
+                        <span>{auditLoading ? "Auditando..." : "Auditar Semanas"}</span>
+                      </button>
+                    )}
                     {canDeleteDoc && (
                       <button
                         onClick={handleDeleteSelectedDoc}
@@ -2159,7 +2296,7 @@ export default function ProspectoDetalle() {
 
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
       {(user?.role === "director" || user?.role === "account_manager") && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40 select-none">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40">
           {isApproved && !isEditingApproved ? (
             <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 w-full">
               <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 shadow-sm">
@@ -2232,7 +2369,7 @@ export default function ProspectoDetalle() {
 
       {/* Pending selection modal overlay */}
       {showPendingModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
             <button
               onClick={() => {
@@ -2326,7 +2463,7 @@ export default function ProspectoDetalle() {
 
       {/* Rejection comment modal overlay */}
       {showRejectionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 mx-4">
             <div className="flex items-center gap-3 border-b border-slate-150 pb-3">
               <div className="h-10 w-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center border border-red-150">
@@ -2374,7 +2511,7 @@ export default function ProspectoDetalle() {
 
       {/* Condition selection modal overlay */}
       {showConditionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
             <button
               onClick={() => {
@@ -2468,7 +2605,7 @@ export default function ProspectoDetalle() {
 
       {/* Approval selection modal overlay */}
       {showApprovalModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
           <div className="bg-white rounded-3xl shadow-xl max-w-lg w-full p-6 space-y-6 border border-slate-200 relative">
             <button
               onClick={() => {
@@ -2576,6 +2713,119 @@ export default function ProspectoDetalle() {
 
       {/* User Settings Modal */}
       <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* Audit Modal (Creditia report) */}
+      {auditOpen && auditResult && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 w-full max-w-5xl shadow-2xl relative text-slate-100 animate-in fade-in zoom-in duration-300">
+            <button 
+              onClick={() => setAuditOpen(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white font-bold text-lg bg-slate-900/30 hover:bg-slate-800 p-2 rounded-full leading-none w-10 h-10 flex items-center justify-center cursor-pointer"
+            >
+              ✕
+            </button>
+            
+            <div className="mb-6">
+              <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
+                <Calculator className="h-5.5 w-5.5 text-emerald-400" />
+                <span>Reporte 250 semanas cotizadas</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Reporte de cálculo automático basado en los bloques laborales del PDF.
+              </p>
+            </div>
+            
+            {/* Meta Info Box */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-slate-900/45 p-4 rounded-2xl border border-slate-800">
+              <div>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block text-left">Asegurado en PDF</span>
+                <div className="flex items-center mt-0.5">
+                  <span className="text-xs font-bold text-slate-200 truncate">{auditResult.parsedData.nombre}</span>
+                  <CopyButton text={auditResult.parsedData.nombre} />
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block text-left">NSS en PDF</span>
+                <div className="flex items-center mt-0.5">
+                  <span className="text-xs font-bold text-slate-200 truncate">{auditResult.parsedData.nss}</span>
+                  <CopyButton text={auditResult.parsedData.nss} />
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block text-left">CURP en PDF</span>
+                <div className="flex items-center mt-0.5">
+                  <span className="text-xs font-bold text-slate-200 truncate">{auditResult.parsedData.curp}</span>
+                  <CopyButton text={auditResult.parsedData.curp} />
+                </div>
+              </div>
+            </div>
+
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Promedio Diario</span>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-lg font-black text-emerald-400">
+                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(auditResult.calculationResult.promedioDiario)}
+                  </div>
+                  <CopyButton text={auditResult.calculationResult.promedioDiario.toFixed(2)} />
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Promedio Mensual</span>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-lg font-black text-emerald-350">
+                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(auditResult.calculationResult.promedioMensual)}
+                  </div>
+                  <CopyButton text={auditResult.calculationResult.promedioMensual.toFixed(2)} />
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Semanas Calculadas</span>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-lg font-black text-indigo-400">
+                    {auditResult.calculationResult.semanasContadas.toFixed(2)} / 250
+                  </div>
+                  <CopyButton text={auditResult.calculationResult.semanasContadas.toFixed(2)} />
+                </div>
+              </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-left">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider font-sans">Resultado Acumulado</span>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="text-lg font-black text-indigo-300">
+                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(auditResult.calculationResult.totalResultado)}
+                  </div>
+                  <CopyButton text={auditResult.calculationResult.totalResultado.toFixed(2)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions Area */}
+            <div className="mb-4 text-left">
+              <span className="text-xs font-semibold text-slate-400">Total de semanas registradas en constancia: <span className="text-slate-200 font-bold">{auditResult.parsedData.totalSemanasCotizadas} semanas</span></span>
+            </div>
+
+            {/* Labor periods details table component */}
+            <div className="max-h-[380px] overflow-y-auto rounded-2xl">
+              <LaborPeriodsTable 
+                allBlockRows={auditResult.calculationResult.rows.map((row: any, i: number) => ({
+                  originalIndex: i,
+                  excluded: false,
+                  row,
+                  block: {
+                    patron: '',
+                    registroPatronal: '',
+                    entidadFederativa: '',
+                    fechaAlta: '',
+                    fechaBaja: '',
+                    salarioDiario: row.salarioDiario,
+                  }
+                }))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

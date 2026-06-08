@@ -120,6 +120,7 @@ interface AppContextType {
   toast: ToastMessage | null;
   isDemoMode: boolean;
   isLoading: boolean;
+  dbError?: string | null;
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
   sendPasswordReset: (email: string) => Promise<void>;
   updateUserPassword: (newPassword: string) => Promise<void>;
@@ -452,6 +453,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
 
   // Helper to map profiles between Supabase role ('director') and Frontend role ('director')
@@ -481,6 +483,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         .select("*")
         .eq("id", authUser.id)
         .maybeSingle();
+        
+      if (fetchError) {
+        console.error("Error fetching profile in ensureProfileExists:", fetchError);
+        return null;
+      }
         
       if (prof) {
         return mapProfileFromDB(prof);
@@ -720,12 +727,44 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
           if (session?.user) {
             try {
-              // Enforce email confirmed check
-              if (!session.user.email_confirmed_at) {
+              // Pre-fetch profile to check if it's a provisional password user
+              let profile = await ensureProfileExists(client, session.user);
+              
+              // Fallback to localStorage if fetching profile failed due to DB/network error
+              if (!profile) {
+                console.warn("Profile fetch returned null, attempting to restore from localStorage fallback");
+                const storedUserStr = localStorage.getItem("pensionflow_user");
+                if (storedUserStr) {
+                  const storedUser = JSON.parse(storedUserStr);
+                  if (storedUser && storedUser.id === session.user.id) {
+                    profile = storedUser;
+                  }
+                }
+              }
+
+              // If still null (meaning first login or empty cache, but query failed),
+              // we can construct a temporary user profile using session user metadata so they are not logged out
+              if (!profile) {
+                console.warn("Profile still null, constructing temporary session profile to avoid logout");
+                const meta = session.user.user_metadata || {};
+                const email = session.user.email || "";
+                const isDirectorEmail = email.toLowerCase().includes("director") || email.toLowerCase().includes("admin") || email.toLowerCase() === "villoutaschellr@gmail.com";
+                profile = {
+                  id: session.user.id,
+                  full_name: meta.full_name || email.split('@')[0],
+                  email: email,
+                  phone: meta.phone || "",
+                  role: meta.role || (isDirectorEmail ? "director" : "aliado"),
+                  created_at: new Date().toISOString(),
+                  is_active: true
+                };
+              }
+              
+              // Only sign out if email is not confirmed AND user does not have a provisional password bypass active
+              if (!session.user.email_confirmed_at && (!profile || !profile.password_provisional)) {
                 console.warn("User has active session but email is not confirmed, signing out");
                 await client.auth.signOut();
               } else {
-                const profile = await ensureProfileExists(client, session.user);
                 if (profile) {
                   currentUser = profile;
                   setUser(profile);
@@ -735,9 +774,42 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             } catch (err) {
               console.error("Error loading session profile:", err);
             }
+          } else {
+            // Restore from localStorage backup if it exists (highly robust fallback)
+            const storedUserStr = localStorage.getItem("pensionflow_user");
+            if (storedUserStr) {
+              try {
+                const storedUser = JSON.parse(storedUserStr);
+                if (storedUser && storedUser.email) {
+                  // Verify that the profile still exists in database and is active
+                  const { data: dbProfile, error: fetchError } = await client
+                    .from("profiles")
+                    .select("*")
+                    .eq("email", storedUser.email.toLowerCase())
+                    .maybeSingle();
+
+                  if (!fetchError && dbProfile) {
+                    const profile = mapProfileFromDB(dbProfile);
+                    if (profile && profile.is_active) {
+                      currentUser = profile;
+                      setUser(profile);
+                      setActiveRole(profile.role);
+                    }
+                  } else if (fetchError) {
+                    // DB/network error: restore from localStorage anyway to prevent drop!
+                    console.warn("DB error when restoring session, keeping localStorage user");
+                    currentUser = storedUser;
+                    setUser(storedUser);
+                    setActiveRole(storedUser.role);
+                  }
+                }
+              } catch (e) {
+                console.error("Error restoring user from localStorage:", e);
+              }
+            }
           }
 
-          // If not signed in via Supabase, clean up state and stop loading
+          // If not signed in via Supabase and no restored user, clean up state and stop loading
           if (!currentUser) {
             setUser(null);
             setIsLoading(false);
@@ -745,7 +817,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
 
           // Fetch all profiles
-          const { data: dbProfiles } = await client.from("profiles").select("*");
+          const { data: dbProfiles, error: profilesError } = await client.from("profiles").select("*");
+          if (profilesError) {
+            console.error("Error fetching profiles:", profilesError);
+            setDbError(prev => prev ? `${prev} | Error perfiles: ${profilesError.message}` : `Error perfiles: ${profilesError.message}`);
+          }
           const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
           setProfiles(mappedProfiles);
 
@@ -763,7 +839,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
             }
           }
-          const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
+          const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
+          if (prospectsError) {
+            console.error("Error fetching prospects:", prospectsError);
+            setDbError(prev => prev ? `${prev} | Error prospectos: ${prospectsError.message}` : `Error prospectos: ${prospectsError.message}`);
+          }
           if (dbProspects) {
             const mappedProspects = dbProspects.map(transformProspectFromDB);
             setProspects(mappedProspects);
@@ -816,7 +896,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
 
           // Fetch invitation codes
-          const { data: dbCodes } = await client.from("invitation_codes").select("*");
+          const { data: dbCodes, error: codesError } = await client.from("invitation_codes").select("*");
+          if (codesError) {
+            console.error("Error fetching invitation codes:", codesError);
+            setDbError(prev => prev ? `${prev} | Error códigos: ${codesError.message}` : `Error códigos: ${codesError.message}`);
+          }
           if (dbCodes) {
             setInvitationCodes(dbCodes.map((c: any) => {
               const userWhoUsedIt = mappedProfiles.find(p => p.invitation_code_used === c.code);
@@ -849,8 +933,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               })));
             }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error loading Supabase data:", error);
+          setDbError(prev => prev ? `${prev} | Error inicialización: ${error.message}` : `Error inicialización: ${error.message}`);
         } finally {
           setIsLoading(false);
         }
@@ -1813,8 +1898,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         let toastMsg = "";
 
         if (newStatus === "rechazado") {
+          const reviewerLabel = user?.role === "account_manager" ? "Account Manager" : "Director";
           notifTitle = "Expediente Rechazado ❌";
-          notifMsg = `El director rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
+          notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
           toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
         } else if (newStatus === "pagado_comision") {
           notifTitle = "¡Comisión Liberada! 💰✨";
@@ -1861,8 +1947,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           let toastMsg = "";
 
           if (newStatus === "rechazado") {
+            const reviewerLabel = user?.role === "account_manager" ? "Account Manager" : "Director";
             notifTitle = "Expediente Rechazado ❌";
-            notifMsg = `El director rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
+            notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
             toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
           } else if (newStatus === "pagado_comision") {
             notifTitle = "¡Comisión Liberada! 💰✨";
@@ -2857,6 +2944,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         toast,
         isDemoMode,
         isLoading,
+        dbError,
         login,
         sendPasswordReset,
         updateUserPassword,

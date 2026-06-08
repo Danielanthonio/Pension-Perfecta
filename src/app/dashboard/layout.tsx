@@ -29,6 +29,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const {
     user,
+    profiles,
     activeRole,
     switchRole,
     notifications,
@@ -147,6 +148,11 @@ export default function DashboardLayout({
                 <span className="inline-block text-[8px] font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest font-sans">
                   Aliado B2B
                 </span>
+                {user.account_manager_id && (
+                  <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
+                    AM: {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Asignado"}
+                  </span>
+                )}
               </div>
               <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 border border-emerald-400/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
                 {user.full_name.charAt(0)}

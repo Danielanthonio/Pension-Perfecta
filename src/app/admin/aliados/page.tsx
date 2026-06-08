@@ -185,7 +185,7 @@ export default function GestorAliados() {
   };
 
   return (
-    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in pb-12">
+    <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -599,7 +599,7 @@ export default function GestorAliados() {
 
       {/* Slide-over Drawer / Modal for Ally Detail */}
       {selectedAlly && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-end z-40 animate-fade-in select-none">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-end z-40 animate-fade-in">
           <div className="bg-white h-full max-w-4xl w-full border-l border-slate-200 flex flex-col animate-slide-in shadow-2xl">
             {/* Drawer Header */}
             <div className="p-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between">

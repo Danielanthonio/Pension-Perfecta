@@ -22,7 +22,7 @@ import {
 import Link from "next/link";
 
 export default function PipelineManager() {
-  const { user, prospects, updateProspectStatus, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
+  const { user, prospects, profiles, updateProspectStatus, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
   const isAM = user?.role === "account_manager";
   const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,8 +32,39 @@ export default function PipelineManager() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
-  const deletedProspects = prospects.filter((p) => isProspectDeleted(p));
+  // Director filtering states
+  const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
+  const [selectedAMId, setSelectedAMId] = useState<string>("all");
+  const [selectedAllyId, setSelectedAllyId] = useState<string>("all");
+
+  const baseFilteredProspects = React.useMemo(() => {
+    if (user?.role !== "director") return prospects;
+    
+    if (directorFilterType === "todos") {
+      return prospects;
+    }
+    if (directorFilterType === "am") {
+      if (selectedAMId === "all") return prospects;
+      const assignedAllyIds = profiles
+        .filter((p) => p.role === "aliado" && p.account_manager_id === selectedAMId)
+        .map((p) => p.id);
+      return prospects.filter((p) => assignedAllyIds.includes(p.aliado_id));
+    }
+    if (directorFilterType === "aliado") {
+      if (selectedAllyId === "all") return prospects;
+      return prospects.filter((p) => p.aliado_id === selectedAllyId);
+    }
+    if (directorFilterType === "gestion_directa") {
+      const unassignedAllyIds = profiles
+        .filter((p) => p.role === "aliado" && !p.account_manager_id)
+        .map((p) => p.id);
+      return prospects.filter((p) => unassignedAllyIds.includes(p.aliado_id));
+    }
+    return prospects;
+  }, [prospects, user, directorFilterType, selectedAMId, selectedAllyId, profiles]);
+
+  const activeProspects = baseFilteredProspects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const deletedProspects = baseFilteredProspects.filter((p) => isProspectDeleted(p));
 
   const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
@@ -204,7 +235,7 @@ export default function PipelineManager() {
 
   return (
     <>
-    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+    <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
@@ -217,8 +248,103 @@ export default function PipelineManager() {
         </div>
       </div>
 
+      {/* Director Pipeline Assignment Filters */}
+      {!isAM && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 flex-shrink-0 text-emerald-500" />
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra todo el embudo por supervisor, aliado comercial o tu gestión directa.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            {/* Segmented filter type selector */}
+            <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-200 dark:border-slate-850 text-xs font-bold">
+              <button
+                onClick={() => {
+                  setDirectorFilterType("todos");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
+                  directorFilterType === "todos" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => {
+                  setDirectorFilterType("am");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
+                  directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
+                }`}
+              >
+                Por Account Manager
+              </button>
+              <button
+                onClick={() => {
+                  setDirectorFilterType("aliado");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
+                  directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
+                }`}
+              >
+                Por Aliado
+              </button>
+              <button
+                onClick={() => {
+                  setDirectorFilterType("gestion_directa");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
+                  directorFilterType === "gestion_directa" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
+                }`}
+              >
+                Gestión Directa
+              </button>
+            </div>
+
+            {/* Sub-dropdown for AMs */}
+            {directorFilterType === "am" && (
+              <select
+                value={selectedAMId}
+                onChange={(e) => setSelectedAMId(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-350 focus:border-emerald-500"
+              >
+                <option value="all">Todos los AM...</option>
+                {profiles
+                  .filter((p) => p.role === "account_manager")
+                  .map((am) => (
+                    <option key={am.id} value={am.id}>
+                      {am.full_name}
+                    </option>
+                  ))}
+              </select>
+            )}
+
+            {/* Sub-dropdown for Allies */}
+            {directorFilterType === "aliado" && (
+              <select
+                value={selectedAllyId}
+                onChange={(e) => setSelectedAllyId(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-355 focus:border-emerald-500"
+              >
+                <option value="all">Todos los aliados...</option>
+                {profiles
+                  .filter((p) => p.role === "aliado")
+                  .map((ally) => (
+                    <option key={ally.id} value={ally.id}>
+                      {ally.full_name}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Calendar className={`h-5 w-5 flex-shrink-0 ${isAM ? "text-blue-500" : "text-emerald-500"}`} />
           <div>
@@ -324,27 +450,29 @@ export default function PipelineManager() {
         </div>
 
         {/* Allied filter dropdown */}
-        <div className="w-full md:w-52 flex items-center gap-2">
-          <Users className="h-4 w-4 text-slate-400 dark:text-slate-550 flex-shrink-0" />
-          <select
-            value={selectedAlly}
-            onChange={(e) => setSelectedAlly(e.target.value)}
-            className={`w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none transition-colors dark:text-slate-300 ${
-              isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-            }`}
-          >
-            <option value="all" className="dark:bg-slate-900">Todos los Aliados</option>
-            {uniqueAllies.map((ally) => (
-              <option key={ally} value={ally} className="dark:bg-slate-900">
-                {ally}
-              </option>
-            ))}
-          </select>
-        </div>
+        {isAM && (
+          <div className="w-full md:w-52 flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-400 dark:text-slate-550 flex-shrink-0" />
+            <select
+              value={selectedAlly}
+              onChange={(e) => setSelectedAlly(e.target.value)}
+              className={`w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none transition-colors dark:text-slate-300 ${
+                isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
+              }`}
+            >
+              <option value="all" className="dark:bg-slate-900">Todos los Aliados</option>
+              {uniqueAllies.map((ally) => (
+                <option key={ally} value={ally} className="dark:bg-slate-900">
+                  {ally}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Segmented Controller Tab Selector */}
-      <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xs flex border border-slate-200 dark:border-slate-800 select-none">
+      <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xs flex border border-slate-200 dark:border-slate-800">
         <button
           onClick={() => setActiveTab("activos")}
           className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
@@ -628,7 +756,7 @@ export default function PipelineManager() {
 
     {/* Delete Confirmation Modal */}
     {deleteTarget && (
-      <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none">
+      <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4">
           {/* Header */}
           <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">

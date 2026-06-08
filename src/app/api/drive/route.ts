@@ -290,6 +290,50 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (action === "downloadFile") {
+      const { fileId } = body;
+
+      if (!fileId) {
+        return NextResponse.json({ success: false, error: "Missing fileId" }, { status: 400 });
+      }
+
+      if (runInSimulation) {
+        console.log(`[SIMULATION] Downloading file: ${fileId}`);
+        return NextResponse.json({
+          success: true,
+          simulated: true,
+          fileDataUrl: "data:application/pdf;base64,JVBERi0xLjQKJ...",
+        });
+      }
+
+      // Get file metadata first to get mimeType
+      const fileMetadata = await drive.files.get({
+        fileId: fileId,
+        supportsAllDrives: true,
+        fields: "name, mimeType",
+      });
+
+      // Get file content as ArrayBuffer
+      const response = await drive.files.get(
+        {
+          fileId: fileId,
+          supportsAllDrives: true,
+          alt: "media",
+        },
+        { responseType: "arraybuffer" }
+      );
+
+      const buffer = Buffer.from(response.data);
+      const base64 = buffer.toString("base64");
+      const mimeType = fileMetadata.data.mimeType || "application/pdf";
+
+      return NextResponse.json({
+        success: true,
+        simulated: false,
+        fileDataUrl: `data:${mimeType};base64,${base64}`,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
 
   } catch (error: any) {

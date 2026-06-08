@@ -194,7 +194,7 @@ export default function MisClientes() {
   });
 
   return (
-    <div className="max-w-[1700px] mx-auto space-y-6 select-none animate-fade-in text-slate-800 dark:text-slate-100">
+    <div className="max-w-[1700px] mx-auto space-y-6 animate-fade-in text-slate-800 dark:text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Expedientes de Prospectos</h1>
@@ -203,7 +203,7 @@ export default function MisClientes() {
       </div>
 
       {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
           <div>

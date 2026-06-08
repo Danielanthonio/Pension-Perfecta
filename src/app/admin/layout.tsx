@@ -30,6 +30,7 @@ export default function AdminLayout({
   const router = useRouter();
   const {
     user,
+    profiles,
     activeRole,
     switchRole,
     notifications,
@@ -75,6 +76,7 @@ export default function AdminLayout({
   const isAliados = pathname === "/admin/aliados";
   const isUsuarios = pathname === "/admin/usuarios";
   const isAMs = pathname === "/admin/account-managers";
+  const isAsignacion = pathname === "/admin/asignacion";
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -159,6 +161,11 @@ export default function AdminLayout({
                 }`}>
                   {isAM ? "Account Manager" : "Director"}
                 </span>
+                {user.account_manager_id && (
+                  <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
+                    AM: {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Asignado"}
+                  </span>
+                )}
               </div>
               <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
                 isAM 
@@ -207,6 +214,20 @@ export default function AdminLayout({
             <Users className="mr-2 h-4 w-4 stroke-[2]" />
             Gestión de Aliados
           </Link>
+
+          {!isAM && (
+            <Link
+              href="/admin/asignacion"
+              className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
+                isAsignacion
+                  ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
+                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+              }`}
+            >
+              <ArrowRightLeft className="mr-2 h-4 w-4 stroke-[2]" />
+              Asignación de Aliados
+            </Link>
+          )}
 
           {!isAM && (
             <Link

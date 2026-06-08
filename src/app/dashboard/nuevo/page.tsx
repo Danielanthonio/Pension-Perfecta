@@ -300,7 +300,7 @@ export default function SubirProspecto() {
   };
 
   return (
-    <div className="max-w-[1700px] mx-auto space-y-6 pb-16 select-none animate-fade-in text-slate-800 dark:text-slate-100">
+    <div className="max-w-[1700px] mx-auto space-y-6 pb-16 animate-fade-in text-slate-800 dark:text-slate-100">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold uppercase tracking-widest">Nuevo Expediente</span>
@@ -780,7 +780,7 @@ export default function SubirProspecto() {
                     )}
                   </div>
                 ) : (
-                  <div className="border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-850/50 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-50 select-none">
+                  <div className="border border-dashed border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-850/50 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-not-allowed opacity-50">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>

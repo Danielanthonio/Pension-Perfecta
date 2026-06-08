@@ -44,6 +44,7 @@ export default function GestionUsuarios() {
     invitationCodes,
     generateInvitationCode,
     triggerPushNotification,
+    dbError,
   } = useApp();
 
   // Search & Filter States
@@ -276,7 +277,7 @@ export default function GestionUsuarios() {
     .slice(0, 3);
 
   return (
-    <div className="space-y-8 select-none max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
+    <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
@@ -293,6 +294,17 @@ export default function GestionUsuarios() {
           Registrar Colaborador
         </button>
       </div>
+
+      {/* Database Error Warning */}
+      {dbError && (
+        <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-250 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 p-4 rounded-2xl text-xs flex items-center gap-3 animate-fade-in max-w-4xl shadow-md shadow-rose-500/5">
+          <AlertCircle className="h-5 w-5 text-rose-500 dark:text-rose-400 shrink-0" />
+          <div>
+            <span className="font-extrabold block mb-0.5">Fallo de Comunicación con Base de Datos</span>
+            <p className="font-medium opacity-90">{dbError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Status Notifications */}
       {createdUser && (
@@ -751,7 +763,7 @@ export default function GestionUsuarios() {
       </div>
                     {/* Creation & Editing Modal (Clean, modern, space-saving) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 mx-4 relative">
             
             {/* Modal Header */}
@@ -987,7 +999,7 @@ export default function GestionUsuarios() {
 
       {/* Delete confirmation modal overlay */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in select-none">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 dark:border-slate-800 mx-4">
             <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-3">
               <div className="h-10 w-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-505 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40">
