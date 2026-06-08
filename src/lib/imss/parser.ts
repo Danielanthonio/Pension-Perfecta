@@ -326,8 +326,87 @@ export function parseImssPdfToLaborBlocks(pdfText: string): ImssPdfData {
       const isoAlta = formatToIso(fechaAlta);
       const isoBaja = formatToIso(fechaBaja);
 
-      // Only add blocks that have at minimum a date
-      if (fechaAlta || patron) {
+      // Search forward from "Nombre del patrón" for detailed salary movements
+      const movements: { date: string; type: string; salary: number }[] = [];
+      let endScanIdx = lines.length;
+      for (let k = i + 1; k < lines.length; k++) {
+        if (lines[k] === 'Nombre del patrón') {
+          endScanIdx = k;
+          break;
+        }
+      }
+
+      for (let k = i + 1; k < endScanIdx; k++) {
+        const currLine = lines[k];
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(currLine)) {
+          const dateStr = currLine;
+          let type = '';
+          let typeIdx = -1;
+          for (let m = k + 1; m < Math.min(k + 5, endScanIdx); m++) {
+            const l = lines[m];
+            if (l === 'BAJA' || l === 'REINGRESO' || l === 'MODIFICACION DE SALARIO' || l === 'ALTA') {
+              type = l;
+              typeIdx = m;
+              break;
+            }
+          }
+
+          if (type) {
+            let salary = 0;
+            for (let m = typeIdx + 1; m < Math.min(typeIdx + 5, endScanIdx); m++) {
+              const l = lines[m];
+              if (l.startsWith('$')) {
+                const valStr = l.replace('$', '').replace(/,/g, '').trim();
+                const parsedVal = parseFloat(valStr);
+                if (!isNaN(parsedVal)) {
+                  salary = parsedVal;
+                  break;
+                }
+              }
+            }
+
+            const parts = dateStr.split('/');
+            const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+            movements.push({
+              date: isoDate,
+              type,
+              salary
+            });
+
+            k = Math.max(k, typeIdx);
+          }
+        }
+      }
+
+      if (movements.length > 0) {
+        // Sort chronologically oldest first
+        movements.sort((a, b) => a.date.localeCompare(b.date));
+
+        for (let idx = 0; idx < movements.length; idx++) {
+          const mov = movements[idx];
+          if (mov.type === 'BAJA') {
+            continue; // BAJA ends the previous segment
+          }
+
+          const blockAlta = mov.date;
+          let blockBaja = '';
+          if (idx + 1 < movements.length) {
+            blockBaja = movements[idx + 1].date;
+          } else {
+            blockBaja = isoBaja;
+          }
+
+          laborBlocks.push({
+            patron: patron || 'Desconocido',
+            registroPatronal,
+            entidadFederativa,
+            fechaAlta: blockAlta,
+            fechaBaja: blockBaja,
+            salarioDiario: mov.salary || salarioDiario
+          });
+        }
+      } else if (fechaAlta || patron) {
         laborBlocks.push({
           patron: patron || 'Desconocido',
           registroPatronal,
