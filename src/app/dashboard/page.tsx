@@ -25,7 +25,7 @@ import {
 import Link from "next/link";
 
 export default function DashboardAliado() {
-  const { prospects, scheduleAssessment, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
+  const { user, prospects, scheduleAssessment, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
   const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "papelera">("evaluacion");
   
   // States for Scheduling Modal
@@ -742,10 +742,14 @@ export default function DashboardAliado() {
                     {isPaid && p.simulation && (
                       <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between shadow-inner">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl">💸</span>
+                          <span className="text-xl">🎉</span>
                           <div>
-                            <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300">¡Comisión Pagada con éxito!</h4>
-                            <p className="text-[10px] text-emerald-600 dark:text-emerald-450 mt-0.5">La comisión acordada por capturar y coordinar este proyecto ha sido liberada por dirección.</p>
+                            <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                              Felicitaciones {p.aliado_name || user?.full_name || "Aliado"}, has concluido este proyecto con éxito
+                            </h4>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-450 mt-0.5">
+                              ¡Vamos por más!
+                            </p>
                           </div>
                         </div>
                         <div className="text-right">
