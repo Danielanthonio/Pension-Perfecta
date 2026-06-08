@@ -243,19 +243,17 @@ export default function AdminLayout({
             </Link>
           )}
 
-          {!isAM && (
-            <Link
-              href="/admin/usuarios"
-              className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
-                isUsuarios
-                  ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
-                  : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
-              }`}
-            >
-              <UserPlus className="mr-2 h-4 w-4 stroke-[2]" />
-              Gestión de Usuarios
-            </Link>
-          )}
+          <Link
+            href="/admin/usuarios"
+            className={`flex items-center px-4 py-2.5 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase border ${
+              isUsuarios
+                ? "bg-slate-50 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-800 dark:text-white shadow-sm"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 hover:bg-slate-50/50 dark:hover:bg-slate-800/50"
+            }`}
+          >
+            <UserPlus className="mr-2 h-4 w-4 stroke-[2]" />
+            Gestión de Usuarios
+          </Link>
         </nav>
       </div>
 

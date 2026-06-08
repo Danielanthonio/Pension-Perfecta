@@ -37,6 +37,7 @@ const COUNTRIES = [
 
 export default function GestionUsuarios() {
   const {
+    user,
     profiles,
     createProfile,
     deleteProfile,
@@ -46,6 +47,8 @@ export default function GestionUsuarios() {
     triggerPushNotification,
     dbError,
   } = useApp();
+
+  const isCurrentUserAM = user?.role === "account_manager";
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState("");
@@ -148,9 +151,10 @@ export default function GestionUsuarios() {
           full_name: fullName,
           email: email.toLowerCase(),
           phone: fullPhoneNumber,
-          role,
+          role: isCurrentUserAM ? "aliado" : role,
           is_active: isActive,
           password_provisional: passwordProvisional || undefined,
+          account_manager_id: isCurrentUserAM ? user?.id : undefined,
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: true });
@@ -210,7 +214,7 @@ export default function GestionUsuarios() {
       triggerPushNotification(
         `🔑 Nuevo código de invitación creado: ${newCode.code}. Compártelo con tu nuevo aliado comercial para su registro.`,
         "email",
-        "Eduardo Director"
+        user?.full_name || "Eduardo Director"
       );
     } catch (e) {
       console.error(e);
@@ -240,6 +244,11 @@ export default function GestionUsuarios() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  // Invitation codes details filtered by creator if it's an AM
+  const myInvitationCodes = isCurrentUserAM
+    ? invitationCodes.filter((c) => c.created_by === user?.id)
+    : invitationCodes;
+
   // Filters profiles list
   const filteredProfiles = profiles
     .filter((p) => {
@@ -251,6 +260,10 @@ export default function GestionUsuarios() {
       );
     })
     .filter((p) => {
+      if (isCurrentUserAM) {
+        // AM only manages and lists allies
+        return p.role === "aliado";
+      }
       if (roleFilter === "all") return true;
       return p.role === roleFilter;
     })
@@ -261,15 +274,21 @@ export default function GestionUsuarios() {
     });
 
   // User Counts Statistics
-  const totalUsers = profiles.length;
-  const totalActive = profiles.filter((p) => p.is_active !== false).length;
-  const totalInactive = profiles.filter((p) => p.is_active === false).length;
+  const totalUsers = isCurrentUserAM
+    ? profiles.filter((p) => p.role === "aliado").length
+    : profiles.length;
+  const totalActive = isCurrentUserAM
+    ? profiles.filter((p) => p.role === "aliado" && p.is_active !== false).length
+    : profiles.filter((p) => p.is_active !== false).length;
+  const totalInactive = isCurrentUserAM
+    ? profiles.filter((p) => p.role === "aliado" && p.is_active === false).length
+    : profiles.filter((p) => p.is_active === false).length;
   const totalDirectors = profiles.filter((p) => p.role === "director").length;
   const totalAllies = profiles.filter((p) => p.role === "aliado").length;
   const totalAMs = profiles.filter((p) => p.role === "account_manager").length;
 
   // Invitation codes details
-  const unusedCodesCount = invitationCodes.filter((c) => !c.is_used).length;
+  const unusedCodesCount = myInvitationCodes.filter((c) => !c.is_used).length;
 
   // 3 Latest registered users
   const latestRegisteredUsers = [...profiles]
@@ -281,9 +300,13 @@ export default function GestionUsuarios() {
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Gestión de Usuarios</h1>
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+            {isCurrentUserAM ? "Gestión de Aliados y Accesos" : "Gestión de Usuarios"}
+          </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Administra los accesos de directores operativos, account managers y aliados comerciales, controla sus estados de activación e invitaciones.
+            {isCurrentUserAM
+              ? "Registra nuevos aliados comerciales bajo tu gestión y genera sus códigos de invitación."
+              : "Administra los accesos de directores operativos, account managers y aliados comerciales, controla sus estados de activación e invitaciones."}
           </p>
         </div>
         <button
@@ -291,7 +314,7 @@ export default function GestionUsuarios() {
           className="inline-flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-2xl shadow-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-600 dark:hover:to-teal-600 transition-all transform hover:-translate-y-0.5 active:scale-95 shadow-emerald-500/10"
         >
           <UserPlus className="h-4.5 w-4.5" />
-          Registrar Colaborador
+          {isCurrentUserAM ? "Registrar Aliado" : "Registrar Colaborador"}
         </button>
       </div>
 
@@ -352,54 +375,87 @@ export default function GestionUsuarios() {
       )}
 
       {/* Statistics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Usuarios Totales</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-              {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-400">Inactivos</span>
-            </span>
+      {isCurrentUserAM ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Asignados</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
+              <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
+                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-400">Inactivos</span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Directores Operativos</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{totalDirectors}</span>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">Dirección</span>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Mi Rol</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-blue-600 dark:text-blue-400">Account Manager</span>
+              <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">Gestor</span>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Managers</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{totalAMs}</span>
-            <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">Gestión AM</span>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Mis Invitaciones Libres</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{unusedCodesCount}</span>
+              <span className="text-[9px] bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full font-bold">Invitaciones</span>
+            </div>
           </div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Usuarios Totales</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
+              <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
+                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-455">Inactivos</span>
+              </span>
+            </div>
+          </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-teal-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Comerciales</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-teal-650 dark:text-teal-400">{totalAllies}</span>
-            <span className="text-[9px] bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full font-bold">Ventas</span>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Directores Operativos</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{totalDirectors}</span>
+              <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">Dirección</span>
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Invitaciones Libres</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{unusedCodesCount}</span>
-            <span className="text-[9px] bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full font-bold">Invitaciones</span>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Managers</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{totalAMs}</span>
+              <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">Gestión AM</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-teal-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Comerciales</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-teal-650 dark:text-teal-400">{totalAllies}</span>
+              <span className="text-[9px] bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full font-bold">Ventas</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
+            <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Invitaciones Libres</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{unusedCodesCount}</span>
+              <span className="text-[9px] bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full font-bold">Invitaciones</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content Layout: Directories + Codes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -432,40 +488,42 @@ export default function GestionUsuarios() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 {/* Segmented Selector for Roles */}
-                <div className="bg-slate-200/55 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-250/70 dark:border-slate-800/80 shadow-inner w-full sm:w-auto">
-                  <button
-                    onClick={() => setRoleFilter("all")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      roleFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-205"
-                    }`}
-                  >
-                    Todos ({totalUsers})
-                  </button>
-                  <button
-                    onClick={() => setRoleFilter("aliado")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      roleFilter === "aliado" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-205"
-                    }`}
-                  >
-                    Aliados ({totalAllies})
-                  </button>
-                  <button
-                    onClick={() => setRoleFilter("account_manager")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      roleFilter === "account_manager" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-205"
-                    }`}
-                  >
-                    AM ({totalAMs})
-                  </button>
-                  <button
-                    onClick={() => setRoleFilter("director")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      roleFilter === "director" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-205"
-                    }`}
-                  >
-                    Directores ({totalDirectors})
-                  </button>
-                </div>
+                {!isCurrentUserAM && (
+                  <div className="bg-slate-200/55 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-250/70 dark:border-slate-800/80 shadow-inner w-full sm:w-auto">
+                    <button
+                      onClick={() => setRoleFilter("all")}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        roleFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Todos ({totalUsers})
+                    </button>
+                    <button
+                      onClick={() => setRoleFilter("aliado")}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        roleFilter === "aliado" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Aliados ({totalAllies})
+                    </button>
+                    <button
+                      onClick={() => setRoleFilter("account_manager")}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        roleFilter === "account_manager" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      AM ({totalAMs})
+                    </button>
+                    <button
+                      onClick={() => setRoleFilter("director")}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        roleFilter === "director" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Directores ({totalDirectors})
+                    </button>
+                  </div>
+                )}
 
                 {/* Filter by Activation Status */}
                 <div className="flex items-center gap-2 text-xs">
@@ -715,12 +773,12 @@ export default function GestionUsuarios() {
               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest block">
                 Historial de Códigos
               </span>
-              {invitationCodes.length === 0 ? (
+              {myInvitationCodes.length === 0 ? (
                 <div className="text-center py-6 border border-dashed border-slate-205 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-505 text-xs bg-slate-50/50 dark:bg-slate-950/20">
                   No hay códigos generados.
                 </div>
               ) : (
-                invitationCodes.map((code) => (
+                myInvitationCodes.map((code) => (
                   <div
                     key={code.id}
                     className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/60 hover:bg-slate-100/50 dark:hover:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 transition-colors"
@@ -890,46 +948,48 @@ export default function GestionUsuarios() {
               </div>
 
               {/* Role Selection */}
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                  Rol Asignado
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRole("aliado")}
-                    className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                      role === "aliado"
-                        ? "bg-teal-50 dark:bg-teal-950/30 border-teal-500 text-teal-600 dark:text-teal-400"
-                        : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <UserCheck className="h-4 w-4" /> Aliado Comercial
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole("account_manager")}
-                    className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                      role === "account_manager"
-                        ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500 text-blue-600 dark:text-blue-400"
-                        : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <ShieldCheck className="h-4 w-4" /> Account Manager
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole("director")}
-                    className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                      role === "director"
-                        ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                        : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <ShieldCheck className="h-4 w-4" /> Director Operativo
-                  </button>
+              {!isCurrentUserAM && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                    Rol Asignado
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setRole("aliado")}
+                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                        role === "aliado"
+                          ? "bg-teal-50 dark:bg-teal-950/30 border-teal-500 text-teal-600 dark:text-teal-400"
+                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                      }`}
+                    >
+                      <UserCheck className="h-4 w-4" /> Aliado Comercial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole("account_manager")}
+                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                        role === "account_manager"
+                          ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500 text-blue-600 dark:text-blue-400"
+                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                      }`}
+                    >
+                      <ShieldCheck className="h-4 w-4" /> Account Manager
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole("director")}
+                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                        role === "director"
+                          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                      }`}
+                    >
+                      <ShieldCheck className="h-4 w-4" /> Director Operativo
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Contraseña Provisoria */}
               <div>

@@ -15,8 +15,9 @@ CREATE TABLE profiles (
   full_name text,
   email text UNIQUE,
   phone text,
-  role text CHECK (role IN ('admin', 'aliado')),
+  role text CHECK (role IN ('admin', 'aliado', 'account_manager')),
   invitation_code_used text,
+  account_manager_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
@@ -118,17 +119,30 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Usuarios pueden ver su propio perfil"
   ON profiles FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Admins pueden ver todos los perfiles"
+CREATE POLICY "Admins ven todos y AMs ven sus aliados"
   ON profiles FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'account_manager')
+      AND account_manager_id = auth.uid()
+    )
   );
 
 CREATE POLICY "Usuarios pueden actualizar su perfil"
   ON profiles FOR UPDATE USING (auth.uid() = id);
 
-CREATE POLICY "Admins pueden crear perfiles"
-  ON profiles FOR INSERT WITH CHECK (
+CREATE POLICY "Admins y AMs pueden actualizar perfiles de sus aliados"
+  ON profiles FOR UPDATE USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR (
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'account_manager')
+      AND account_manager_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Admins y Account Managers pueden crear perfiles"
+  ON profiles FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'account_manager'))
     OR auth.uid() = id
   );
 
@@ -197,14 +211,15 @@ CREATE POLICY "Usuarios pueden marcar como leídas"
   ON notifications FOR UPDATE USING (user_id = auth.uid());
 
 -- ─── Invitation Codes ────────────────────────────────────────────────────────
-CREATE POLICY "Admins ven todos los códigos"
+CREATE POLICY "Admins ven todos y AMs ven sus propios creados"
   ON invitation_codes FOR SELECT USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR created_by = auth.uid()
   );
 
-CREATE POLICY "Admins crean códigos"
+CREATE POLICY "Admins y AMs crean códigos"
   ON invitation_codes FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'account_manager'))
   );
 
 -- =============================================================================

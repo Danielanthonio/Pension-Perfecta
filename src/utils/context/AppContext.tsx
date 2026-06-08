@@ -2360,17 +2360,21 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const validCode = invitationCodes.find(c => c.code === code && !c.is_used);
         if (!validCode) throw new Error("Código de invitación inválido o ya usado.");
         
+        const storedProfiles = localStorage.getItem("pensionflow_profiles");
+        const parsedProfiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
+        const creator = parsedProfiles.find((p: any) => p.id === validCode.created_by);
+        const accountManagerId = creator?.role === "account_manager" ? creator.id : null;
+
         const newProfile: UserProfile = {
           id: `aliado-${Math.random().toString(36).substr(2, 9)}`,
           full_name: fullName,
           email,
           phone,
           role: "aliado",
+          account_manager_id: accountManagerId,
           created_at: new Date().toISOString()
         };
         
-        const storedProfiles = localStorage.getItem("pensionflow_profiles");
-        const parsedProfiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
         saveToStorage("pensionflow_profiles", [...parsedProfiles, newProfile]);
         
         const updatedCodes = invitationCodes.map(c => c.code === code ? { ...c, is_used: true, used_by: newProfile.id } : c);
@@ -2389,6 +2393,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           
         if (codeError || !dbCode) {
           throw new Error("El código de invitación no es válido, ya fue utilizado o no existe.");
+        }
+
+        // Check if the invitation code was created by an Account Manager
+        let accountManagerId = null;
+        if (dbCode.created_by) {
+          const { data: creatorProfile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", dbCode.created_by)
+            .maybeSingle();
+          if (creatorProfile && creatorProfile.role === "account_manager") {
+            accountManagerId = dbCode.created_by;
+          }
         }
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -2425,7 +2442,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               email: email.toLowerCase(),
               phone,
               role: "aliado",
-              invitation_code_used: code.trim().toUpperCase()
+              invitation_code_used: code.trim().toUpperCase(),
+              account_manager_id: accountManagerId
             });
             
           // If successful, try to mark invitation code as used
@@ -2621,6 +2639,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: dbRole,
             invitation_code_used: profileData.invitation_code_used || null,
             password_provisional: profileData.password_provisional || null,
+            account_manager_id: profileData.account_manager_id || null,
           })
           .select()
           .single();
@@ -2638,6 +2657,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: profileData.role,
             invitation_code_used: profileData.invitation_code_used || undefined,
             password_provisional: profileData.password_provisional || undefined,
+            account_manager_id: profileData.account_manager_id || undefined,
             created_at: new Date().toISOString(),
           };
 
@@ -2658,6 +2678,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : (dbProfile.role as any),
             invitation_code_used: dbProfile.invitation_code_used,
             password_provisional: dbProfile.password_provisional,
+            account_manager_id: dbProfile.account_manager_id,
             created_at: dbProfile.created_at,
           };
 
