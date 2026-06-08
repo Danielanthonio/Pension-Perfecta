@@ -2736,7 +2736,7 @@ export default function ProspectoDetalle() {
             </div>
             
             {/* Meta Info Box */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-slate-900/45 p-4 rounded-2xl border border-slate-800">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-slate-900/45 p-4 rounded-2xl border border-slate-800">
               <div>
                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block text-left">Asegurado en PDF</span>
                 <div className="flex items-center mt-0.5">
@@ -2756,6 +2756,13 @@ export default function ProspectoDetalle() {
                 <div className="flex items-center mt-0.5">
                   <span className="text-xs font-bold text-slate-200 truncate">{auditResult.parsedData.curp}</span>
                   <CopyButton text={auditResult.parsedData.curp} />
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block text-left">Semanas en Constancia</span>
+                <div className="flex items-center mt-0.5">
+                  <span className="text-xs font-bold text-slate-200 truncate">{auditResult.parsedData.totalSemanasCotizadas} semanas</span>
+                  <CopyButton text={auditResult.parsedData.totalSemanasCotizadas.toString()} />
                 </div>
               </div>
             </div>
@@ -2798,11 +2805,6 @@ export default function ProspectoDetalle() {
                   <CopyButton text={auditResult.calculationResult.totalResultado.toFixed(2)} />
                 </div>
               </div>
-            </div>
-
-            {/* Actions Area */}
-            <div className="mb-4 text-left">
-              <span className="text-xs font-semibold text-slate-400">Total de semanas registradas en constancia: <span className="text-slate-200 font-bold">{auditResult.parsedData.totalSemanasCotizadas} semanas</span></span>
             </div>
 
             {/* Labor periods details table component */}
