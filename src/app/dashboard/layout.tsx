@@ -19,6 +19,9 @@ import {
   Menu,
   SlidersHorizontal,
   RotateCcw,
+  Calendar,
+  Contact,
+  Filter,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -83,14 +86,17 @@ function SidebarFilters() {
 
   return (
     <div className="pt-8 border-t border-slate-800/55 mt-6 space-y-4">
-      <span className="px-4 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
-        FILTRAR
-      </span>
+      <div className="flex items-center gap-2 px-4">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">
+          FILTRAR
+        </span>
+        <div className="h-px bg-slate-850 flex-1"></div>
+      </div>
 
       {/* Rango de Fechas */}
       <div className="px-4 space-y-3">
-        <div className="flex items-center gap-2 text-slate-405 text-xs font-bold">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-indigo-400" />
+        <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
+          <Calendar className="h-3.5 w-3.5 text-indigo-400" />
           <span>Rango de fechas</span>
         </div>
         
@@ -101,16 +107,7 @@ function SidebarFilters() {
               type="date"
               value={localStartDate}
               onChange={(e) => setLocalStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
-            <input
-              type="date"
-              value={localEndDate}
-              onChange={(e) => setLocalEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-505/30 transition-all"
             />
           </div>
         </div>
@@ -118,14 +115,14 @@ function SidebarFilters() {
         {/* Etapas Dropdowns */}
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
                 setLocalStageFilter(e.target.value);
                 setLocalSubStageFilter("all");
               }}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-505/30 transition-all cursor-pointer"
             >
               <option value="all">Todas las Etapas</option>
               {STAGES_LIST.map((stage) => (
@@ -136,7 +133,7 @@ function SidebarFilters() {
             </select>
           </div>
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subetapa</label>
+            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Subetapa</label>
             <select
               value={localSubStageFilter}
               onChange={(e) => setLocalSubStageFilter(e.target.value)}
@@ -157,8 +154,9 @@ function SidebarFilters() {
         <div className="space-y-2 pt-4">
           <button
             onClick={handleApplyFilters}
-            className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-violet-500 hover:to-indigo-500 hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2"
+            className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-650 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-violet-550 hover:to-indigo-500 hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2"
           >
+            <Filter className="h-3.5 w-3.5" />
             Aplicar Filtros
           </button>
           <button
@@ -338,8 +336,8 @@ export default function DashboardLayout({
                 : "text-slate-400 hover:text-white hover:bg-slate-800/50"
             }`}
           >
-            <Folder className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Mis Clientes
+            <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+            Mis Clientes (Listado)
           </Link>
 
           {/* Collapsible sidebar filter widgets wrapped in Suspense */}

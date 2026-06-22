@@ -20,6 +20,10 @@ import {
   Menu,
   SlidersHorizontal,
   RotateCcw,
+  Calendar,
+  Contact,
+  Filter,
+  LayoutDashboard,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -93,13 +97,16 @@ function SidebarFilters() {
 
   return (
     <div className="pt-8 border-t border-slate-800/55 mt-6 space-y-4">
-      <span className="px-4 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
-        FILTRAR
-      </span>
+      <div className="flex items-center gap-2 px-4">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">
+          FILTRAR
+        </span>
+        <div className="h-px bg-slate-850 flex-1"></div>
+      </div>
 
       <div className="px-4 space-y-3">
         <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-indigo-405" />
+          <Calendar className="h-3.5 w-3.5 text-indigo-400" />
           <span>Rango de fechas</span>
         </div>
         
@@ -113,20 +120,11 @@ function SidebarFilters() {
               className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-205 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
             />
           </div>
-          <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
-            <input
-              type="date"
-              value={localEndDate}
-              onChange={(e) => setLocalEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-205 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-            />
-          </div>
         </div>
 
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
@@ -154,8 +152,8 @@ function SidebarFilters() {
               <option value="all">Todas las Subetapas</option>
               {subStagesList.map((sub) => (
                 <option key={sub} value={sub} className="bg-slate-900 text-slate-200">
-                  {sub
-                }</option>
+                  {sub}
+                </option>
               ))}
             </select>
           </div>
@@ -185,6 +183,7 @@ function SidebarFilters() {
               isAM ? "bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-500 hover:to-indigo-500" : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
             }`}
           >
+            <Filter className="h-3.5 w-3.5" />
             Aplicar Filtros
           </button>
           <button
@@ -371,8 +370,8 @@ export default function AdminLayout({
                 : "text-slate-400 hover:text-white hover:bg-slate-800/50"
             }`}
           >
-            <FolderKanban className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Pipeline
+            <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+            Dashboard
           </Link>
 
           <Link

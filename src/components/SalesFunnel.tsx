@@ -2,7 +2,20 @@
 
 import React from "react";
 import { Prospect, useApp } from "@/utils/context/AppContext";
-import { ChevronRight } from "lucide-react";
+import {
+  ChevronRight,
+  Users,
+  FileText,
+  Hourglass,
+  Check,
+  Clock,
+  X,
+  Gift,
+  PieChart,
+  TrendingUp,
+  Target,
+  CircleDollarSign,
+} from "lucide-react";
 
 interface SalesFunnelProps {
   prospects: Prospect[];
@@ -81,89 +94,186 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
     ...(showAliadosCard
       ? [
           {
-            label: "Aliados",
+            label: "ALIADOS",
             value: alliesCount,
-            color: user?.role === "account_manager"
-              ? "border-blue-100 dark:border-blue-900/30 bg-blue-50/40 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400"
-              : "border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400",
+            icon: Users,
+            iconColor: "text-slate-500 bg-slate-100 dark:bg-slate-800",
+            textColor: "text-slate-550 dark:text-slate-400",
           },
         ]
       : []),
-    { label: "Proyectos", value: proyectosCount, color: "border-slate-205 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300" },
-    { label: "En Evaluación", value: enEvaluacionCount, color: "border-blue-100 dark:border-blue-900/30 bg-blue-50/40 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400" },
-    { label: "Aprobados", value: aprobadosCount, color: "border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400" },
-    { label: "Condicionados", value: condicionadosCount, color: "border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-955/15 text-amber-600 dark:text-amber-400" },
-    { label: "Rechazados", value: rechazadosCount, color: "border-rose-100 dark:border-rose-900/30 bg-rose-50/40 dark:bg-rose-955/15 text-rose-600 dark:text-rose-450" },
-    { label: "Otorgados", value: otorgadosCount, color: "border-teal-100 dark:border-teal-900/30 bg-teal-50/40 dark:bg-teal-955/15 text-teal-600 dark:text-teal-400" },
+    {
+      label: "PROYECTOS",
+      value: proyectosCount,
+      icon: FileText,
+      iconColor: "text-slate-500 bg-slate-100 dark:bg-slate-800",
+      textColor: "text-slate-550 dark:text-slate-400",
+    },
+    {
+      label: "EN EVALUACIÓN",
+      value: enEvaluacionCount,
+      icon: Hourglass,
+      iconColor: "text-blue-500 bg-blue-50 dark:bg-blue-950/40",
+      textColor: "text-blue-600 dark:text-blue-400",
+    },
+    {
+      label: "APROBADOS",
+      value: aprobadosCount,
+      icon: Check,
+      iconColor: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
+      textColor: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      label: "CONDICIONADOS",
+      value: condicionadosCount,
+      icon: Clock,
+      iconColor: "text-amber-505 bg-amber-50 dark:bg-amber-955/30",
+      textColor: "text-amber-600 dark:text-amber-400",
+    },
+    {
+      label: "RECHAZADOS",
+      value: rechazadosCount,
+      icon: X,
+      iconColor: "text-rose-500 bg-rose-50 dark:bg-rose-955/30",
+      textColor: "text-rose-600 dark:text-rose-400",
+    },
+    {
+      label: "OTORGADOS",
+      value: otorgadosCount,
+      icon: Gift,
+      iconColor: "text-teal-500 bg-teal-50 dark:bg-teal-955/30",
+      textColor: "text-teal-600 dark:text-teal-400",
+    },
   ];
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 p-6 shadow-sm space-y-5 w-full">
       {/* Visual Header */}
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-        <h3 className="text-xs font-black uppercase tracking-wider text-slate-505 dark:text-slate-400">Embudo Comercial (Sales Funnel)</h3>
-        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">Actualizado en tiempo real</span>
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Embudo Comercial (Sales Funnel)</h3>
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-555">Actualizado en tiempo real</span>
       </div>
 
       {/* Funnel row */}
       <div className="flex flex-row items-center gap-1.5 overflow-x-auto pb-3 w-full select-none no-scrollbar">
-        {steps.map((step, idx) => (
-          <React.Fragment key={step.label}>
-            <div className={`flex-1 min-w-[120px] rounded-2xl border p-4 flex flex-col justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${step.color}`}>
-              <span className="text-[9px] font-bold uppercase tracking-wider opacity-85 leading-none">{step.label}</span>
-              <span className="text-2xl font-black mt-3 block leading-none">{step.value}</span>
-            </div>
-            {idx < steps.length - 1 && (
-              <div className="flex items-center justify-center text-slate-300 dark:text-slate-600 shrink-0 px-0.5">
-                <ChevronRight className="h-4 w-4 stroke-[2.5]" />
+        {steps.map((step, idx) => {
+          const IconComponent = step.icon;
+          return (
+            <React.Fragment key={step.label}>
+              <div className="flex-1 min-w-[120px] rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col items-center justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md h-[135px]">
+                {/* Circular Icon */}
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${step.iconColor}`}>
+                  <IconComponent className="h-4 w-4" />
+                </div>
+                {/* Label */}
+                <span className={`text-[9px] font-bold uppercase tracking-wider mt-3 text-center leading-none ${step.textColor}`}>
+                  {step.label}
+                </span>
+                {/* Value */}
+                <span className="text-xl font-black text-slate-800 dark:text-white mt-2 block leading-none">
+                  {step.value}
+                </span>
               </div>
-            )}
-          </React.Fragment>
-        ))}
+              {idx < steps.length - 1 && (
+                <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0 px-0.5">
+                  <ChevronRight className="h-4 w-4 stroke-[2.5]" />
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
 
-        {/* Vertical divider */}
-        <div className="w-px bg-slate-200 dark:bg-slate-800 self-stretch mx-2 shrink-0 hidden lg:block" />
-
-        {/* Right Arrow Connector to Aprobados financing */}
-        <div className="flex items-center justify-center text-slate-350 dark:text-slate-600 shrink-0 px-0.5">
-          <ChevronRight className="h-4 w-4 stroke-[2.5] text-indigo-400 dark:text-indigo-500" />
+        {/* Chevron connector to Aprobados financing */}
+        <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0 px-0.5">
+          <ChevronRight className="h-4 w-4 stroke-[2.5]" />
         </div>
 
         {/* Financiamientos Aprobados block */}
-        <div className="flex-1 min-w-[170px] rounded-2xl border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/40 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 p-4 flex flex-col justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <span className="text-[9px] font-bold uppercase tracking-wider opacity-85 leading-none">Financiamientos Aprobados</span>
-          <span className="text-xl font-black mt-3 block leading-none truncate">{formatCurrency(finAprobados)}</span>
+        <div className="flex-1 min-w-[170px] rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md h-[135px]">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 leading-normal">
+            FINANCIAMIENTOS APROBADOS
+          </span>
+          <span className="text-lg font-black mt-3 block leading-none text-indigo-700 dark:text-indigo-400 truncate">
+            {formatCurrency(finAprobados)}
+          </span>
         </div>
 
-        {/* Arrow Connector to Otorgados financing */}
-        <div className="flex items-center justify-center text-slate-355 dark:text-slate-600 shrink-0 px-0.5">
-          <ChevronRight className="h-4 w-4 stroke-[2.5] text-emerald-400 dark:text-emerald-500" />
+        {/* Chevron connector to Otorgados financing */}
+        <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0 px-0.5">
+          <ChevronRight className="h-4 w-4 stroke-[2.5]" />
         </div>
 
         {/* Financiamientos Otorgados block */}
-        <div className="flex-1 min-w-[170px] rounded-2xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 p-4 flex flex-col justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <span className="text-[9px] font-bold uppercase tracking-wider opacity-85 leading-none">Financiamientos Otorgados</span>
-          <span className="text-xl font-black mt-3 block leading-none truncate">{formatCurrency(finOtorgados)}</span>
+        <div className="flex-1 min-w-[170px] rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col justify-between shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md h-[135px]">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 leading-normal">
+            FINANCIAMIENTOS OTORGADOS
+          </span>
+          <span className="text-lg font-black mt-3 block leading-none text-emerald-700 dark:text-emerald-400 truncate">
+            {formatCurrency(finOtorgados)}
+          </span>
         </div>
       </div>
 
       {/* Rates row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
-        <div className="bg-slate-50/70 dark:bg-slate-950/20 border border-slate-205/50 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider leading-none">T. Evaluación</span>
-          <span className="text-lg font-black text-slate-700 dark:text-slate-200 mt-2 leading-none">{tasaEvaluacion.toFixed(1)}%</span>
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
+        {/* Rate 1 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-row items-center gap-3.5 shadow-sm">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-950/30 text-blue-500 shrink-0">
+            <PieChart className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider leading-none">
+              T. EVALUACIÓN
+            </span>
+            <span className="block text-lg font-black text-slate-800 dark:text-white mt-1 leading-none">
+              {tasaEvaluacion.toFixed(1)}%
+            </span>
+          </div>
         </div>
-        <div className="bg-slate-50/70 dark:bg-slate-950/20 border border-slate-205/50 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider leading-none">T. Aprobación</span>
-          <span className="text-lg font-black text-slate-700 dark:text-slate-200 mt-2 leading-none">{tasaAprobacion.toFixed(1)}%</span>
+
+        {/* Rate 2 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-row items-center gap-3.5 shadow-sm">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 shrink-0">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider leading-none">
+              T. APROBACIÓN
+            </span>
+            <span className="block text-lg font-black text-slate-800 dark:text-white mt-1 leading-none">
+              {tasaAprobacion.toFixed(1)}%
+            </span>
+          </div>
         </div>
-        <div className="bg-slate-50/70 dark:bg-slate-950/20 border border-slate-205/50 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider leading-none">T. Cierre</span>
-          <span className="text-lg font-black text-slate-700 dark:text-slate-200 mt-2 leading-none">{tasaCierre.toFixed(1)}%</span>
+
+        {/* Rate 3 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-row items-center gap-3.5 shadow-sm">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-50 dark:bg-amber-955/20 text-amber-505 shrink-0">
+            <Target className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider leading-none">
+              T. CIERRE
+            </span>
+            <span className="block text-lg font-black text-slate-800 dark:text-white mt-1 leading-none">
+              {tasaCierre.toFixed(1)}%
+            </span>
+          </div>
         </div>
-        <div className="bg-slate-50/70 dark:bg-slate-950/20 border border-slate-205/50 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
-          <span className="text-[9px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider leading-none">T. Cierre monto fin.</span>
-          <span className="text-lg font-black text-indigo-650 dark:text-indigo-400 mt-2 leading-none">{tasaCierreMonto.toFixed(1)}%</span>
+
+        {/* Rate 4 */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 flex flex-row items-center gap-3.5 shadow-sm">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-955/20 text-indigo-500 shrink-0">
+            <CircleDollarSign className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider leading-none">
+              T. CIERRE MONTO FIN.
+            </span>
+            <span className="block text-lg font-black text-slate-800 dark:text-white mt-1 leading-none">
+              {tasaCierreMonto.toFixed(1)}%
+            </span>
+          </div>
         </div>
       </div>
     </div>
