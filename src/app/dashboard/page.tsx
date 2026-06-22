@@ -57,22 +57,7 @@ function DashboardContent() {
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in">
-      {/* Welcome Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Mi Panel Comercial</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Monitorea el embudo de ventas, conversiones y financiamientos de tus prospectos.
-          </p>
-        </div>
-        <Link
-          href="/dashboard/nuevo"
-          className="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm"
-        >
-          <Plus className="mr-2 h-4 w-4 stroke-[2.5]" />
-          Registrar Prospecto
-        </Link>
-      </div>
+
 
       {/* Incidencia Alert Bar (Incompletos) */}
       {faltaDocumentos.length > 0 && (

@@ -28,6 +28,102 @@ import {
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 
+function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { user } = useApp();
+  const currentParamsString = searchParams.toString();
+
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isAdminRoot = cleanPath === "/admin";
+  const isAliados = cleanPath === "/admin/aliados";
+  const isUsuarios = cleanPath === "/admin/usuarios";
+  const isAMs = cleanPath === "/admin/account-managers";
+  const isAsignacion = cleanPath === "/admin/asignacion";
+
+  const isAM = user?.role === "account_manager";
+  const themeColor = isAM ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-teal-650";
+
+  const adminHref = currentParamsString ? `/admin?${currentParamsString}` : "/admin";
+  const aliadosHref = currentParamsString ? `/admin/aliados?${currentParamsString}` : "/admin/aliados";
+  const asignacionHref = currentParamsString ? `/admin/asignacion?${currentParamsString}` : "/admin/asignacion";
+  const accountManagersHref = currentParamsString ? `/admin/account-managers?${currentParamsString}` : "/admin/account-managers";
+  const usuariosHref = currentParamsString ? `/admin/usuarios?${currentParamsString}` : "/admin/usuarios";
+
+  return (
+    <>
+      <Link
+        href={adminHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isAdminRoot
+            ? `${themeColor} text-white shadow-md`
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Dashboard
+      </Link>
+
+      <Link
+        href={aliadosHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isAliados
+            ? `${themeColor} text-white shadow-md`
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Gestión Aliados
+      </Link>
+
+      {!isAM && (
+        <Link
+          href={asignacionHref}
+          onClick={onLinkClick}
+          className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+            isAsignacion
+              ? `${themeColor} text-white shadow-md`
+              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+          }`}
+        >
+          <ArrowRightLeft className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+          Asignación Aliados
+        </Link>
+      )}
+
+      {!isAM && (
+        <Link
+          href={accountManagersHref}
+          onClick={onLinkClick}
+          className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+            isAMs
+              ? `${themeColor} text-white shadow-md`
+              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+          }`}
+        >
+          <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+          Gestión AMs
+        </Link>
+      )}
+
+      <Link
+        href={usuariosHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isUsuarios
+            ? `${themeColor} text-white shadow-md`
+            : "text-slate-405 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <UserPlus className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Gestión Usuarios
+      </Link>
+    </>
+  );
+}
+
 function SidebarFilters() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -248,11 +344,12 @@ export default function AdminLayout({
     );
   }
 
-  const isAdminRoot = pathname === "/admin";
-  const isAliados = pathname === "/admin/aliados";
-  const isUsuarios = pathname === "/admin/usuarios";
-  const isAMs = pathname === "/admin/account-managers";
-  const isAsignacion = pathname === "/admin/asignacion";
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isAdminRoot = cleanPath === "/admin";
+  const isAliados = cleanPath === "/admin/aliados";
+  const isUsuarios = cleanPath === "/admin/usuarios";
+  const isAMs = cleanPath === "/admin/account-managers";
+  const isAsignacion = cleanPath === "/admin/asignacion";
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -271,31 +368,32 @@ export default function AdminLayout({
 
   // Dynamic header titles based on path
   const getHeaderTitle = () => {
-    if (pathname === "/admin") {
+    const cleanPath = pathname.replace(/\/$/, "");
+    if (cleanPath === "/admin") {
       return {
         title: isAM ? "Gestión Pipeline" : "Gestión Director",
         subtitle: "Supervisa y audita las etapas operativas de los expedientes comerciales.",
       };
     }
-    if (pathname === "/admin/aliados") {
+    if (cleanPath === "/admin/aliados") {
       return {
         title: "Gestión de Aliados",
         subtitle: "Administra los códigos de invitación y audita el rendimiento de tus socios comerciales.",
       };
     }
-    if (pathname === "/admin/asignacion") {
+    if (cleanPath === "/admin/asignacion") {
       return {
         title: "Asignación de Aliados",
         subtitle: "Asigna tus asesores comerciales a los gestores de cuentas correspondientes.",
       };
     }
-    if (pathname === "/admin/account-managers") {
+    if (cleanPath === "/admin/account-managers") {
       return {
         title: "Gestión Account Managers",
         subtitle: "Crea y administra los perfiles de los coordinadores de cuentas de la plataforma.",
       };
     }
-    if (pathname === "/admin/usuarios") {
+    if (cleanPath === "/admin/usuarios") {
       return {
         title: "Gestión de Usuarios",
         subtitle: "Administra credenciales, perfiles y estados de acceso en la plataforma.",
@@ -361,74 +459,9 @@ export default function AdminLayout({
 
         {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
-          <Link
-            href="/admin"
-            onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-              isAdminRoot
-                ? `${themeColor} text-white shadow-md`
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Dashboard
-          </Link>
-
-          <Link
-            href="/admin/aliados"
-            onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-              isAliados
-                ? `${themeColor} text-white shadow-md`
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Gestión Aliados
-          </Link>
-
-          {!isAM && (
-            <Link
-              href="/admin/asignacion"
-              onClick={() => setIsSidebarOpen(false)}
-              className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-                isAsignacion
-                  ? `${themeColor} text-white shadow-md`
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <ArrowRightLeft className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-              Asignación Aliados
-            </Link>
-          )}
-
-          {!isAM && (
-            <Link
-              href="/admin/account-managers"
-              onClick={() => setIsSidebarOpen(false)}
-              className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-                isAMs
-                  ? `${themeColor} text-white shadow-md`
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
-            >
-              <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-              Gestión AMs
-            </Link>
-          )}
-
-          <Link
-            href="/admin/usuarios"
-            onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-              isUsuarios
-                ? `${themeColor} text-white shadow-md`
-                : "text-slate-405 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <UserPlus className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Gestión Usuarios
-          </Link>
+          <Suspense fallback={<div className="h-48 px-4 py-3 text-[10px] text-slate-500">Cargando enlaces...</div>}>
+            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} />
+          </Suspense>
 
           {/* Sidebar Filters wrapped in Suspense */}
           <Suspense fallback={<div className="px-4 py-3 text-[10px] text-slate-500">Cargando filtros...</div>}>

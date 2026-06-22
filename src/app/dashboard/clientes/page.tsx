@@ -211,17 +211,56 @@ function ClientesContent() {
 
   return (
     <div className="space-y-6 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
-      {/* Title Header */}
+      
+      {/* Tab select and action button row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight font-black">Expedientes de Clientes</h1>
-          <p className="text-slate-505 dark:text-slate-400 text-sm mt-1">
-            Revisa las etapas finales, subetapas y el avance de los financiamientos de tus clientes.
-          </p>
+        {/* Segmented Controller Tab Selector */}
+        <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl flex-1 max-w-xl flex border border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => setActiveTab("evaluacion")}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              activeTab === "evaluacion"
+                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+                : "text-slate-555 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+            }`}
+          >
+            En Evaluación ({enEvaluacion.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("listo")}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              activeTab === "listo"
+                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+                : "text-slate-550 dark:text-slate-400 hover:text-slate-850 dark:hover:text-white"
+            }`}
+          >
+            Listo para Presentar ({listoPresentar.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("activos")}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              activeTab === "activos"
+                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+            }`}
+          >
+            Proyectos Activos ({proyectosActivos.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("papelera")}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              activeTab === "papelera"
+                ? "bg-white dark:bg-slate-800 text-slate-805 dark:text-white shadow-sm"
+                : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+            }`}
+          >
+            Papelera ({filteredDeleted.length})
+          </button>
         </div>
+
         <Link
           href="/dashboard/nuevo"
-          className="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm"
+          className="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm shrink-0"
         >
           <Plus className="mr-2 h-4 w-4 stroke-[2.5]" />
           Subir Prospecto
@@ -231,7 +270,7 @@ function ClientesContent() {
       {/* Search Input Bar */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4">
         <div className="relative w-full">
-          <Search className="absolute left-3.5 top-2.5 h-4.5 w-4.5 text-slate-400 dark:text-slate-555" />
+          <Search className="absolute left-3.5 top-2.5 h-4.5 w-4.5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             value={searchTerm}
@@ -240,50 +279,6 @@ function ClientesContent() {
             className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
           />
         </div>
-      </div>
-
-      {/* Segmented Controller Tab Selector */}
-      <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xl flex border border-slate-200 dark:border-slate-800">
-        <button
-          onClick={() => setActiveTab("evaluacion")}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "evaluacion"
-              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-              : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-          }`}
-        >
-          En Evaluación ({enEvaluacion.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("listo")}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "listo"
-              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-              : "text-slate-505 dark:text-slate-400 hover:text-slate-805 dark:hover:text-white"
-          }`}
-        >
-          Listo para Presentar ({listoPresentar.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("activos")}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "activos"
-              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-              : "text-slate-555 dark:text-slate-405 hover:text-slate-800 dark:hover:text-white"
-          }`}
-        >
-          Proyectos Activos ({proyectosActivos.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("papelera")}
-          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-            activeTab === "papelera"
-              ? "bg-white dark:bg-slate-805 text-slate-800 dark:text-white shadow-sm"
-              : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-          }`}
-        >
-          Papelera ({filteredDeleted.length})
-        </button>
       </div>
 
       {/* Tab Panels */}

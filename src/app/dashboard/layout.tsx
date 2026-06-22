@@ -26,6 +26,49 @@ import {
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 
+function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentParamsString = searchParams.toString();
+
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isDashboard = cleanPath === "/dashboard";
+  const isClientes = cleanPath === "/dashboard/clientes";
+
+  const dashboardHref = currentParamsString ? `/dashboard?${currentParamsString}` : "/dashboard";
+  const clientesHref = currentParamsString ? `/dashboard/clientes?${currentParamsString}` : "/dashboard/clientes";
+
+  return (
+    <>
+      <Link
+        href={dashboardHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isDashboard
+            ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Dashboard
+      </Link>
+
+      <Link
+        href={clientesHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isClientes
+            ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Mis Clientes (Listado)
+      </Link>
+    </>
+  );
+}
+
 function SidebarFilters() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -238,19 +281,20 @@ export default function DashboardLayout({
 
   // Get dynamic header titles
   const getHeaderTitle = () => {
-    if (pathname === "/dashboard") {
+    const cleanPath = pathname.replace(/\/$/, "");
+    if (cleanPath === "/dashboard") {
       return {
         title: "Dashboard",
         subtitle: "Resumen general de tu embudo comercial (Sales Funnel).",
       };
     }
-    if (pathname === "/dashboard/clientes") {
+    if (cleanPath === "/dashboard/clientes") {
       return {
         title: "Mis Clientes",
         subtitle: "Gestiona tus prospectos, sus etapas finales y subetapas.",
       };
     }
-    if (pathname === "/dashboard/nuevo") {
+    if (cleanPath === "/dashboard/nuevo") {
       return {
         title: "Subir Prospecto",
         subtitle: "Registra un nuevo prospecto y adjunta su documentación.",
@@ -295,7 +339,7 @@ export default function DashboardLayout({
 
       {/* Left Sidebar Layout */}
       <aside
-        className={`fixed inset-y-0 left-0 z-35 w-64 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
+         className={`fixed inset-y-0 left-0 z-35 w-64 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -314,31 +358,9 @@ export default function DashboardLayout({
 
         {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
-          <Link
-            href="/dashboard"
-            onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-              isDashboard
-                ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Dashboard
-          </Link>
-
-          <Link
-            href="/dashboard/clientes"
-            onClick={() => setIsSidebarOpen(false)}
-            className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-              isClientes
-                ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-            Mis Clientes (Listado)
-          </Link>
+          <Suspense fallback={<div className="h-24 px-4 py-3 text-[10px] text-slate-500">Cargando enlaces...</div>}>
+            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} />
+          </Suspense>
 
           {/* Collapsible sidebar filter widgets wrapped in Suspense */}
           <Suspense fallback={<div className="px-4 py-3 text-[10px] text-slate-550">Cargando filtros...</div>}>

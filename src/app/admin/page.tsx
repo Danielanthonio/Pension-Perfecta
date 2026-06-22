@@ -240,17 +240,7 @@ function PipelineManagerContent() {
   return (
     <>
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-            {isAM ? "Gestión Pipeline" : "Gestión Director"}
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Supervisa y audita las etapas operativas de los expedientes comerciales y tasas del embudo.
-          </p>
-        </div>
-      </div>
+
 
       {/* Director Pipeline Assignment Filters */}
       {!isAM && (
