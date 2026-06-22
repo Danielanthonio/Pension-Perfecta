@@ -1,382 +1,889 @@
 "use client";
 
-import React, { useState } from "react";
-import { useApp, Prospect } from "@/utils/context/AppContext";
-import SalesFunnel from "@/components/SalesFunnel";
+import React, { useState, useEffect, Suspense } from "react";
+import {
+  useApp,
+  Prospect,
+  getStageAndSubStage,
+  STAGES_LIST,
+  SUB_STAGES_BY_STAGE,
+} from "@/utils/context/AppContext";
 import {
   Search,
-  SlidersHorizontal,
   ChevronRight,
-  User,
-  AlertCircle,
-  FileCheck,
-  CheckCircle,
-  ArrowUpDown,
-  FileText,
+  Plus,
   Calendar,
+  CheckSquare,
+  FileText,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock,
+  Folder,
+  Trash2,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export default function MisClientes() {
-  const { prospects, isProspectDeleted, isProspectPurged } = useApp();
+function ClientesContent() {
+  const {
+    user,
+    prospects,
+    scheduleAssessment,
+    deleteProspect,
+    restoreProspect,
+    permanentlyDeleteProspect,
+    isProspectDeleted,
+    isProspectPurged,
+    getProspectDeletedAt,
+  } = useApp();
+
+  const searchParams = useSearchParams();
+
+  // URL Filter parameters
+  const startDate = searchParams.get("desde") || "";
+  const endDate = searchParams.get("hasta") || "";
+  const stageFilter = searchParams.get("etapa") || "all";
+  const subStageFilter = searchParams.get("subetapa") || "all";
+
+  // Page local states
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name">("recent");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "papelera">("evaluacion");
 
-  // Format Date Helper
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("es-MX", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+  // States for Scheduling Modal
+  const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
+
+  // Get stage label
+  const getStageLabel = (status: Prospect["status"]) => {
+    const { stage } = getStageAndSubStage(status);
+    const stageObj = STAGES_LIST.find((s) => s.id === stage);
+    return stageObj ? stageObj.label : stage;
   };
 
-  const getStatusBadge = (status: Prospect["status"]) => {
-    switch (status) {
+  const getSubStageLabel = (status: Prospect["status"]) => {
+    const { subStage } = getStageAndSubStage(status);
+    return subStage || "Ninguna";
+  };
+
+  const getStageBadgeColor = (status: Prospect["status"]) => {
+    const { stage } = getStageAndSubStage(status);
+    switch (stage) {
       case "evaluacion_pendiente":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
-            En Evaluación
-          </span>
-        );
+        return "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/40";
       case "rechazado":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-100">
-            Rechazado
-          </span>
-        );
-      case "aprobado_listo":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-            Listo para Presentar
-          </span>
-        );
-      case "asesoria_agendada":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-100">
-            Asesoría Agendada
-          </span>
-        );
-      case "doc_proceso":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-            En Trámite (M40)
-          </span>
-        );
-      case "analisis_riesgo":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-600 border border-cyan-100">
-            Análisis de Riesgo
-          </span>
-        );
-      case "firma_programada":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-            Firma Programada
-          </span>
-        );
-      case "pagado_comision":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 border border-amber-500/25">
-            ★ Comisión Liberada
-          </span>
-        );
-      case "aportacion":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-100">
-            Aportación Requerida
-          </span>
-        );
-      case "falta_reporte":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100">
-            Falta Reporte IMSS
-          </span>
-        );
-      case "falta_afore":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100">
-            Falta Afore
-          </span>
-        );
-      case "pendiente_documentos":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
-            Pendiente Documentos
-          </span>
-        );
-      case "falta_semanas":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
-            Falta Semanas
-          </span>
-        );
-      case "falta_afore_cuenta":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-755 border border-amber-100">
-            Falta Cta Afore
-          </span>
-        );
+        return "bg-red-50 text-red-605 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
+      case "condicionado":
+        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-800/40";
+      case "aprobado":
+        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-955/20 dark:text-emerald-400 dark:border-emerald-800/40";
       case "cerrado_perdido":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-            Cerrado Perdido
-          </span>
-        );
+        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-770";
       default:
-        return null;
+        return "bg-slate-50 text-slate-500 border-slate-100";
     }
   };
 
-  // 0. Filter by date first
+  const getSubStageBadgeColor = (status: Prospect["status"]) => {
+    const { subStage } = getStageAndSubStage(status);
+    if (!subStage) return "bg-slate-50 text-slate-400 dark:bg-slate-900/50 dark:text-slate-600";
+    return "bg-indigo-50/70 text-indigo-600 border-indigo-100 dark:bg-indigo-950/15 dark:text-indigo-400 dark:border-indigo-900/30";
+  };
+
+  // Filter Active vs Deleted
   const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
-  const filteredByDate = activeProspects.filter((p) => {
-    if (!p.created_at) return true;
-    const createdDate = new Date(p.created_at).getTime();
-    
-    if (startDate) {
-      const start = new Date(startDate + "T00:00:00").getTime();
-      if (createdDate < start) return false;
+  const deletedProspects = prospects.filter((p) => isProspectDeleted(p));
+
+  // Apply filters to active list
+  const filteredActive = activeProspects.filter((p) => {
+    // Search Term filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        p.full_name.toLowerCase().includes(term) ||
+        p.nss.includes(term) ||
+        p.curp.toLowerCase().includes(term);
+      if (!matchesSearch) return false;
     }
-    
-    if (endDate) {
-      const end = new Date(endDate + "T23:59:59").getTime();
-      if (createdDate > end) return false;
+
+    // Date filters
+    if (p.created_at) {
+      const createdDate = new Date(p.created_at).getTime();
+      if (startDate) {
+        const start = new Date(startDate + "T00:00:00").getTime();
+        if (createdDate < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate + "T23:59:59").getTime();
+        if (createdDate > end) return false;
+      }
     }
-    
+
+    // Stage filters
+    const { stage, subStage } = getStageAndSubStage(p.status);
+    if (stageFilter !== "all" && stage !== stageFilter) {
+      return false;
+    }
+
+    // Substage filters
+    if (subStageFilter !== "all" && subStage !== subStageFilter) {
+      return false;
+    }
+
     return true;
   });
 
-  // 1. Text Search Filter (FullName, NSS, CURP)
-  const filteredSearch = filteredByDate.filter((p) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      p.full_name.toLowerCase().includes(term) ||
-      p.nss.includes(term) ||
-      p.curp.toLowerCase().includes(term)
-    );
-  });
-
-  // 2. Status Grouping Filter
-  const filteredStatus = filteredSearch.filter((p) => {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "evaluacion") return ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status);
-    if (statusFilter === "listo") return p.status === "aprobado_listo" || p.status === "aportacion" || (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"));
-    if (statusFilter === "rechazado") return p.status === "rechazado";
-    if (statusFilter === "activos") {
-      const activeBase = [
-        "doc_proceso",
-        "analisis_riesgo",
-        "firma_programada",
-        "pagado_comision",
-      ].includes(p.status);
-      const isScheduledAsesoria = p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada");
-      return activeBase || isScheduledAsesoria;
+  // Apply filters to deleted list
+  const filteredDeleted = deletedProspects.filter((p) => {
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      return (
+        p.full_name.toLowerCase().includes(term) ||
+        p.nss.includes(term) ||
+        p.curp.toLowerCase().includes(term)
+      );
     }
     return true;
   });
 
-  // 3. Sorting list
-  const sortedProspects = [...filteredStatus].sort((a, b) => {
-    if (sortBy === "recent") {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  // Tab grouping
+  const enEvaluacion = filteredActive.filter((p) =>
+    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status)
+  );
+
+  const listoPresentar = filteredActive.filter((p) =>
+    ["aprobado_listo", "aportacion"].includes(p.status) ||
+    (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"))
+  );
+
+  const activeStatuses = [
+    "doc_proceso",
+    "analisis_riesgo",
+    "firma_programada",
+    "pagado_comision",
+  ];
+  const proyectosActivos = filteredActive.filter((p) =>
+    activeStatuses.includes(p.status) ||
+    (p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada"))
+  );
+
+  const getActiveStageIndex = (status: Prospect["status"]) => {
+    switch (status) {
+      case "asesoria_agendada":
+        return 0;
+      case "doc_proceso":
+        return 1;
+      case "analisis_riesgo":
+        return 2;
+      case "firma_programada":
+        return 3;
+      case "pagado_comision":
+        return 4;
+      default:
+        return 0;
     }
-    if (sortBy === "oldest") {
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    }
-    if (sortBy === "name") {
-      return a.full_name.localeCompare(b.full_name);
-    }
-    return 0;
-  });
+  };
+
+  const activeSteps = [
+    { label: "Agenda Asesoria", desc: "Asesoría agendada para presentar propuesta" },
+    { label: "Firma Carta Compromiso", desc: "Carta compromiso firmada por el cliente" },
+    { label: "Analisis de Riesgo", desc: "En análisis de riesgo operativo" },
+    { label: "Cerrada Ganada", desc: "Caso cerrado y ganado" },
+    { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
+  ];
+
+  const handleOpenSchedule = (prospect: Prospect) => {
+    setSelectedProspect(prospect);
+    setSelectedDate("");
+    setSelectedTime("");
+    setSchedulingStep("datetime");
+  };
+
+  const handleConfirmSchedule = async () => {
+    if (!selectedProspect || !selectedDate || !selectedTime) return;
+    await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
+    setSelectedProspect(null);
+    setActiveTab("activos"); // Switch tab to see active projects
+  };
 
   return (
-    <div className="max-w-[1700px] mx-auto space-y-6 animate-fade-in text-slate-800 dark:text-slate-100">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+      {/* Title Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Expedientes de Prospectos</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Busca, filtra y audita el historial de todos tus clientes registrados.</p>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight font-black">Expedientes de Clientes</h1>
+          <p className="text-slate-505 dark:text-slate-400 text-sm mt-1">
+            Revisa las etapas finales, subetapas y el avance de los financiamientos de tus clientes.
+          </p>
         </div>
+        <Link
+          href="/dashboard/nuevo"
+          className="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm"
+        >
+          <Plus className="mr-2 h-4 w-4 stroke-[2.5]" />
+          Subir Prospecto
+        </Link>
       </div>
 
-      {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-indigo-500 flex-shrink-0" />
-          <div>
-            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtrar por Fecha</h4>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Desde:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Hasta:</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all w-full sm:w-auto dark:text-slate-200"
-            />
-          </div>
-          {(startDate || endDate) && (
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-              }}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-655 dark:text-slate-300 rounded-xl text-xs font-bold transition-all"
-            >
-              Limpiar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Embudo comercial */}
-      <SalesFunnel prospects={filteredByDate} />
-
-      {/* Query Search Matrix bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
-        {/* Text Search Input */}
-        <div className="relative w-full md:flex-1">
-          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-            <Search className="h-4.5 w-4.5" />
-          </span>
+      {/* Search Input Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4">
+        <div className="relative w-full">
+          <Search className="absolute left-3.5 top-2.5 h-4.5 w-4.5 text-slate-400 dark:text-slate-555" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por Nombre, NSS o CURP..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 transition-all dark:text-slate-200"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
           />
-        </div>
-
-        {/* Status Dropdown */}
-        <div className="w-full md:w-44 flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors dark:text-slate-300"
-          >
-            <option value="all" className="dark:bg-slate-900">Todos los Estados</option>
-            <option value="evaluacion" className="dark:bg-slate-900">En Evaluación</option>
-            <option value="listo" className="dark:bg-slate-900">Listo para Presentar</option>
-            <option value="activos" className="dark:bg-slate-900">Proyectos Activos</option>
-            <option value="rechazado" className="dark:bg-slate-900">Rechazados</option>
-          </select>
-        </div>
-
-        {/* Sorting Dropdown */}
-        <div className="w-full md:w-44 flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none focus:border-blue-500 transition-colors dark:text-slate-300"
-          >
-            <option value="recent" className="dark:bg-slate-900">Más recientes</option>
-            <option value="oldest" className="dark:bg-slate-900">Más antiguos</option>
-            <option value="name" className="dark:bg-slate-900">Nombre A-Z</option>
-          </select>
         </div>
       </div>
 
-      {/* Main Results Table container */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden">
-        {sortedProspects.length === 0 ? (
-          <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
-            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
-              <Search className="h-5 w-5" />
+      {/* Segmented Controller Tab Selector */}
+      <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xl flex border border-slate-200 dark:border-slate-800">
+        <button
+          onClick={() => setActiveTab("evaluacion")}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "evaluacion"
+              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+              : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+          }`}
+        >
+          En Evaluación ({enEvaluacion.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("listo")}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "listo"
+              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+              : "text-slate-505 dark:text-slate-400 hover:text-slate-805 dark:hover:text-white"
+          }`}
+        >
+          Listo para Presentar ({listoPresentar.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("activos")}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "activos"
+              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+              : "text-slate-555 dark:text-slate-405 hover:text-slate-800 dark:hover:text-white"
+          }`}
+        >
+          Proyectos Activos ({proyectosActivos.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("papelera")}
+          className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+            activeTab === "papelera"
+              ? "bg-white dark:bg-slate-805 text-slate-800 dark:text-white shadow-sm"
+              : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+          }`}
+        >
+          Papelera ({filteredDeleted.length})
+        </button>
+      </div>
+
+      {/* Tab Panels */}
+      <div className="space-y-6">
+        
+        {/* TAB 1: EN EVALUACIÓN */}
+        {activeTab === "evaluacion" && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-909/50">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">En Evaluación Técnica</h3>
             </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-305">Sin resultados coincidentes</h4>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Prueba ajustando los términos de búsqueda o los filtros aplicados en las pestañas.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
-                  <th className="px-6 py-4.5 w-1/3">Cliente</th>
-                  <th className="px-6 py-4.5">NSS / CURP</th>
-                  <th className="px-6 py-4.5">Fecha de Subida</th>
-                  <th className="px-6 py-4.5">Estado</th>
-                  <th className="px-6 py-4.5 relative"><span className="sr-only">Expediente</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {sortedProspects.map((p) => {
-                  return (
-                    <tr
-                      key={p.id}
-                      className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group cursor-pointer"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8.5 w-8.5 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500 dark:group-hover:text-blue-400 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors">
-                            {p.full_name.charAt(0)}
-                          </div>
-                          <div>
-                            <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                              {p.full_name}
-                            </span>
-                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none">
-                              Contacto: {p.phone}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <span className="block text-[11px] font-semibold text-slate-600 dark:text-slate-350 leading-tight">
-                            NSS: {p.nss}
-                          </span>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium mt-0.5 uppercase tracking-wide leading-none">
-                            CURP: {p.curp}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-555 dark:text-slate-400">
-                        {formatDate(p.created_at)}
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(p.status)}
-                      </td>
-
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <Link
-                          href={`/prospectos/${p.id}`}
-                          className="inline-flex p-1.5 bg-slate-100/60 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-slate-400 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 rounded-xl transition-all border border-slate-200 dark:border-slate-700 group-hover:scale-105"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </td>
+            {enEvaluacion.length === 0 ? (
+              <div className="py-16 text-center">
+                <Clock className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos en evaluación</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-505 dark:text-slate-455 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Email</th>
+                      <th className="px-6 py-4.5">Etapa</th>
+                      <th className="px-6 py-4.5">Subetapa</th>
+                      <th className="px-6 py-4.5">Fecha Registro</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {enEvaluacion.map((p) => {
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+                              {getSubStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-505 dark:text-slate-400">
+                            {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-805 group-hover:bg-blue-50 dark:group-hover:bg-blue-955/20 text-slate-550 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                    await deleteProspect(p.id);
+                                  }
+                                }}
+                                className="inline-flex p-1.5 bg-slate-105 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-505 dark:text-slate-400 hover:text-red-655 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                title="Mover a Papelera"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: LISTO PARA PRESENTAR */}
+        {activeTab === "listo" && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
+            </div>
+
+            {listoPresentar.length === 0 ? (
+              <div className="py-16 text-center">
+                <CheckSquare className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Ninguna simulación aprobada aún</h4>
+                <p className="text-xs text-slate-405 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 dark:bg-slate-955/20 border-b border-slate-150 dark:border-slate-805 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Email</th>
+                      <th className="px-6 py-4.5">Crédito Total</th>
+                      <th className="px-6 py-4.5">Etapa</th>
+                      <th className="px-6 py-4.5">Subetapa</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {listoPresentar.map((p) => {
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {p.simulation ? (
+                              <div>
+                                <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  ${p.simulation.totalCredito.toLocaleString()}
+                                </span>
+                                <span className="block text-[9px] text-slate-400 dark:text-slate-505">M40 + Gestión</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+                              {getSubStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-slate-205 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                                title="Ver Expediente"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Link>
+                              <a
+                                href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
+                                title="Abrir Agenda Externa"
+                              >
+                                <Calendar className="h-4 w-4" />
+                              </a>
+                              <button
+                                onClick={() => handleOpenSchedule(p)}
+                                className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-606 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
+                                title="Confirmar Agendado (Avanzar a Activos)"
+                              >
+                                <CheckSquare className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                    await deleteProspect(p.id);
+                                  }
+                                }}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                title="Mover a Papelera"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: PROYECTOS ACTIVOS */}
+        {activeTab === "activos" && (
+          <div className="space-y-6">
+            {proyectosActivos.length === 0 ? (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-808/80 shadow-sm py-16 text-center">
+                <Folder className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Sin proyectos activos en curso</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Una vez que agendes la reunión de presentación de simulación, el caso se moverá automáticamente aquí para seguimiento.
+                </p>
+              </div>
+            ) : (
+              proyectosActivos.map((p) => {
+                const activeIndex = getActiveStageIndex(p.status);
+                const isPaid = p.status === "pagado_comision";
+                return (
+                  <div key={p.id} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-800/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                    
+                    {/* Header Details in Horizontal Grid */}
+                    <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 flex-1">
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
+                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-205 leading-tight block mt-0.5 flex items-center gap-1.5">
+                            {p.full_name}
+                            {isPaid && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30">
+                                ★
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">NSS</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.nss}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">CURP</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 uppercase">{p.curp}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Teléfono</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.phone}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Email</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.email}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Etapa</span>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Subetapa</span>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+                              {getSubStageLabel(p.status)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between xl:justify-end gap-6 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100 dark:border-slate-800">
+                        {p.simulation && (
+                          <div className="text-left xl:text-right xl:border-r xl:pr-4 xl:border-slate-100 dark:xl:border-slate-800">
+                            <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Crédito Total</span>
+                            <span className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 mt-0.5">${p.simulation.totalCredito.toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/prospectos/${p.id}`}
+                            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-202 dark:border-slate-700 transition-colors flex items-center gap-1.5"
+                          >
+                            Expediente <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                await deleteProspect(p.id);
+                              }
+                            }}
+                            className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-505 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                            title="Mover a Papelera"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stepper Pipeline Progress Bar */}
+                    <div className="space-y-4 pt-2">
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                          <div className="w-full border-t-2 border-slate-200 dark:border-slate-800" />
+                        </div>
+                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                          <div
+                            className="border-t-2 border-emerald-505 transition-all duration-500"
+                            style={{ width: `${(activeIndex / 4) * 100}%` }}
+                          />
+                        </div>
+
+                        <div className="relative flex justify-between w-full">
+                          {activeSteps.map((step, idx) => {
+                            const isCompleted = idx < activeIndex;
+                            const isActive = idx === activeIndex;
+                            return (
+                              <div key={idx} className="flex flex-col items-center group relative">
+                                <div
+                                  className={`h-7 w-7 rounded-full flex items-center justify-center transition-all border-2 text-[10px] font-bold ${
+                                    isCompleted
+                                      ? "bg-emerald-500 border-emerald-605 text-white shadow-sm shadow-emerald-500/20"
+                                      : isActive
+                                      ? "bg-blue-600 border-blue-700 text-white shadow-md ring-4 ring-blue-500/10 dark:ring-blue-500/5 scale-110"
+                                      : "bg-slate-100 dark:bg-slate-808 border-slate-202 dark:border-slate-700 text-slate-405 dark:text-slate-500"
+                                  }`}
+                                >
+                                  {isCompleted ? <CheckCircle2 className="h-4 w-4 text-white" /> : idx + 1}
+                                </div>
+                                <span
+                                  className={`text-[9px] font-bold mt-2 text-center transition-colors uppercase tracking-wider hidden sm:block ${
+                                    isActive ? "text-blue-600 dark:text-blue-400" : isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                                >
+                                  {step.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Congratulations Banner / Commission status */}
+                    {isPaid && p.simulation && (
+                      <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">🎉</span>
+                          <div>
+                            <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                              Felicitaciones {p.aliado_name || user?.full_name || "Aliado"}, has concluido este proyecto con éxito
+                            </h4>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-450 mt-0.5">
+                              ¡Vamos por más!
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-[8px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-wider">Tu Comisión</span>
+                          <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400">${p.simulation.costoGestion.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: PAPELERA */}
+        {activeTab === "papelera" && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">
+                Papelera de Reciclaje (Se eliminan permanentemente en 7 días)
+              </h3>
+            </div>
+
+            {filteredDeleted.length === 0 ? (
+              <div className="py-16 text-center">
+                <Trash2 className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-655" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">La papelera está vacía</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Los clientes que elimines aparecerán aquí por 7 días antes de borrarse definitivamente.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Fecha Eliminación</th>
+                      <th className="px-6 py-4.5">Días Restantes</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredDeleted.map((p) => {
+                      const deletedAt = getProspectDeletedAt(p);
+                      const remainingDays = deletedAt
+                        ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
+                        : 7;
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/15 dark:text-red-400 dark:border-red-800/50" : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/15 dark:text-amber-400 dark:border-amber-800/50"}`}>
+                              {remainingDays} {remainingDays === 1 ? "día" : "días"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Restaurar a ${p.full_name} al pipeline activo?`)) {
+                                    await restoreProspect(p.id);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-202 dark:border-emerald-850 transition-colors"
+                              >
+                                Restaurar
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Eliminar permanentemente a ${p.full_name}?`)) {
+                                    await permanentlyDeleteProspect(p.id);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-red-50 dark:bg-red-955/10 hover:bg-red-105 dark:hover:bg-red-900/30 text-red-755 dark:text-red-400 text-[10px] font-bold rounded-xl border border-red-202 dark:border-red-850 transition-colors"
+                              >
+                                Eliminar Permanente
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Scheduling Assessment Modal */}
+      {selectedProspect && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-202 dark:border-slate-800 mx-4">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 flex items-center justify-center border border-indigo-150 dark:border-indigo-800/40 shadow-sm">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-white">Agenda Reunión de Propuesta</h3>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                    Asigna fecha y hora para presentar el dictamen Ley 73.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedProspect(null)}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-202 transition-colors"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Steps navigation */}
+            {schedulingStep === "datetime" ? (
+              <div className="space-y-4">
+                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-202 dark:border-slate-800 rounded-2xl p-4">
+                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Prospecto</span>
+                  <span className="text-xs font-extrabold text-slate-805 dark:text-slate-200 block mt-0.5">{selectedProspect.full_name}</span>
+                  <span className="text-[10px] text-slate-405 mt-0.5 block">NSS: {selectedProspect.nss}</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                      Fecha de Asesoría
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                      Hora de la Cita
+                    </label>
+                    <input
+                      type="time"
+                      value={selectedTime}
+                      onChange={(e) => setSelectedTime(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-202 dark:border-slate-755 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-202"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  disabled={!selectedDate || !selectedTime}
+                  onClick={() => setSchedulingStep("confirm")}
+                  className="w-full py-2.5 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] transform flex items-center justify-center gap-1.5"
+                >
+                  Continuar
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-4 flex gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 font-black">¿Confirmar Fecha y Hora?</h4>
+                    <p className="text-[10px] text-emerald-705 dark:text-emerald-405 mt-0.5">
+                      El caso avanzará a la etapa de &quot;Proyectos Activos&quot; tras guardar la cita.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-202 dark:border-slate-800 rounded-2xl p-4 space-y-2">
+                  <div>
+                    <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Cliente</span>
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{selectedProspect.full_name}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-850 pt-2">
+                    <div>
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Fecha</span>
+                      <span className="text-xs font-semibold text-slate-705 dark:text-slate-300 block">{selectedDate}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Hora</span>
+                      <span className="text-xs font-semibold text-slate-705 dark:text-slate-300 block">{selectedTime} hs</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setSchedulingStep("datetime")}
+                    className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-202 rounded-xl text-xs font-bold border border-slate-202 dark:border-slate-700 transition-all"
+                  >
+                    Atrás
+                  </button>
+                  <button
+                    onClick={handleConfirmSchedule}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-650 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all active:scale-[0.98] transform flex items-center justify-center gap-1.5"
+                  >
+                    Confirmar Agenda
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function MisClientes() {
+  return (
+    <Suspense fallback={<div className="text-sm text-slate-400">Cargando listado de clientes...</div>}>
+      <ClientesContent />
+    </Suspense>
   );
 }

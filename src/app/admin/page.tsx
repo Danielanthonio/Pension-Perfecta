@@ -19,18 +19,22 @@ import {
   Trash2,
   Calendar,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function PipelineManager() {
+function PipelineManagerContent() {
   const { user, prospects, profiles, updateProspectStatus, deleteProspect, restoreProspect, permanentlyDeleteProspect, isProspectDeleted, isProspectPurged, getProspectDeletedAt } = useApp();
   const isAM = user?.role === "account_manager";
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
   const [searchTerm, setSearchTerm] = useState("");
-  const [stageFilter, setStageFilter] = useState<string>("all");
-  const [subStageFilter, setSubStageFilter] = useState<string>("all");
-  const [selectedAlly, setSelectedAlly] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+
+  const startDate = searchParams.get("desde") || "";
+  const endDate = searchParams.get("hasta") || "";
+  const stageFilter = searchParams.get("etapa") || "all";
+  const subStageFilter = searchParams.get("subetapa") || "all";
+  const selectedAlly = searchParams.get("aliado") || "all";
 
   // Director filtering states
   const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
@@ -343,60 +347,12 @@ export default function PipelineManager() {
         </div>
       )}
 
-      {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar className={`h-5 w-5 flex-shrink-0 ${isAM ? "text-blue-500" : "text-emerald-500"}`} />
-          <div>
-            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtrar por Fecha</h4>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra el embudo y listado por fecha de registro.</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Desde:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={`px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-205 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all w-full sm:w-auto dark:text-slate-200 ${
-                isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-              }`}
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Hasta:</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={`px-3 py-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-205 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all w-full sm:w-auto dark:text-slate-200 ${
-                isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-              }`}
-            />
-          </div>
-          {(startDate || endDate) && (
-            <button
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-              }}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition-all"
-            >
-              Limpiar
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Sales Funnel Section */}
       <SalesFunnel prospects={filteredByDate} />
 
-      {/* Query Search Matrix */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col md:flex-row gap-4 items-center">
-        {/* Text Input Search */}
-        <div className="relative w-full md:flex-1">
+      {/* Search Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4">
+        <div className="relative w-full">
           <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
             <Search className="h-4.5 w-4.5" />
           </span>
@@ -405,70 +361,11 @@ export default function PipelineManager() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar prospecto por Nombre, NSS o CURP..."
-            className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
+            className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-205 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
               isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
             }`}
           />
         </div>
-
-        {/* Stage Filter */}
-        <div className="w-full md:w-52 flex items-center gap-2">
-          <Layers className="h-4 w-4 text-slate-400 dark:text-slate-550 flex-shrink-0" />
-          <select
-            value={stageFilter}
-            onChange={(e) => {
-              setStageFilter(e.target.value);
-              setSubStageFilter("all"); // Reset sub-stage filter on stage change
-            }}
-            className={`w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-300 ${
-              isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-            }`}
-          >
-            <option value="all" className="dark:bg-slate-900">Todas las Etapas</option>
-            {STAGES_LIST.map((stage) => (
-              <option key={stage.id} value={stage.id} className="dark:bg-slate-900">{stage.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Sub-stage Filter */}
-        <div className="w-full md:w-52 flex items-center gap-2">
-          <Layers className="h-4 w-4 text-slate-400 dark:text-slate-550 flex-shrink-0" />
-          <select
-            value={subStageFilter}
-            onChange={(e) => setSubStageFilter(e.target.value)}
-            disabled={stageFilter === "all"}
-            className={`w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer dark:text-slate-300 ${
-              isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-            }`}
-          >
-            <option value="all" className="dark:bg-slate-900">Todas las Subetapas</option>
-            {stageFilter !== "all" && (SUB_STAGES_BY_STAGE[stageFilter] || []).map((sub) => (
-              <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Allied filter dropdown */}
-        {isAM && (
-          <div className="w-full md:w-52 flex items-center gap-2">
-            <Users className="h-4 w-4 text-slate-400 dark:text-slate-550 flex-shrink-0" />
-            <select
-              value={selectedAlly}
-              onChange={(e) => setSelectedAlly(e.target.value)}
-              className={`w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-2 px-3 text-xs font-semibold outline-none transition-colors dark:text-slate-300 ${
-                isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-              }`}
-            >
-              <option value="all" className="dark:bg-slate-900">Todos los Aliados</option>
-              {uniqueAllies.map((ally) => (
-                <option key={ally} value={ally} className="dark:bg-slate-900">
-                  {ally}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* Segmented Controller Tab Selector */}
@@ -826,5 +723,13 @@ export default function PipelineManager() {
       </div>
     )}
     </>
+  );
+}
+
+export default function PipelineManager() {
+  return (
+    <Suspense fallback={<div className="text-sm text-slate-450">Cargando consola...</div>}>
+      <PipelineManagerContent />
+    </Suspense>
   );
 }

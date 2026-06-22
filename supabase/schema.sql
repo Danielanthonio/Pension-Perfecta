@@ -115,15 +115,47 @@ ALTER TABLE prospects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
+-- Trigger function to automatically keep auth.users metadata in sync with public.profiles role/assignment
+CREATE OR REPLACE FUNCTION public.sync_profile_to_auth_metadata()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE auth.users
+  SET raw_user_meta_data = 
+    coalesce(raw_user_meta_data, '{}'::jsonb) 
+    || jsonb_build_object('role', NEW.role, 'account_manager_id', NEW.account_manager_id)
+  WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger declaration on public.profiles
+DROP TRIGGER IF EXISTS sync_profile_to_auth_metadata_trigger ON public.profiles;
+CREATE TRIGGER sync_profile_to_auth_metadata_trigger
+  AFTER INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.sync_profile_to_auth_metadata();
+
+-- Helper function for isolated metadata checks
+CREATE OR REPLACE FUNCTION public.get_user_role(user_id uuid)
+RETURNS text AS $$
+  SELECT role FROM public.profiles WHERE id = user_id;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.get_user_account_manager(user_id uuid)
+RETURNS uuid AS $$
+  SELECT account_manager_id FROM public.profiles WHERE id = user_id;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
 -- ─── Profiles ────────────────────────────────────────────────────────────────
 CREATE POLICY "Usuarios pueden ver su propio perfil"
   ON profiles FOR SELECT USING (auth.uid() = id);
 
 CREATE POLICY "Admins ven todos y AMs ven sus aliados"
   ON profiles FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    auth.uid() = id
+    OR public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
     OR (
-      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'account_manager')
+      public.get_user_role(auth.uid()) = 'account_manager'
       AND account_manager_id = auth.uid()
     )
   );
@@ -133,16 +165,20 @@ CREATE POLICY "Usuarios pueden actualizar su perfil"
 
 CREATE POLICY "Admins y AMs pueden actualizar perfiles de sus aliados"
   ON profiles FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    auth.uid() = id
+    OR public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
     OR (
-      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'account_manager')
+      public.get_user_role(auth.uid()) = 'account_manager'
       AND account_manager_id = auth.uid()
     )
   );
 
 CREATE POLICY "Admins y Account Managers pueden crear perfiles"
   ON profiles FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'account_manager'))
+    public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
+    OR public.get_user_role(auth.uid()) = 'account_manager'
     OR auth.uid() = id
   );
 
@@ -150,7 +186,12 @@ CREATE POLICY "Admins y Account Managers pueden crear perfiles"
 CREATE POLICY "Aliados ven sus propios prospectos"
   ON prospects FOR SELECT USING (
     aliado_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
+    OR (
+      public.get_user_role(auth.uid()) = 'account_manager'
+      AND public.get_user_account_manager(aliado_id) = auth.uid()
+    )
   );
 
 CREATE POLICY "Aliados crean sus prospectos"
@@ -159,44 +200,42 @@ CREATE POLICY "Aliados crean sus prospectos"
 CREATE POLICY "Admins y dueños pueden actualizar"
   ON prospects FOR UPDATE USING (
     aliado_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    OR public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
+    OR (
+      public.get_user_role(auth.uid()) = 'account_manager'
+      AND public.get_user_account_manager(aliado_id) = auth.uid()
+    )
   );
 
 CREATE POLICY "Admins pueden eliminar prospectos"
   ON prospects FOR DELETE USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
   );
 
 -- ─── Documents ───────────────────────────────────────────────────────────────
 CREATE POLICY "Ver documentos permitidos"
   ON documents FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM prospects
-      WHERE id = documents.prospect_id
-      AND (
-        aliado_id = auth.uid()
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-      )
+      SELECT 1 FROM public.prospects p
+      WHERE p.id = documents.prospect_id
     )
   );
 
 CREATE POLICY "Subir documentos"
   ON documents FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM prospects
-      WHERE id = documents.prospect_id AND aliado_id = auth.uid()
+      SELECT 1 FROM public.prospects p
+      WHERE p.id = prospect_id
     )
   );
 
 CREATE POLICY "Eliminar documentos con prospecto"
   ON documents FOR DELETE USING (
     EXISTS (
-      SELECT 1 FROM prospects
-      WHERE id = documents.prospect_id
-      AND (
-        aliado_id = auth.uid()
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-      )
+      SELECT 1 FROM public.prospects p
+      WHERE p.id = documents.prospect_id
     )
   );
 
@@ -213,13 +252,16 @@ CREATE POLICY "Usuarios pueden marcar como leídas"
 -- ─── Invitation Codes ────────────────────────────────────────────────────────
 CREATE POLICY "Admins ven todos y AMs ven sus propios creados"
   ON invitation_codes FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
     OR created_by = auth.uid()
   );
 
 CREATE POLICY "Admins y AMs crean códigos"
   ON invitation_codes FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND (role = 'admin' OR role = 'account_manager'))
+    public.get_user_role(auth.uid()) = 'admin'
+    OR public.get_user_role(auth.uid()) = 'director'
+    OR public.get_user_role(auth.uid()) = 'account_manager'
   );
 
 -- =============================================================================

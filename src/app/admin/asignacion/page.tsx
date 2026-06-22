@@ -26,9 +26,6 @@ export default function AsignacionAliados() {
   const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">("all");
   const [selectedAMFilter, setSelectedAMFilter] = useState<string>("all");
   
-  // Local pending assignments: allyId -> selectedAMId (string | null)
-  const [pendingAssignments, setPendingAssignments] = useState<Record<string, string | null>>({});
-
   // Loading states for individual rows
   const [updatingRow, setUpdatingRow] = useState<string | null>(null);
   const [successRow, setSuccessRow] = useState<string | null>(null);
@@ -36,48 +33,24 @@ export default function AsignacionAliados() {
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
 
-  // Handle local change before database update
-  const handleSelectAM = (allyId: string, value: string) => {
-    const dbValue = allies.find((a) => a.id === allyId)?.account_manager_id || "";
-    if (value === dbValue) {
-      setPendingAssignments((prev) => {
-        const next = { ...prev };
-        delete next[allyId];
-        return next;
-      });
-    } else {
-      setPendingAssignments((prev) => ({
-        ...prev,
-        [allyId]: value === "" ? null : value,
-      }));
-    }
-  };
-
-  // Confirm pending assignment to DB
-  const handleConfirmAssign = async (allyId: string) => {
+  // Handle immediate database update when changing assignment
+  const handleSelectAM = async (allyId: string, value: string) => {
     setUpdatingRow(allyId);
     setSuccessRow(null);
     try {
-      const pendingAMId = pendingAssignments[allyId];
-      await updateProfileAdmin(allyId, { account_manager_id: pendingAMId });
+      const selectedAMId = value === "" ? null : value;
+      await updateProfileAdmin(allyId, { account_manager_id: selectedAMId });
       
       const ally = allies.find((a) => a.id === allyId);
-      const am = accountManagers.find((m) => m.id === pendingAMId);
+      const am = accountManagers.find((m) => m.id === selectedAMId);
       
       if (ally) {
-        const msg = pendingAMId 
+        const msg = selectedAMId 
           ? `💼 Asignación Comercial: El aliado ${ally.full_name} ha sido asignado al Account Manager ${am?.full_name || "Desconocido"}.`
           : `⚠️ Aliado Desasignado: El aliado ${ally.full_name} ha sido retirado de su Account Manager y queda en espera en la mesa del Director.`;
         
         triggerPushNotification(msg, "whatsapp", ally.full_name);
       }
-      
-      // Clean from pending state
-      setPendingAssignments((prev) => {
-        const next = { ...prev };
-        delete next[allyId];
-        return next;
-      });
 
       setSuccessRow(allyId);
       setTimeout(() => setSuccessRow(null), 3000);
@@ -87,15 +60,6 @@ export default function AsignacionAliados() {
     } finally {
       setUpdatingRow(null);
     }
-  };
-
-  // Cancel/decline pending assignment and restore DB value
-  const handleDeclineAssign = (allyId: string) => {
-    setPendingAssignments((prev) => {
-      const next = { ...prev };
-      delete next[allyId];
-      return next;
-    });
   };
 
   // Helper to count active prospects of an ally
@@ -114,24 +78,20 @@ export default function AsignacionAliados() {
       );
     })
     .filter((a) => {
-      // Determine what the current value is (taking pending into account or database)
-      const currentAMId = pendingAssignments[a.id] !== undefined ? pendingAssignments[a.id] : a.account_manager_id;
-      const isAssigned = currentAMId !== null && currentAMId !== undefined;
+      const isAssigned = a.account_manager_id !== null && a.account_manager_id !== undefined;
       if (assignmentFilter === "assigned") return isAssigned;
       if (assignmentFilter === "unassigned") return !isAssigned;
       return true;
     })
     .filter((a) => {
-      const currentAMId = pendingAssignments[a.id] !== undefined ? pendingAssignments[a.id] : a.account_manager_id;
       if (selectedAMFilter === "all") return true;
-      return currentAMId === selectedAMFilter;
+      return a.account_manager_id === selectedAMFilter;
     });
 
   // Stats
   const totalAllies = allies.length;
   const assignedCount = allies.filter((a) => {
-    const val = pendingAssignments[a.id] !== undefined ? pendingAssignments[a.id] : a.account_manager_id;
-    return val !== null && val !== undefined;
+    return a.account_manager_id !== null && a.account_manager_id !== undefined;
   }).length;
   const unassignedCount = totalAllies - assignedCount;
   const totalAMs = accountManagers.length;
@@ -296,13 +256,8 @@ export default function AsignacionAliados() {
                   </thead>
                   <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
                     {filteredAllies.map((a) => {
-                      // Get pending choice if any, or fall back to DB value
-                      const isPending = pendingAssignments[a.id] !== undefined;
-                      const currentSelectedVal = isPending ? (pendingAssignments[a.id] || "") : (a.account_manager_id || "");
-                      
-                      const isAssignedInDB = a.account_manager_id !== null && a.account_manager_id !== undefined;
+                      const currentSelectedVal = a.account_manager_id || "";
                       const isAssignedNow = currentSelectedVal !== "";
-                      
                       const currentProspects = getProspectCount(a.id);
                       const isUpdating = updatingRow === a.id;
                       const isSuccess = successRow === a.id;
@@ -365,24 +320,7 @@ export default function AsignacionAliados() {
                                 <CheckCircle className="h-3.5 w-3.5" />
                                 Guardado
                               </span>
-                            ) : isPending ? (
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() => handleConfirmAssign(a.id)}
-                                  className="p-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors shadow-sm active:scale-90"
-                                  title="Confirmar asignación"
-                                >
-                                  <Check className="h-3.5 w-3.5 stroke-[3]" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeclineAssign(a.id)}
-                                  className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors shadow-sm active:scale-90"
-                                  title="Declinar cambio"
-                                >
-                                  <X className="h-3.5 w-3.5 stroke-[3]" />
-                                </button>
-                              </div>
-                            ) : isAssignedInDB ? (
+                            ) : isAssignedNow ? (
                               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
                                 <UserCheck className="h-3 w-3" /> Asignado
                               </span>
@@ -462,10 +400,10 @@ export default function AsignacionAliados() {
           {/* Allocation Tip banner */}
           <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/15 dark:border-emerald-500/10 rounded-3xl p-6 relative overflow-hidden">
             <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
-            <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Confirmación Requerida</span>
-            <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo No Automático</h4>
+            <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
+            <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
             <p className="text-[11px] text-slate-550 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
-              Al seleccionar un Account Manager para un aliado comercial, la asignación permanecerá pendiente. Debes confirmar presionando el botón <span className="text-emerald-600 font-extrabold">✓</span> o cancelarla con <span className="text-red-500 font-extrabold">✗</span>. Ningún cambio se guardará en la base de datos automáticamente.
+              Al seleccionar un Account Manager para un aliado comercial, la asignación se actualizará y guardará en la base de datos de manera inmediata. Se enviará automáticamente una notificación push de aviso al aliado comercial.
             </p>
           </div>
         </div>

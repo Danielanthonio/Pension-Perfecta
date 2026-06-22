@@ -490,6 +490,21 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
         
       if (prof) {
+        // Sync metadata to auth.users if missing or mismatch
+        const meta = authUser.user_metadata || {};
+        if (meta.role !== prof.role || meta.account_manager_id !== prof.account_manager_id) {
+          console.log("Syncing missing/outdated role or account_manager_id to auth metadata...");
+          try {
+            await client.auth.updateUser({
+              data: {
+                role: prof.role,
+                account_manager_id: prof.account_manager_id
+              }
+            });
+          } catch (updateErr) {
+            console.warn("Could not sync metadata to auth user in ensureProfileExists:", updateErr);
+          }
+        }
         return mapProfileFromDB(prof);
       }
       
@@ -1101,8 +1116,20 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       });
 
       if (dbErr) {
-        console.error("Metadata insert error in Supabase:", dbErr);
-        throw dbErr;
+        console.warn("Metadata insert failed in Supabase, retrying with legacy columns:", dbErr);
+        // Fallback: retry inserting only the columns that exist in the base schema
+        const { error: dbErrLegacy } = await supabase.from("documents").insert({
+          id: docId,
+          prospect_id: prospectId,
+          file_name: fileName,
+          file_url: driveFileUrl,
+          file_type: fileType,
+        });
+
+        if (dbErrLegacy) {
+          console.error("Critical insert error with legacy columns:", dbErrLegacy);
+          throw dbErrLegacy;
+        }
       }
     }
 
