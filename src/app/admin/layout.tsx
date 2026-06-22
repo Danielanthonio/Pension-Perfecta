@@ -24,6 +24,7 @@ import {
   Contact,
   Filter,
   LayoutDashboard,
+  ChevronDown,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -213,21 +214,30 @@ function SidebarFilters() {
               type="date"
               value={localStartDate}
               onChange={(e) => setLocalStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-205 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+            <input
+              type="date"
+              value={localEndDate}
+              onChange={(e) => setLocalEndDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
             />
           </div>
         </div>
 
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
                 setLocalStageFilter(e.target.value);
                 setLocalSubStageFilter("all");
               }}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-505/30 transition-all cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
             >
               <option value="all">Todas las Etapas</option>
               {STAGES_LIST.map((stage) => (
@@ -515,21 +525,20 @@ export default function AdminLayout({
                 className="flex items-center gap-3.5 pl-4 border-l border-slate-200 dark:border-slate-800 select-none cursor-pointer hover:opacity-85 transition-opacity"
               >
                 <div className="text-right hidden sm:block">
-                  <span className="block text-xs font-black text-slate-800 dark:text-white leading-none">
-                    {user.full_name}
-                  </span>
-                  <span className={`inline-block text-[8px] font-extrabold rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest border ${
-                    isAM 
-                      ? "text-blue-600 bg-blue-505/10 border-blue-500/20 dark:text-blue-400" 
-                      : "text-emerald-600 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400"
-                  }`}>
+                  <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                     {isAM ? "Account Manager" : "Director"}
                   </span>
+                  <div className="flex items-center gap-1.5 mt-0.5 justify-end">
+                    <span className="block text-xs font-black text-slate-855 dark:text-white leading-none">
+                      {user.full_name}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-505" />
+                  </div>
                 </div>
-                <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
+                <div className={`h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm ${
                   isAM 
-                    ? "bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-400/20" 
-                    : "bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/20"
+                    ? "bg-blue-500 border-blue-400/20" 
+                    : "bg-emerald-505 border-emerald-400/20"
                 }`}>
                   {user.full_name.charAt(0)}
                 </div>

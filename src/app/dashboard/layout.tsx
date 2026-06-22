@@ -22,6 +22,7 @@ import {
   Calendar,
   Contact,
   Filter,
+  ChevronDown,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -150,7 +151,16 @@ function SidebarFilters() {
               type="date"
               value={localStartDate}
               onChange={(e) => setLocalStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-505/30 transition-all"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+            <input
+              type="date"
+              value={localEndDate}
+              onChange={(e) => setLocalEndDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
             />
           </div>
         </div>
@@ -158,14 +168,14 @@ function SidebarFilters() {
         {/* Etapas Dropdowns */}
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
                 setLocalStageFilter(e.target.value);
                 setLocalSubStageFilter("all");
               }}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-505/30 transition-all cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
             >
               <option value="all">Todas las Etapas</option>
               {STAGES_LIST.map((stage) => (
@@ -412,14 +422,17 @@ export default function DashboardLayout({
                 className="flex items-center gap-3.5 pl-4 border-l border-slate-200 dark:border-slate-800 select-none cursor-pointer hover:opacity-85 transition-opacity"
               >
                 <div className="text-right hidden sm:block">
-                  <span className="block text-xs font-black text-slate-805 dark:text-white leading-none">
-                    {user.full_name}
+                  <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    Aliado
                   </span>
-                  <span className="inline-block text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1 mt-1.5 leading-none uppercase tracking-widest">
-                    Aliado B2B
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5 justify-end">
+                    <span className="block text-xs font-black text-slate-800 dark:text-white leading-none">
+                      {user.full_name}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  </div>
                 </div>
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 border border-emerald-450/20 flex items-center justify-center text-white text-sm font-black shadow-sm">
+                <div className="h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-black shadow-sm">
                   {user.full_name.charAt(0)}
                 </div>
               </div>
