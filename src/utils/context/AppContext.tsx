@@ -1304,13 +1304,20 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           saveToStorage("pensionflow_user", profile);
           saveToStorage("pensionflow_active_role", profile.role);
           
-          // Reload prospects and notifications for this specific user
+          // Reload all user data (profiles, invitation codes, prospects, notifications)
+          const { data: dbProfiles, error: profilesError } = await supabase.from("profiles").select("*");
+          if (profilesError) {
+            console.error("Error fetching profiles on login:", profilesError);
+          }
+          const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+          setProfiles(mappedProfiles);
+
+          // Fetch prospects (filtered by role if user is aliado or account_manager)
           let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
           if (profile.role === "aliado") {
             prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
           } else if (profile.role === "account_manager") {
-            const { data: dbProfiles } = await supabase.from("profiles").select("id, role, account_manager_id");
-            const assignedAllyIds = (dbProfiles || [])
+            const assignedAllyIds = mappedProfiles
               .filter((p: any) => p.role === "aliado" && p.account_manager_id === profile.id)
               .map((p: any) => p.id);
             if (assignedAllyIds.length > 0) {
@@ -1319,11 +1326,34 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
             }
           }
-          const { data: dbProspects } = await prospectsQuery.order("created_at", { ascending: false });
+          const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
+          if (prospectsError) {
+            console.error("Error fetching prospects on login:", prospectsError);
+          }
           if (dbProspects) {
             setProspects(dbProspects.map(transformProspectFromDB));
           }
 
+          // Fetch invitation codes
+          const { data: dbCodes, error: codesError } = await supabase.from("invitation_codes").select("*");
+          if (codesError) {
+            console.error("Error fetching codes on login:", codesError);
+          }
+          if (dbCodes) {
+            setInvitationCodes(dbCodes.map((c: any) => {
+              const userWhoUsedIt = mappedProfiles.find((p: any) => p.invitation_code_used === c.code);
+              return {
+                id: c.id,
+                code: c.code,
+                created_by: c.created_by,
+                is_used: c.is_used || !!userWhoUsedIt,
+                used_by: c.used_by || userWhoUsedIt?.id,
+                created_at: c.created_at
+              };
+            }));
+          }
+
+          // Fetch notifications
           const { data: dbNotifs } = await supabase
             .from("notifications")
             .select("*")
