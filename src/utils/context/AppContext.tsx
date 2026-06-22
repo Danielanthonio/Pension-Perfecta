@@ -2652,8 +2652,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         const authUserId = authData.user.id;
 
-        // Map role for Database check constraint (director -> director)
-        const dbRole = profileData.role === "director" ? "director" : profileData.role;
+        // Map role for Database check constraint (director -> admin)
+        const dbRole = profileData.role === "director" ? "admin" : profileData.role;
 
         // Insert profile into the profiles table
         const { data: dbProfile, error: insertError } = await supabase
