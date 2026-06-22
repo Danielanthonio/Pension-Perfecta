@@ -121,8 +121,9 @@ function SidebarFilters() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const isDashboard = pathname === "/dashboard";
-  const isClientes = pathname === "/dashboard/clientes";
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isDashboard = cleanPath === "/dashboard";
+  const isClientes = cleanPath === "/dashboard/clientes";
 
   if (!isDashboard && !isClientes) return null;
 
@@ -275,8 +276,9 @@ export default function DashboardLayout({
     );
   }
 
-  const isDashboard = pathname === "/dashboard";
-  const isClientes = pathname === "/dashboard/clientes";
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isDashboard = cleanPath === "/dashboard";
+  const isClientes = cleanPath === "/dashboard/clientes";
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 

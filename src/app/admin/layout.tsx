@@ -185,7 +185,8 @@ function SidebarFilters() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const isAdminRoot = pathname === "/admin";
+  const cleanPath = pathname.replace(/\/$/, "");
+  const isAdminRoot = cleanPath === "/admin";
   if (!isAdminRoot) return null;
 
   const isAM = user?.role === "account_manager";
