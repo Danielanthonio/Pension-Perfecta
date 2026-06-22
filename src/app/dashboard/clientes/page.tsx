@@ -639,7 +639,7 @@ function ClientesContent() {
 
                     {/* Congratulations Banner / Commission status */}
                     {isPaid && p.simulation && (
-                      <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                      <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 flex items-center shadow-inner">
                         <div className="flex items-center gap-3">
                           <span className="text-xl">🎉</span>
                           <div>
@@ -650,10 +650,6 @@ function ClientesContent() {
                               ¡Vamos por más!
                             </p>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="block text-[8px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-wider">Tu Comisión</span>
-                          <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400">${p.simulation.costoGestion.toLocaleString()}</span>
                         </div>
                       </div>
                     )}
