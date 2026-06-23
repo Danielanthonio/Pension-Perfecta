@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Target,
   CircleDollarSign,
+  Shield,
 } from "lucide-react";
 
 interface SalesFunnelProps {
@@ -24,12 +25,15 @@ interface SalesFunnelProps {
 export default function SalesFunnel({ prospects }: SalesFunnelProps) {
   const { user, profiles } = useApp();
 
+  const showAccountManagers = user?.role === "director";
   const showAliadosCard = user?.role === "director" || user?.role === "account_manager";
+  let accountManagersCount = 0;
   let alliesCount = 0;
   if (user?.role === "director") {
-    alliesCount = profiles.filter((p) => p.role === "aliado" && p.account_manager_id !== null).length;
+    accountManagersCount = profiles.filter((p) => p.role === "account_manager" && p.is_active).length;
+    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active && p.account_manager_id !== null).length;
   } else if (user?.role === "account_manager") {
-    alliesCount = profiles.filter((p) => p.role === "aliado" && p.account_manager_id === user.id).length;
+    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active && p.account_manager_id === user.id).length;
   }
 
   // 1. Filter counts according to the specific mappings
@@ -91,6 +95,17 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
   };
 
   const steps = [
+    ...(showAccountManagers
+      ? [
+          {
+            label: "ACCOUNT MANAGERS",
+            value: accountManagersCount,
+            icon: Shield,
+            iconColor: "text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40",
+            textColor: "text-indigo-600 dark:text-indigo-400",
+          },
+        ]
+      : []),
     ...(showAliadosCard
       ? [
           {

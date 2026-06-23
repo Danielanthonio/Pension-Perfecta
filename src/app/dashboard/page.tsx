@@ -25,15 +25,9 @@ function DashboardContent() {
   const filteredProspects = activeProspects.filter((p) => {
     // Date filter
     if (p.created_at) {
-      const createdDate = new Date(p.created_at).getTime();
-      if (startDate) {
-        const start = new Date(startDate + "T00:00:00").getTime();
-        if (createdDate < start) return false;
-      }
-      if (endDate) {
-        const end = new Date(endDate + "T23:59:59").getTime();
-        if (createdDate > end) return false;
-      }
+      const createdDateStr = p.created_at.substring(0, 10);
+      if (startDate && createdDateStr < startDate) return false;
+      if (endDate && createdDateStr > endDate) return false;
     }
 
     // Stage filter

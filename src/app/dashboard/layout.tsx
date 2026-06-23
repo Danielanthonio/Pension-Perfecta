@@ -23,6 +23,8 @@ import {
   Contact,
   Filter,
   ChevronDown,
+  Sun,
+  Moon,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -46,7 +48,7 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
         onClick={onLinkClick}
         className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
           isDashboard
-            ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
+            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
             : "text-slate-400 hover:text-white hover:bg-slate-800/50"
         }`}
       >
@@ -59,7 +61,7 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
         onClick={onLinkClick}
         className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
           isClientes
-            ? "bg-gradient-to-r from-indigo-650 to-blue-600 text-white shadow-md shadow-indigo-500/10"
+            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
             : "text-slate-400 hover:text-white hover:bg-slate-800/50"
         }`}
       >
@@ -141,27 +143,27 @@ function SidebarFilters() {
       {/* Rango de Fechas */}
       <div className="px-4 space-y-3">
         <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
-          <Calendar className="h-3.5 w-3.5 text-indigo-400" />
+          <Calendar className="h-3.5 w-3.5 text-emerald-400" />
           <span>Rango de fechas</span>
         </div>
         
         <div className="space-y-2.5">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Desde</label>
+            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Desde</label>
             <input
               type="date"
               value={localStartDate}
               onChange={(e) => setLocalStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
             />
           </div>
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Hasta</label>
             <input
               type="date"
               value={localEndDate}
               onChange={(e) => setLocalEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
             />
           </div>
         </div>
@@ -169,14 +171,14 @@ function SidebarFilters() {
         {/* Etapas Dropdowns */}
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
+            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Etapa</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
                 setLocalStageFilter(e.target.value);
                 setLocalSubStageFilter("all");
               }}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer"
             >
               <option value="all">Todas las Etapas</option>
               {STAGES_LIST.map((stage) => (
@@ -192,7 +194,7 @@ function SidebarFilters() {
               value={localSubStageFilter}
               onChange={(e) => setLocalSubStageFilter(e.target.value)}
               disabled={localStageFilter === "all"}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <option value="all">Todas las Subetapas</option>
               {subStagesList.map((sub) => (
@@ -208,7 +210,7 @@ function SidebarFilters() {
         <div className="space-y-2 pt-4">
           <button
             onClick={handleApplyFilters}
-            className="w-full px-4 py-2.5 bg-gradient-to-r from-violet-650 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-violet-550 hover:to-indigo-500 hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2"
+            className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 text-white rounded-xl text-xs font-bold hover:from-emerald-500 hover:to-teal-500 hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2"
           >
             <Filter className="h-3.5 w-3.5" />
             Aplicar Filtros
@@ -247,10 +249,26 @@ export default function DashboardLayout({
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("pensionflow_theme") || "light";
+      setCurrentTheme(savedTheme as any);
+    }
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = currentTheme === "light" ? "dark" : "light";
+    setCurrentTheme(nextTheme);
+    localStorage.setItem("pensionflow_theme", nextTheme);
+    if (nextTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
 
   // Protect client side routes
   useEffect(() => {
@@ -325,7 +343,7 @@ export default function DashboardLayout({
       
       {/* Impersonation Bar Floating at the top of content */}
       {isDemoMode && (
-        <div className="fixed top-0 left-0 right-0 h-10 bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold z-45 md:pl-[17rem]">
+        <div className="fixed top-0 left-0 right-0 h-10 bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold z-40 md:pl-[17rem]">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>
@@ -351,7 +369,7 @@ export default function DashboardLayout({
 
       {/* Left Sidebar Layout */}
       <aside
-         className={`fixed inset-y-0 left-0 z-35 w-64 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
+         className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -414,6 +432,19 @@ export default function DashboardLayout({
                 <span className="absolute top-[-2px] right-[-2px] h-4.5 min-w-[18px] px-1 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-white dark:border-slate-900 shadow-sm">
                   {unreadNotifsCount}
                 </span>
+              )}
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl transition-colors active:scale-95 transform"
+              title={currentTheme === "light" ? "Activar modo oscuro" : "Activar modo claro"}
+            >
+              {currentTheme === "light" ? (
+                <Moon className="h-4.5 w-4.5" />
+              ) : (
+                <Sun className="h-4.5 w-4.5 text-amber-500" />
               )}
             </button>
 

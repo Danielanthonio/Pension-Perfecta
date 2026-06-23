@@ -303,7 +303,7 @@ export default function SubirProspecto() {
     <div className="max-w-[1700px] mx-auto space-y-6 pb-16 animate-fade-in text-slate-800 dark:text-slate-100">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold uppercase tracking-widest">Nuevo Expediente</span>
+          <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-widest">Nuevo Expediente</span>
           <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mt-0.5">Captura de Prospecto Ley 73</h1>
         </div>
       </div>
@@ -328,7 +328,7 @@ export default function SubirProspecto() {
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                <User className="h-4.5 w-4.5 text-blue-500 dark:text-blue-400" />
+                <User className="h-4.5 w-4.5 text-emerald-500 dark:text-emerald-400" />
                 Información del Prospecto
               </h2>
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">* Obligatorio</span>
@@ -348,7 +348,7 @@ export default function SubirProspecto() {
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="ej: Juan Pérez García"
                     className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                      formSubmitted && !nameValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500"
+                      formSubmitted && !nameValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                     } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                   />
                 </div>
@@ -378,7 +378,7 @@ export default function SubirProspecto() {
                       onChange={(e) => setNss(e.target.value.replace(/\D/g, ""))}
                       placeholder="11 dígitos"
                       className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                        formSubmitted && !nssValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500"
+                        formSubmitted && !nssValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                       } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                     />
                     {nss.length > 0 && (
@@ -415,7 +415,7 @@ export default function SubirProspecto() {
                       onChange={(e) => setCurp(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase())}
                       placeholder="18 caracteres alfanuméricos"
                       className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                        formSubmitted && !curpValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500"
+                        formSubmitted && !curpValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                       } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                     />
                     {curp.length > 0 && (
@@ -449,7 +449,7 @@ export default function SubirProspecto() {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="ej: 5512345678"
                       className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                        formSubmitted && !phoneValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500"
+                        formSubmitted && !phoneValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                       } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                     />
                   </div>
@@ -471,7 +471,7 @@ export default function SubirProspecto() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="ej: pedro@gmail.com"
                       className={`w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                        formSubmitted && !emailValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500"
+                        formSubmitted && !emailValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                       } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                     />
                   </div>
@@ -489,7 +489,7 @@ export default function SubirProspecto() {
                   value={notesAliado}
                   onChange={(e) => setNotesAliado(e.target.value)}
                   placeholder="Escribe comentarios, dudas o incidencias iniciales relevantes..."
-                  className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-850/80 outline-none text-xs font-semibold focus:bg-white dark:focus:bg-slate-850 focus:border-blue-500 dark:focus:border-blue-500 transition-all resize-none dark:text-white"
+                  className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-850/80 outline-none text-xs font-semibold focus:bg-white dark:focus:bg-slate-850 focus:border-emerald-500 dark:focus:border-emerald-500 transition-all resize-none dark:text-white"
                 />
               </div>
             </div>
@@ -514,7 +514,7 @@ export default function SubirProspecto() {
                     value={semanas}
                     onChange={(e) => setSemanas(e.target.value.replace(/\D/g, ""))}
                     placeholder="ej: 1308"
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                   />
                 </div>
 
@@ -529,7 +529,7 @@ export default function SubirProspecto() {
                         value={pensionActual}
                         onChange={(e) => setPensionActual(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 11825"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -543,7 +543,7 @@ export default function SubirProspecto() {
                         value={pensionProyectada}
                         onChange={(e) => setPensionProyectada(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 33213"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -562,7 +562,7 @@ export default function SubirProspecto() {
                         value={financiamientoM40}
                         onChange={(e) => setFinanciamientoM40(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 408778"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -576,7 +576,7 @@ export default function SubirProspecto() {
                         value={costoCobertura}
                         onChange={(e) => setCostoCobertura(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 57880"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -593,7 +593,7 @@ export default function SubirProspecto() {
                         value={aforePensionarse}
                         onChange={(e) => setAforePensionarse(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 392672"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -607,7 +607,7 @@ export default function SubirProspecto() {
                         value={creditoNomina}
                         onChange={(e) => setCreditoNomina(e.target.value.replace(/\D/g, ""))}
                         placeholder="ej: 50000"
-                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-blue-500 dark:focus:border-blue-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
+                        className={`w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500 dark:text-white ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                       />
                     </div>
                   </div>
@@ -621,7 +621,7 @@ export default function SubirProspecto() {
                     value={observaciones}
                     onChange={(e) => setObservaciones(e.target.value)}
                     placeholder="Escribe observaciones adicionales sobre el diagnóstico de pensión..."
-                    className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-850/80 outline-none text-xs font-semibold focus:bg-white dark:focus:bg-slate-850 focus:border-blue-500 dark:focus:border-blue-500 transition-all resize-none dark:text-white"
+                    className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-850/80 outline-none text-xs font-semibold focus:bg-white dark:focus:bg-slate-850 focus:border-emerald-500 dark:focus:border-emerald-500 transition-all resize-none dark:text-white"
                   />
                 </div>
 
@@ -663,7 +663,7 @@ export default function SubirProspecto() {
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
               <h2 className="text-xs font-bold text-slate-600 dark:text-slate-350 uppercase tracking-widest flex items-center gap-2">
-                <FileCheck className="h-4.5 w-4.5 text-blue-500 dark:text-blue-400" />
+                <FileCheck className="h-4.5 w-4.5 text-emerald-500 dark:text-emerald-400" />
                 Carga Expediente *
               </h2>
             </div>
@@ -674,8 +674,8 @@ export default function SubirProspecto() {
               </span>
 
               {/* Google Drive Status Header */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/50 rounded-2xl p-3.5 flex flex-col gap-1.5 shadow-sm">
-                <span className="text-[9px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl p-3.5 flex flex-col gap-1.5 shadow-sm">
+                <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   Google Drive Sincronizado
                 </span>
@@ -687,7 +687,7 @@ export default function SubirProspecto() {
               {/* Dropzone 1: IMSS */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">1. Reporte Semanas IMSS *</label>
-                <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group">
+                <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group">
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
@@ -696,23 +696,23 @@ export default function SubirProspecto() {
                   />
                   {imssFileName ? (
                     <div className="w-full flex flex-col items-center animate-scale-in">
-                      <FileCheck className={`h-8 w-8 ${imssOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
+                      <FileCheck className={`h-8 w-8 ${imssOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-emerald-600"}`} />
                       <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 mt-2 truncate w-full max-w-[150px]">{imssFileName}</span>
                       
                       {imssOcrStatus === "uploading" && (
                         <div className="w-full mt-3">
                           <div className="w-full bg-slate-200 dark:bg-slate-850 rounded-full h-1.5">
-                            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${imssProgress}%` }} />
+                            <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${imssProgress}%` }} />
                           </div>
-                          <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold mt-1.5 block">Subiendo a Google Drive... {imssProgress}%</span>
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-1.5 block">Subiendo a Google Drive... {imssProgress}%</span>
                         </div>
                       )}
 
                       {imssOcrStatus === "analyzing" && (
                         <div className="w-full mt-3 flex flex-col items-center gap-1">
-                          <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-605 rounded-full w-full animate-pulse" />
-                          <span className="text-[9px] text-blue-600 dark:text-blue-400 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                          <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full w-full animate-pulse" />
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping" />
                             Escaneando con OCR de IA...
                           </span>
                         </div>
@@ -724,7 +724,7 @@ export default function SubirProspecto() {
                     </div>
                   ) : (
                     <>
-                      <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:scale-105 transition-all" />
+                      <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 group-hover:scale-105 transition-all" />
                       <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir Semanas IMSS</span>
                       <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Reporte digital oficial</span>
                     </>
@@ -736,7 +736,7 @@ export default function SubirProspecto() {
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">2. Estado de Cuenta AFORE *</label>
                 {imssOcrStatus === "completed" ? (
-                  <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group animate-fade-in">
+                  <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group animate-fade-in">
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
@@ -745,23 +745,23 @@ export default function SubirProspecto() {
                     />
                     {aforeFileName ? (
                       <div className="w-full flex flex-col items-center animate-scale-in">
-                        <FileCheck className={`h-8 w-8 ${aforeOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-blue-500"}`} />
+                        <FileCheck className={`h-8 w-8 ${aforeOcrStatus === "completed" ? "text-emerald-500 animate-scale-in" : "text-emerald-600"}`} />
                         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 mt-2 truncate w-full max-w-[150px]">{aforeFileName}</span>
                         
                         {aforeOcrStatus === "uploading" && (
                           <div className="w-full mt-3">
                             <div className="w-full bg-slate-200 dark:bg-slate-850 rounded-full h-1.5">
-                              <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
+                              <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-100" style={{ width: `${aforeProgress}%` }} />
                             </div>
-                            <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold mt-1.5 block">Subiendo a Google Drive... {aforeProgress}%</span>
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-1.5 block">Subiendo a Google Drive... {aforeProgress}%</span>
                           </div>
                         )}
 
                         {aforeOcrStatus === "analyzing" && (
                           <div className="w-full mt-3 flex flex-col items-center gap-1">
-                            <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-650 rounded-full w-full animate-pulse" />
-                            <span className="text-[9px] text-blue-600 dark:text-blue-400 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                            <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full w-full animate-pulse" />
+                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-extrabold uppercase tracking-wider flex items-center gap-1 mt-1 animate-pulse">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping" />
                               Guardando en Drive...
                             </span>
                           </div>
@@ -773,7 +773,7 @@ export default function SubirProspecto() {
                       </div>
                     ) : (
                       <>
-                        <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-blue-500 dark:group-hover:text-blue-400 group-hover:scale-105 transition-all" />
+                        <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 group-hover:scale-105 transition-all" />
                         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir AFORE</span>
                         <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">PDF o imagen (.jpg, .png)</span>
                       </>
@@ -822,7 +822,7 @@ export default function SubirProspecto() {
           <button
             onClick={handleSave}
             disabled={saving || !formIsValid || uploadsInProgress}
-            className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/10 border border-blue-450 dark:border-blue-900 hover:scale-[1.02] active:scale-[0.98] transform transition-all disabled:opacity-50 disabled:pointer-events-none"
+            className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/10 border border-emerald-450 dark:border-emerald-900 hover:scale-[1.02] active:scale-[0.98] transform transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
             <Save className="mr-2 h-4 w-4" />
             {saving ? "Registrando..." : "Enviar a Evaluación"}

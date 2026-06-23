@@ -90,7 +90,7 @@ function ClientesContent() {
   const getSubStageBadgeColor = (status: Prospect["status"]) => {
     const { subStage } = getStageAndSubStage(status);
     if (!subStage) return "bg-slate-50 text-slate-400 dark:bg-slate-900/50 dark:text-slate-600";
-    return "bg-indigo-50/70 text-indigo-600 border-indigo-100 dark:bg-indigo-950/15 dark:text-indigo-400 dark:border-indigo-900/30";
+    return "bg-emerald-50/70 text-emerald-600 border-emerald-100 dark:bg-emerald-950/15 dark:text-emerald-400 dark:border-emerald-900/30";
   };
 
   // Filter Active vs Deleted
@@ -111,15 +111,9 @@ function ClientesContent() {
 
     // Date filters
     if (p.created_at) {
-      const createdDate = new Date(p.created_at).getTime();
-      if (startDate) {
-        const start = new Date(startDate + "T00:00:00").getTime();
-        if (createdDate < start) return false;
-      }
-      if (endDate) {
-        const end = new Date(endDate + "T23:59:59").getTime();
-        if (createdDate > end) return false;
-      }
+      const createdDateStr = p.created_at.substring(0, 10);
+      if (startDate && createdDateStr < startDate) return false;
+      if (endDate && createdDateStr > endDate) return false;
     }
 
     // Stage filters
@@ -260,7 +254,7 @@ function ClientesContent() {
 
         <Link
           href="/dashboard/nuevo"
-          className="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm shrink-0"
+          className="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm shrink-0"
         >
           <Plus className="mr-2 h-4 w-4 stroke-[2.5]" />
           Subir Prospecto
@@ -276,7 +270,7 @@ function ClientesContent() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar por Nombre, NSS o CURP..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-200"
           />
         </div>
       </div>
@@ -463,7 +457,7 @@ function ClientesContent() {
                                 href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1.5 bg-gradient-to-r from-blue-500 to-indigo-650 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow border border-blue-400 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
+                                className="p-1.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 text-white rounded-xl shadow border border-emerald-450 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
                                 title="Abrir Agenda Externa"
                               >
                                 <Calendar className="h-4 w-4" />
@@ -758,7 +752,7 @@ function ClientesContent() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 flex items-center justify-center border border-indigo-150 dark:border-indigo-800/40 shadow-sm">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40 shadow-sm">
                   <Calendar className="h-5 w-5" />
                 </div>
                 <div>
@@ -795,7 +789,7 @@ function ClientesContent() {
                       value={selectedDate}
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-200"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-200"
                     />
                   </div>
                   <div>
@@ -806,7 +800,7 @@ function ClientesContent() {
                       type="time"
                       value={selectedTime}
                       onChange={(e) => setSelectedTime(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-202 dark:border-slate-755 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-all dark:text-slate-202"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-202 dark:border-slate-755 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-202"
                     />
                   </div>
                 </div>
@@ -814,7 +808,7 @@ function ClientesContent() {
                 <button
                   disabled={!selectedDate || !selectedTime}
                   onClick={() => setSchedulingStep("confirm")}
-                  className="w-full py-2.5 bg-gradient-to-r from-indigo-650 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] transform flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] transform flex items-center justify-center gap-1.5"
                 >
                   Continuar
                 </button>

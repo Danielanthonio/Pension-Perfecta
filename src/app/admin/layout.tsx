@@ -25,6 +25,8 @@ import {
   Filter,
   LayoutDashboard,
   ChevronDown,
+  Sun,
+  Moon,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -37,15 +39,17 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
 
   const cleanPath = pathname.replace(/\/$/, "");
   const isAdminRoot = cleanPath === "/admin";
+  const isClientes = cleanPath === "/admin/clientes";
   const isAliados = cleanPath === "/admin/aliados";
   const isUsuarios = cleanPath === "/admin/usuarios";
   const isAMs = cleanPath === "/admin/account-managers";
   const isAsignacion = cleanPath === "/admin/asignacion";
 
   const isAM = user?.role === "account_manager";
-  const themeColor = isAM ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-teal-650";
+  const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
 
   const adminHref = currentParamsString ? `/admin?${currentParamsString}` : "/admin";
+  const clientesHref = currentParamsString ? `/admin/clientes?${currentParamsString}` : "/admin/clientes";
   const aliadosHref = currentParamsString ? `/admin/aliados?${currentParamsString}` : "/admin/aliados";
   const asignacionHref = currentParamsString ? `/admin/asignacion?${currentParamsString}` : "/admin/asignacion";
   const accountManagersHref = currentParamsString ? `/admin/account-managers?${currentParamsString}` : "/admin/account-managers";
@@ -64,6 +68,19 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
       >
         <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
         Dashboard
+      </Link>
+
+      <Link
+        href={clientesHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isClientes
+            ? `${themeColor} text-white shadow-md`
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Gestión Clientes
       </Link>
 
       <Link
@@ -187,11 +204,18 @@ function SidebarFilters() {
 
   const cleanPath = pathname.replace(/\/$/, "");
   const isAdminRoot = cleanPath === "/admin";
-  if (!isAdminRoot) return null;
+  const isClientes = cleanPath === "/admin/clientes";
+  if (!isAdminRoot && !isClientes) return null;
 
   const isAM = user?.role === "account_manager";
   const subStagesList = localStageFilter !== "all" ? (SUB_STAGES_BY_STAGE[localStageFilter] || []) : [];
-  const uniqueAllies = profiles.filter((p) => p.role === "aliado" && p.is_active);
+  const uniqueAllies = profiles.filter((p) => {
+    if (p.role !== "aliado" || !p.is_active) return false;
+    if (user?.role === "account_manager") {
+      return p.account_manager_id === user.id;
+    }
+    return true;
+  });
 
   return (
     <div className="pt-8 border-t border-slate-800/55 mt-6 space-y-4">
@@ -229,66 +253,66 @@ function SidebarFilters() {
           </div>
         </div>
 
-        <div className="space-y-2.5 pt-2">
-          <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
-            <select
-              value={localStageFilter}
-              onChange={(e) => {
-                setLocalStageFilter(e.target.value);
-                setLocalSubStageFilter("all");
-              }}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
-            >
-              <option value="all">Todas las Etapas</option>
-              {STAGES_LIST.map((stage) => (
-                <option key={stage.id} value={stage.id} className="bg-slate-900 text-slate-200">
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Subetapa</label>
-            <select
-              value={localSubStageFilter}
-              onChange={(e) => setLocalSubStageFilter(e.target.value)}
-              disabled={localStageFilter === "all"}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-505 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <option value="all">Todas las Subetapas</option>
-              {subStagesList.map((sub) => (
-                <option key={sub} value={sub} className="bg-slate-900 text-slate-200">
-                  {sub}
-                </option>
-              ))}
-            </select>
-          </div>
+        {isClientes && (
+          <div className="space-y-2.5 pt-2">
+            <div>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
+              <select
+                value={localStageFilter}
+                onChange={(e) => {
+                  setLocalStageFilter(e.target.value);
+                  setLocalSubStageFilter("all");
+                }}
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
+              >
+                <option value="all">Todas las Etapas</option>
+                {STAGES_LIST.map((stage) => (
+                  <option key={stage.id} value={stage.id} className="bg-slate-900 text-slate-200">
+                    {stage.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Subetapa</label>
+              <select
+                value={localSubStageFilter}
+                onChange={(e) => setLocalSubStageFilter(e.target.value)}
+                disabled={localStageFilter === "all"}
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-505 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <option value="all">Todas las Subetapas</option>
+                {subStagesList.map((sub) => (
+                  <option key={sub} value={sub} className="bg-slate-900 text-slate-200">
+                    {sub}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Allied Dropdown filter */}
-          <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Aliado Comercial</label>
-            <select
-              value={localAllyFilter}
-              onChange={(e) => setLocalAllyFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
-            >
-              <option value="all">Todos los Aliados</option>
-              {uniqueAllies.map((ally) => (
-                <option key={ally.id} value={ally.full_name} className="bg-slate-900 text-slate-200">
-                  {ally.full_name}
-                </option>
-              ))}
-            </select>
+            {/* Allied Dropdown filter */}
+            <div>
+              <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Aliado Comercial</label>
+              <select
+                value={localAllyFilter}
+                onChange={(e) => setLocalAllyFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
+              >
+                <option value="all">Todos los Aliados</option>
+                {uniqueAllies.map((ally) => (
+                  <option key={ally.id} value={ally.full_name} className="bg-slate-900 text-slate-200">
+                    {ally.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2 pt-4">
           <button
             onClick={handleApplyFilters}
-            className={`w-full px-4 py-2.5 text-white rounded-xl text-xs font-bold hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2 ${
-              isAM ? "bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-500 hover:to-indigo-500" : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
-            }`}
+            className="w-full px-4 py-2.5 text-white rounded-xl text-xs font-bold hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
           >
             <Filter className="h-3.5 w-3.5" />
             Aplicar Filtros
@@ -326,10 +350,26 @@ export default function AdminLayout({
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("pensionflow_theme") || "light";
+      setCurrentTheme(savedTheme as any);
+    }
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = currentTheme === "light" ? "dark" : "light";
+    setCurrentTheme(nextTheme);
+    localStorage.setItem("pensionflow_theme", nextTheme);
+    if (nextTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
 
   // Protect client side routes
   useEffect(() => {
@@ -374,8 +414,8 @@ export default function AdminLayout({
   };
 
   const isAM = user.role === "account_manager";
-  const themeColor = isAM ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-teal-650";
-  const selectionColor = isAM ? "selection:bg-blue-500" : "selection:bg-emerald-500";
+  const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
+  const selectionColor = "selection:bg-emerald-500";
 
   // Dynamic header titles based on path
   const getHeaderTitle = () => {
@@ -384,6 +424,12 @@ export default function AdminLayout({
       return {
         title: isAM ? "Gestión Pipeline" : "Gestión Director",
         subtitle: "Supervisa y audita las etapas operativas de los expedientes comerciales.",
+      };
+    }
+    if (cleanPath === "/admin/clientes") {
+      return {
+        title: "Gestión de Clientes",
+        subtitle: "Visualiza, audita y gestiona el pipeline de expedientes comerciales y prospectos.",
       };
     }
     if (cleanPath === "/admin/aliados") {
@@ -423,18 +469,16 @@ export default function AdminLayout({
       
       {/* Impersonation Floating Bar at the top of content */}
       {isDemoMode && (
-        <div className="fixed top-0 left-0 right-0 h-10 bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold z-45 md:pl-[17rem]">
+        <div className="fixed top-0 left-0 right-0 h-10 bg-slate-900 border-b border-slate-800 text-slate-200 px-6 py-2 flex items-center justify-between text-xs font-semibold z-40 md:pl-[17rem]">
           <div className="flex items-center gap-2">
-            <span className={`inline-flex h-2.5 w-2.5 rounded-full animate-pulse ${isAM ? "bg-blue-500" : "bg-teal-500"}`} />
+            <span className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse bg-teal-500" />
             <span>
-              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : "Dirección"}: <span className={isAM ? "text-blue-400" : "text-teal-400"}>{user.full_name} ({isAM ? "Account Manager" : "Director de Operaciones"})</span>
+              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : "Dirección"}: <span className="text-teal-400">{user.full_name} ({isAM ? "Account Manager" : "Director de Operaciones"})</span>
             </span>
           </div>
           <button
             onClick={handleRoleSwitch}
-            className={`px-3 py-0.5 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm text-[10px] ${
-              isAM ? "bg-blue-600 hover:bg-blue-700" : "bg-teal-600 hover:bg-teal-700"
-            }`}
+            className="px-3 py-0.5 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm text-[10px] bg-teal-600 hover:bg-teal-700"
           >
             Switch to Ally View 💼
           </button>
@@ -451,15 +495,15 @@ export default function AdminLayout({
 
       {/* Left Sidebar Layout */}
       <aside
-        className={`fixed inset-y-0 left-0 z-35 w-64 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Sidebar Header / Logo */}
         <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-2.5">
-          <Heart className={`h-6 w-6 ${isAM ? "text-blue-400 fill-blue-450/20" : "text-emerald-400 fill-emerald-450/20"}`} strokeWidth={2.5} />
+          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-450/20" strokeWidth={2.5} />
           <div>
-            <span className={`text-lg font-black tracking-tight text-white bg-gradient-to-r bg-clip-text text-transparent ${isAM ? "from-blue-400 to-indigo-300" : "from-emerald-400 to-teal-300"}`}>
+            <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r bg-clip-text text-transparent from-emerald-400 to-teal-300">
               Pensión Perfecta
             </span>
             <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider leading-none mt-0.5">
@@ -511,11 +555,22 @@ export default function AdminLayout({
             >
               <Bell className="h-4.5 w-4.5" />
               {unreadNotifsCount > 0 && (
-                <span className={`absolute top-[-2px] right-[-2px] h-4.5 min-w-[18px] px-1 rounded-full text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-white dark:border-slate-900 shadow-sm ${
-                  isAM ? "bg-blue-500" : "bg-emerald-505"
-                }`}>
+                <span className="absolute top-[-2px] right-[-2px] h-4.5 min-w-[18px] px-1 rounded-full text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-white dark:border-slate-900 shadow-sm bg-emerald-500">
                   {unreadNotifsCount}
                 </span>
+              )}
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl transition-colors active:scale-95 transform"
+              title={currentTheme === "light" ? "Activar modo oscuro" : "Activar modo claro"}
+            >
+              {currentTheme === "light" ? (
+                <Moon className="h-4.5 w-4.5" />
+              ) : (
+                <Sun className="h-4.5 w-4.5 text-amber-500" />
               )}
             </button>
 
@@ -536,11 +591,7 @@ export default function AdminLayout({
                     <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-505" />
                   </div>
                 </div>
-                <div className={`h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm ${
-                  isAM 
-                    ? "bg-blue-500 border-blue-400/20" 
-                    : "bg-emerald-505 border-emerald-400/20"
-                }`}>
+                <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-55 border-emerald-400/20">
                   {user.full_name.charAt(0)}
                 </div>
               </div>
@@ -579,12 +630,10 @@ export default function AdminLayout({
           <div className="relative w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col z-10 border-l border-slate-200 dark:border-slate-800 transform transition-transform duration-300">
             <div className="p-6 border-b border-slate-150 dark:border-slate-850 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
               <div className="flex items-center gap-2">
-                <Bell className={`h-5 w-5 ${isAM ? "text-blue-500" : "text-emerald-500"}`} />
+                <Bell className="h-5 w-5 text-emerald-500" />
                 <h3 className="text-base font-bold text-slate-800 dark:text-white font-black">Notificaciones</h3>
                 {unreadNotifsCount > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    isAM ? "bg-blue-500/10 text-blue-505" : "bg-emerald-505/10 text-emerald-500"
-                  }`}>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-505/10 text-emerald-500">
                     {unreadNotifsCount} nuevas
                   </span>
                 )}
@@ -601,9 +650,7 @@ export default function AdminLayout({
               <div className="px-6 py-3 border-b border-slate-180 dark:border-slate-850 flex justify-end">
                 <button
                   onClick={markAllNotificationsRead}
-                  className={`text-xs font-bold flex items-center gap-1.5 ${
-                    isAM ? "text-blue-505 hover:text-blue-600" : "text-emerald-500 hover:text-emerald-600"
-                  }`}
+                  className="text-xs font-bold flex items-center gap-1.5 text-emerald-500 hover:text-emerald-600"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Marcar todas como leídas
@@ -633,15 +680,11 @@ export default function AdminLayout({
                       className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-3 relative ${
                         notif.read
                           ? "bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-805"
-                          : isAM
-                            ? "bg-blue-50/20 dark:bg-blue-955/10 border-blue-100 dark:border-blue-900/30 hover:bg-blue-50/40"
-                            : "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50/40"
+                          : "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50/40"
                       }`}
                     >
                       {!notif.read && (
-                        <span className={`absolute top-4 right-4 h-2.5 w-2.5 rounded-full shadow ${
-                          isAM ? "bg-blue-500 shadow-blue-500" : "bg-emerald-500 shadow-emerald-500"
-                        }`} />
+                        <span className="absolute top-4 right-4 h-2.5 w-2.5 rounded-full shadow bg-emerald-500 shadow-emerald-500" />
                       )}
 
                       <div className="flex-shrink-0">

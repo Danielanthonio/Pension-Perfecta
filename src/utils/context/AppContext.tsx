@@ -641,6 +641,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   // Load state from localStorage/Supabase on mount
   useEffect(() => {
+    // Theme initialization
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("pensionflow_theme") || "light";
+      if (savedTheme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+
     const hasKeys =
       process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_URL !== "tu_supabase_url_aqui" &&
