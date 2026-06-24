@@ -2162,7 +2162,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const notifTitle = newStatus === "aportacion" ? "Dictamen Emitido (Aportación) 💰" : "Dictamen Emitido (Aprobado) ✅";
         const notifMsg = newStatus === "aportacion"
           ? `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Aportación Requerida: $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}).`
-          : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
+          : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Tu Pensión Perfecta: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
 
         const newNotif: NotificationItem = {
           id: `notif-${Math.random().toString(36).substr(2, 9)}`,
@@ -2177,7 +2177,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         const whatsappMsg = newStatus === "aportacion"
           ? `📈 ¡Simulación lista, Roberto! El director Eduardo aprobó la simulación para ${target.full_name} con Aportación Requerida de $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}). ¡Ingresa ya para presentar la propuesta!`
-          : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
+          : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Tu Pensión Perfecta: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
 
         triggerPushNotification(
           whatsappMsg,
@@ -2223,7 +2223,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           const notifTitle = newStatus === "aportacion" ? "Dictamen Emitido (Aportación) 💰" : "Dictamen Emitido (Aprobado) ✅";
           const notifMsg = newStatus === "aportacion"
             ? `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Aportación Requerida: $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}).`
-            : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
+            : `El Director Eduardo emitió el dictamen financiero para ${target.full_name}. Tu Pensión Perfecta: $${simulationData.pensionMejorada.toLocaleString()}/mes.`;
 
           // Notify Ally
           await supabase.from("notifications").insert({
@@ -2236,7 +2236,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
           const whatsappMsg = newStatus === "aportacion"
             ? `📈 ¡Simulación lista, Roberto! El director Eduardo aprobó la simulación para ${target.full_name} con Aportación Requerida de $${aportacion.toLocaleString()} (Afore: $${aforePensionarse.toLocaleString()}). ¡Ingresa ya para presentar la propuesta!`
-            : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Pensión Mejorada: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
+            : `📈 ¡Gran oportunidad, Roberto! El director Eduardo aprobó la simulación para ${target.full_name}. Pensión actual: $${simulationData.pensionActual.toLocaleString()} ➡️ Tu Pensión Perfecta: $${simulationData.pensionMejorada.toLocaleString()}. Financiamiento: $${simulationData.financiamiento.toLocaleString()}. ¡Ingresa ya para presentar y agendar la asesoría!`;
 
           triggerPushNotification(
             whatsappMsg,

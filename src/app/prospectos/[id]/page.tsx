@@ -27,6 +27,7 @@ import {
   Trash2,
   Copy,
   Check,
+  Heart,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
@@ -531,7 +532,7 @@ export default function ProspectoDetalle() {
   const totalCredito = financiamiento + costoGestion;
   const incrementoMensual = pensionMejorada - pensionActual;
   const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
-  const aportacion = Math.max(0, totalCredito - aforePensionarse - creditoNomina);
+  const aportacion = Math.max(0, financiamiento - aforePensionarse);
 
   if (!prospect) {
     return (
@@ -1145,13 +1146,13 @@ export default function ProspectoDetalle() {
                     <div className="space-y-4">
                       <div className="bg-emerald-500/5 dark:bg-emerald-950/10 rounded-2xl p-4 border border-emerald-100/40 dark:border-emerald-900/20 grid grid-cols-2 gap-3.5 text-slate-800 dark:text-slate-200">
                         <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Pensión Mejorada</span>
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Tu Pensión Perfecta</span>
                           <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 block mt-1.5 leading-none">
                             ${prospect.simulation.pensionMejorada.toLocaleString()} / mes
                           </span>
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Pensión Anterior</span>
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Pensión actual</span>
                           <span className="text-xs font-black text-slate-500 dark:text-slate-400 block mt-1.5 leading-none">
                             ${prospect.simulation.pensionActual.toLocaleString()} / mes
                           </span>
@@ -1163,7 +1164,7 @@ export default function ProspectoDetalle() {
                           </span>
                         </div>
                         <div className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800 shadow-sm">
-                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Incremento Neto</span>
+                          <span className="text-[7.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block leading-none">Incremento de pensión</span>
                           <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 block mt-1.5 leading-none">
                             ${(prospect.simulation.pensionMejorada - prospect.simulation.pensionActual).toLocaleString()}
                           </span>
@@ -1363,7 +1364,7 @@ export default function ProspectoDetalle() {
 
   const handleEmitSimulation = async () => {
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
-      alert("Por favor verifica los números. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero.");
+      alert("Por favor verifica los números. Tu Pensión Perfecta debe superar a la actual, y el financiamiento debe ser mayor a cero.");
       return;
     }
 
@@ -1413,7 +1414,7 @@ export default function ProspectoDetalle() {
 
     if (selectedConditionOption === "aportacion") {
       if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
-        alert("Por favor verifica los números del simulador. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero para condicionar por aportación.");
+        alert("Por favor verifica los números del simulador. Tu Pensión Perfecta debe superar a la actual, y el financiamiento debe ser mayor a cero para condicionar por aportación.");
         return;
       }
       await saveSimulation(prospect.id, {
@@ -1442,7 +1443,7 @@ export default function ProspectoDetalle() {
     }
 
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
-      alert("Por favor verifica los números. La pensión mejorada debe superar a la actual, y el financiamiento debe ser mayor a cero.");
+      alert("Por favor verifica los números. Tu Pensión Perfecta debe superar a la actual, y el financiamiento debe ser mayor a cero.");
       return;
     }
 
@@ -2112,8 +2113,8 @@ export default function ProspectoDetalle() {
               <div className="space-y-4">
                 {/* Semanas Cotizadas */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                    Semanas Reconocidas IMSS
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+                    Semanas cotizadas
                   </label>
                   <input
                     type="number"
@@ -2124,48 +2125,10 @@ export default function ProspectoDetalle() {
                   />
                 </div>
 
-                {/* Pensión inputs grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Pensión actual
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
-                      <input
-                        type="number"
-                        value={pensionActual}
-                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                        onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Pensión proyectada
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
-                      <input
-                        type="number"
-                        value={pensionMejorada}
-                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                        onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 {/* Financing inputs grid */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
                       Financiamiento M40
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
@@ -2182,29 +2145,8 @@ export default function ProspectoDetalle() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Costo Cobertura
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
-                      <input
-                        type="number"
-                        value={costoGestion}
-                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                        onChange={(e) => setCostoGestion(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Afore and Credito de Nomina grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Afore al pensionarse
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+                      Prestamo Pension Perfecta
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -2219,9 +2161,13 @@ export default function ProspectoDetalle() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Pensión inputs grid */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-                      Credito de nomina
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+                      Pension actual
                     </label>
                     <div className="relative rounded-2xl shadow-sm">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
@@ -2229,18 +2175,72 @@ export default function ProspectoDetalle() {
                       </div>
                       <input
                         type="number"
-                        value={creditoNomina}
+                        value={pensionActual}
                         disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                        onChange={(e) => setCreditoNomina(Math.max(0, Number(e.target.value)))}
+                        onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
                         className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+                      Incremento de pension
+                    </label>
+                    <div className="relative rounded-2xl shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
+                        $
+                      </div>
+                      <input
+                        type="text"
+                        readOnly
+                        value={incrementoMensual.toLocaleString()}
+                        className="w-full pl-7 pr-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none rounded-2xl py-2.5 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-not-allowed"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Dictamen comments */}
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                {/* Branded Highlight card for Tu Pension Perfecta */}
+                <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-650 text-white p-4.5 rounded-[22px] shadow-md border border-emerald-500/35 relative overflow-hidden transition-all duration-300">
+                  <div className="absolute right-[-10px] top-[-10px] bg-white/10 h-16 w-16 rounded-full blur-lg pointer-events-none" />
+                  
+                  <div className="flex items-center gap-2 mb-2">
+                    <Heart className="h-4.5 w-4.5 text-white fill-white/20 animate-pulse" />
+                    <label className="block text-[10px] font-black uppercase tracking-wider font-sans text-emerald-105">
+                      Tu Pension Perfecta
+                    </label>
+                  </div>
+                  <div className="relative rounded-2xl shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/70 text-xs font-bold">
+                      $
+                    </div>
+                    <input
+                      type="number"
+                      value={pensionMejorada}
+                      disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
+                      onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
+                      className="w-full pl-7 pr-3 bg-white/15 hover:bg-white/20 focus:bg-white/25 disabled:bg-white/10 disabled:cursor-not-allowed border border-white/20 focus:border-white outline-none rounded-xl py-2.5 text-xs font-black text-white placeholder-emerald-200 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Aportacion taking 1 column width */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 p-4.5 rounded-[22px] shadow-sm hover:shadow transition-shadow">
+                    <span className="text-[10px] font-bold text-rose-550 dark:text-rose-400 uppercase tracking-wider block leading-none">
+                      Aportacion
+                    </span>
+                    <span className="text-lg font-black text-slate-805 dark:text-white block mt-2.5 leading-none">
+                      ${aportacion.toLocaleString()}
+                    </span>
+                  </div>
+                  {/* Empty space for mock grid symmetry */}
+                  <div />
+                </div>
+
+                {/* Dictamen comments / Observaciones */}
+                <div className="pt-2">
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                     Observaciones
                   </label>
                   <textarea
@@ -2249,14 +2249,14 @@ export default function ProspectoDetalle() {
                     onChange={(e) => setComments(e.target.value)}
                     rows={3}
                     placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
-                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none dark:text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-855 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none dark:text-white"
                   />
                 </div>
               </div>
 
               {/* Redesigned Diagnóstico Section */}
               <div className="border-t border-slate-150 pt-5 space-y-4">
-                <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest flex items-center gap-1.5 leading-none">
+                <span className="text-[10px] text-slate-505 font-extrabold uppercase tracking-widest flex items-center gap-1.5 leading-none">
                   Diagnostico
                 </span>
                 
@@ -2266,24 +2266,18 @@ export default function ProspectoDetalle() {
                     <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-wider block leading-none">
                       Total credito
                     </span>
-                    <span className="text-lg font-black text-indigo-950 block mt-2.5 leading-none">
+                    <span className="text-lg font-black text-indigo-950 dark:text-white block mt-2.5 leading-none">
                       ${totalCredito.toLocaleString()}
                     </span>
                   </div>
 
-                  {/* Aportación Card */}
-                  <div className={`border rounded-2xl p-4 shadow-sm hover:shadow transition-shadow ${
-                    aportacion > 0 
-                      ? "bg-amber-50/50 border-amber-100/80 text-amber-950" 
-                      : "bg-teal-50/50 border-teal-100/80 text-teal-950"
-                  }`}>
-                    <span className={`text-[9px] font-extrabold uppercase tracking-wider block leading-none ${
-                      aportacion > 0 ? "text-amber-400" : "text-teal-400"
-                    }`}>
-                      Aportacion
+                  {/* ROI meses Card */}
+                  <div className="bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/40 rounded-2xl p-4 shadow-sm hover:shadow transition-shadow">
+                    <span className="text-[9px] text-cyan-500 font-extrabold uppercase tracking-wider block leading-none">
+                      ROI Estimado
                     </span>
-                    <span className="text-lg font-black block mt-2.5 leading-none">
-                      ${aportacion.toLocaleString()}
+                    <span className="text-lg font-black text-slate-800 dark:text-white block mt-2.5 leading-none">
+                      {roiMeses} meses
                     </span>
                   </div>
                 </div>
@@ -2291,7 +2285,6 @@ export default function ProspectoDetalle() {
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
