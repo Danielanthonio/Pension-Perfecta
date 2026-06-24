@@ -2093,195 +2093,168 @@ export default function ProspectoDetalle() {
           </div>
         </div>
 
-        {/* Columna Derecha: Simulador Ley 73 (~33%) */}
         <div className="w-full lg:w-[33%] flex flex-col shrink-0">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-auto transition-all">
+          <div className="bg-[#070e1b] rounded-3xl border border-[#1b2b48] shadow-2xl flex flex-col lg:h-[820px] h-auto transition-all overflow-hidden">
             {/* Header title */}
-            <div className="px-5 py-4 border-b border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-4 border-b border-[#1b2b48] bg-[#070e1b] flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Calculator className="h-4.5 w-4.5 text-indigo-500 dark:text-indigo-400" />
+                <Calculator className="h-5 w-5 text-[#d4b285]" />
                 <div>
-                  <h3 className="text-xs font-black text-slate-800 dark:text-white">Simulador Ley 73</h3>
-                  <span className="block text-[9px] text-slate-400 dark:text-slate-550 font-semibold">Emisión de dictamen financiero</span>
+                  <h3 className="text-sm font-black text-white font-sans tracking-wide">Simulador Ley 73</h3>
+                  <span className="block text-[9px] text-slate-400/90 font-semibold mt-0.5">Emisión de dictamen financiero</span>
                 </div>
               </div>
             </div>
 
             {/* Scrollable Form Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Form Input fields */}
-              <div className="space-y-4">
-                {/* Semanas Cotizadas */}
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Semanas cotizadas
-                  </label>
-                  <input
-                    type="number"
-                    value={semanas}
-                    disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                    onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
-                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-bold transition-all dark:text-white"
-                  />
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 no-scrollbar">
+              
+              {/* 2-Column Data Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                
+                {/* Column Left */}
+                <div className="space-y-4">
+                  {/* Card 1: Semanas Cotizadas */}
+                  <div className="bg-[#121c32]/85 border border-[#1f2d4e] rounded-2xl p-4 h-[160px] flex flex-col justify-between shadow-sm">
+                    <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
+                      Semanas cotizadas
+                    </span>
+                    <div className="flex-grow flex items-center justify-center py-2">
+                      <input
+                        type="number"
+                        value={semanas}
+                        disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
+                        onChange={(e) => setSemanas(Math.max(0, Number(e.target.value)))}
+                        className="bg-transparent text-center text-3xl font-black text-white outline-none w-full border-b border-[#1f2d4e]/40 focus:border-[#d4b285]/50 transition-colors"
+                      />
+                    </div>
+                    <div className="text-[10px] font-bold text-center border-t border-[#1f2d4e]/60 pt-2 leading-none">
+                      <span className="text-[#d4b285]">REQUISITO: </span>
+                      <span className={semanas >= 500 ? "text-emerald-450" : "text-rose-400"}>
+                        {semanas >= 500 ? "Cumplido" : "Incompleto"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Pensión Actual & Incremento */}
+                  <div className="bg-[#121c32]/85 border border-[#1f2d4e] rounded-2xl p-4 h-[180px] flex flex-col justify-between shadow-sm">
+                    {/* Pensión Actual */}
+                    <div className="space-y-1.5">
+                      <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
+                        Pensión actual
+                      </span>
+                      <div className="relative rounded-xl bg-[#09101f] border border-[#1b2b48] px-3 py-2 flex items-center transition-colors hover:border-[#1e3256]">
+                        <span className="text-slate-400 text-xs font-bold mr-1">$</span>
+                        <input
+                          type="number"
+                          value={pensionActual}
+                          disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
+                          onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
+                          className="bg-transparent text-white text-xs font-extrabold outline-none w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="border-t border-[#1f2d4e]/60 my-2" />
+
+                    {/* Incremento de Pensión */}
+                    <div className="space-y-1.5">
+                      <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
+                        Incremento de pensión
+                      </span>
+                      <div className="relative rounded-xl bg-[#09101f]/40 border border-[#1b2b48]/50 px-3 py-2 flex items-center">
+                        <span className="text-slate-500 text-xs font-bold mr-1">$</span>
+                        <span className="text-white text-xs font-extrabold">
+                          {incrementoMensual.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Financing inputs grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+                {/* Column Right */}
+                <div className="space-y-4">
+                  {/* Card 3: Financiamiento M40 */}
+                  <div className="bg-[#121c32]/85 border border-[#1f2d4e] rounded-2xl p-4 h-[86px] flex flex-col justify-between shadow-sm">
+                    <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
                       Financiamiento M40
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
+                    </span>
+                    <div className="relative rounded-xl bg-[#09101f] border border-[#1b2b48] px-3 py-2 flex items-center transition-colors hover:border-[#1e3256]">
+                      <span className="text-slate-400 text-xs font-bold mr-1">$</span>
                       <input
                         type="number"
                         value={financiamiento}
                         disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setFinanciamiento(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
+                        className="bg-transparent text-white text-xs font-extrabold outline-none w-full"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                      Prestamo Pension Perfecta
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
+
+                  {/* Card 4: Préstamo Pensión Perfecta */}
+                  <div className="bg-[#121c32]/85 border border-[#1f2d4e] rounded-2xl p-4 h-[86px] flex flex-col justify-between shadow-sm">
+                    <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
+                      Préstamo Pensión Perfecta
+                    </span>
+                    <div className="relative rounded-xl bg-[#09101f] border border-[#1b2b48] px-3 py-2 flex items-center transition-colors hover:border-[#1e3256]">
+                      <span className="text-slate-400 text-xs font-bold mr-1">$</span>
                       <input
                         type="number"
                         value={aforePensionarse}
                         disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
                         onChange={(e) => setAforePensionarse(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
+                        className="bg-transparent text-white text-xs font-extrabold outline-none w-full"
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Pensión inputs grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                      Pension actual
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
+                  {/* Card 5: Tu Pensión Perfecta Estimada (Green Card) */}
+                  <div className="bg-gradient-to-br from-[#0c4e34] via-[#0e5c3c] to-[#167d53] border border-[#1da86f]/40 rounded-2xl p-4 h-[152px] flex flex-col justify-between shadow-sm relative overflow-hidden transition-all duration-300">
+                    <Heart className="absolute -bottom-6 -right-6 h-28 w-28 text-emerald-300/10 fill-emerald-300/5 rotate-[15deg] pointer-events-none" />
+                    
+                    <span className="block text-[9px] font-black text-[#9bf2cc] uppercase tracking-wider font-sans leading-tight relative z-10">
+                      Tu pensión<br/>perfecta estimada
+                    </span>
+                    
+                    <div className="relative flex items-center mt-2 border-b border-emerald-400/20 pb-1 relative z-10">
+                      <span className="text-[#f1c40f] text-lg font-black mr-1">$</span>
                       <input
                         type="number"
-                        value={pensionActual}
+                        value={pensionMejorada}
                         disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                        onChange={(e) => setPensionActual(Math.max(0, Number(e.target.value)))}
-                        className="w-full pl-7 pr-3 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl py-2.5 text-xs font-bold transition-all dark:text-white"
+                        onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
+                        className="bg-transparent text-[#f1c40f] text-2xl font-black outline-none w-full placeholder-emerald-800"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                      Incremento de pension
-                    </label>
-                    <div className="relative rounded-2xl shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
-                        $
-                      </div>
-                      <input
-                        type="text"
-                        readOnly
-                        value={incrementoMensual.toLocaleString()}
-                        className="w-full pl-7 pr-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none rounded-2xl py-2.5 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Branded Highlight card for Tu Pension Perfecta */}
-                <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-650 text-white p-4.5 rounded-[22px] shadow-md border border-emerald-500/35 relative overflow-hidden transition-all duration-300">
-                  <div className="absolute right-[-10px] top-[-10px] bg-white/10 h-16 w-16 rounded-full blur-lg pointer-events-none" />
-                  
-                  <div className="flex items-center gap-2 mb-2">
-                    <Heart className="h-4.5 w-4.5 text-white fill-white/20 animate-pulse" />
-                    <label className="block text-[10px] font-black uppercase tracking-wider font-sans text-emerald-105">
-                      Tu Pension Perfecta
-                    </label>
-                  </div>
-                  <div className="relative rounded-2xl shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/70 text-xs font-bold">
-                      $
-                    </div>
-                    <input
-                      type="number"
-                      value={pensionMejorada}
-                      disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                      onChange={(e) => setPensionMejorada(Math.max(0, Number(e.target.value)))}
-                      className="w-full pl-7 pr-3 bg-white/15 hover:bg-white/20 focus:bg-white/25 disabled:bg-white/10 disabled:cursor-not-allowed border border-white/20 focus:border-white outline-none rounded-xl py-2.5 text-xs font-black text-white placeholder-emerald-200 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Aportacion taking 1 column width */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-rose-50/70 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 p-4.5 rounded-[22px] shadow-sm hover:shadow transition-shadow">
-                    <span className="text-[10px] font-bold text-rose-550 dark:text-rose-400 uppercase tracking-wider block leading-none">
-                      Aportacion
-                    </span>
-                    <span className="text-lg font-black text-slate-805 dark:text-white block mt-2.5 leading-none">
-                      ${aportacion.toLocaleString()}
-                    </span>
-                  </div>
-                  {/* Empty space for mock grid symmetry */}
-                  <div />
-                </div>
-
-                {/* Dictamen comments / Observaciones */}
-                <div className="pt-2">
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
-                    Observaciones
-                  </label>
-                  <textarea
-                    value={comments}
-                    disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
-                    onChange={(e) => setComments(e.target.value)}
-                    rows={3}
-                    placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
-                    className="w-full bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-855 disabled:bg-slate-100/60 dark:disabled:bg-slate-800/60 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-750 focus:border-indigo-500 dark:focus:border-indigo-500 outline-none rounded-2xl px-4 py-2.5 text-xs font-semibold transition-all resize-none dark:text-white"
-                  />
                 </div>
               </div>
 
-              {/* Redesigned Diagnóstico Section */}
-              <div className="border-t border-slate-150 pt-5 space-y-4">
-                <span className="text-[10px] text-slate-505 font-extrabold uppercase tracking-widest flex items-center gap-1.5 leading-none">
-                  Diagnostico
+              {/* Card 6: Aportación Total (Centered Banner) */}
+              <div className="bg-[#12213d] border border-[#1e345e] rounded-2xl p-4 text-center flex flex-col items-center justify-center shadow-sm">
+                <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-widest leading-none">
+                  Aportación total
                 </span>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Total Crédito Card */}
-                  <div className="bg-indigo-50/50 border border-indigo-100/80 rounded-2xl p-4 shadow-sm hover:shadow transition-shadow">
-                    <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-wider block leading-none">
-                      Total credito
-                    </span>
-                    <span className="text-lg font-black text-indigo-950 dark:text-white block mt-2.5 leading-none">
-                      ${totalCredito.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {/* ROI meses Card */}
-                  <div className="bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-100 dark:border-cyan-900/40 rounded-2xl p-4 shadow-sm hover:shadow transition-shadow">
-                    <span className="text-[9px] text-cyan-500 font-extrabold uppercase tracking-wider block leading-none">
-                      ROI Estimado
-                    </span>
-                    <span className="text-lg font-black text-slate-800 dark:text-white block mt-2.5 leading-none">
-                      {roiMeses} meses
-                    </span>
-                  </div>
-                </div>
+                <span className="text-xl font-black text-white mt-2 leading-none">
+                  ${aportacion.toLocaleString()}
+                </span>
               </div>
+
+              {/* Card 7: Observaciones Técnicas */}
+              <div className="space-y-2">
+                <span className="block text-[9px] font-black text-[#d4b285] uppercase tracking-wider font-sans leading-none">
+                  Observaciones técnicas
+                </span>
+                <textarea
+                  value={comments}
+                  disabled={(user?.role !== "director" && user?.role !== "account_manager") || (isApproved && !isEditingApproved)}
+                  onChange={(e) => setComments(e.target.value)}
+                  rows={3}
+                  placeholder="Escribe comentarios sobre la M40 y la viabilidad del proyecto..."
+                  className="w-full bg-[#09101f] border border-[#1b2b48] hover:border-[#1e3256] focus:border-[#2b4470] outline-none rounded-2xl px-4 py-3 text-xs font-semibold text-slate-200 placeholder-slate-500 transition-all resize-none leading-relaxed"
+                />
+              </div>
+
             </div>
           </div>
         </div>
