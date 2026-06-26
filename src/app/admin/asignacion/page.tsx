@@ -495,11 +495,11 @@ export default function AsignacionAliados() {
                               >
                                 <option value="" className="text-slate-405 dark:bg-slate-900">👥 Sin asignar a Líder</option>
                                 {activeLeaders
-                                  // Leaders must have the same Account Manager to be assignable
-                                  .filter(l => l.account_manager_id === a.account_manager_id)
+                                  // Directors can assign any leader globally, AMs can only assign leaders under their management
+                                  .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
                                   .map((l) => (
                                     <option key={l.id} value={l.id} className="text-slate-850 dark:bg-slate-900">
-                                      Líder: {l.lider_grupo}
+                                      {l.full_name} ({l.lider_grupo || "Sin Grupo"})
                                     </option>
                                   ))}
                               </select>
