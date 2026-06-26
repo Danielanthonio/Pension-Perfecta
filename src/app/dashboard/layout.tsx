@@ -242,6 +242,8 @@ export default function DashboardLayout({
     markNotificationRead,
     markAllNotificationsRead,
     isDemoMode,
+    isProvisionalSession,
+    isLoading,
     logout,
   } = useApp();
 
@@ -272,22 +274,22 @@ export default function DashboardLayout({
 
   // Protect client side routes
   useEffect(() => {
-    if (mounted) {
+    if (mounted && !isLoading) {
       if (!user) {
         router.push("/login");
       } else if (user.role === "director" || user.role === "account_manager") {
         router.push("/admin");
       }
     }
-  }, [user, mounted, router]);
+  }, [user, mounted, isLoading, router]);
 
-  if (!mounted || !user || user.role === "director" || user.role === "account_manager") {
+  if (!mounted || isLoading || !user || user.role === "director" || user.role === "account_manager") {
     return (
       <div className="min-h-screen bg-slate-955 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
-            {(user?.role === "director" || user?.role === "account_manager") ? "Redireccionando..." : "Cargando Portal..."}
+            {isLoading ? "Cargando Plataforma..." : (user?.role === "director" || user?.role === "account_manager") ? "Redireccionando..." : "Cargando Portal..."}
           </span>
         </div>
       </div>
@@ -485,6 +487,19 @@ export default function DashboardLayout({
         {/* Dynamic App Route Content */}
         <main className="flex-grow overflow-y-auto p-6 sm:p-10 bg-[#f8fafc] dark:bg-slate-900 transition-colors duration-200">
           <div className="max-w-[1700px] mx-auto w-full">
+            {isProvisionalSession && (
+              <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-3 shadow-sm">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wider">
+                    Modo Emergencia Local Activo (Sesión Provisional)
+                  </h4>
+                  <p className="text-[11px] text-slate-650 dark:text-slate-400 leading-normal">
+                    Tu correo electrónico no está confirmado en Supabase. El sistema ha activado el almacenamiento local en este navegador para prevenir la pérdida de tus prospectos. **Pide al administrador desactivar "Confirm Email" en Supabase Auth** para habilitar la sincronización en la nube.
+                  </p>
+                </div>
+              </div>
+            )}
             {children}
           </div>
         </main>

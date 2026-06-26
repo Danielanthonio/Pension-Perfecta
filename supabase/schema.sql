@@ -18,6 +18,8 @@ CREATE TABLE profiles (
   role text CHECK (role IN ('admin', 'aliado', 'account_manager')),
   invitation_code_used text,
   account_manager_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  aliado_tipo text DEFAULT 'aliado' CHECK (aliado_tipo IN ('aliado', 'lider')),
+  lider_grupo text,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
@@ -125,7 +127,12 @@ BEGIN
   UPDATE auth.users
   SET raw_user_meta_data = 
     coalesce(raw_user_meta_data, '{}'::jsonb) 
-    || jsonb_build_object('role', NEW.role, 'account_manager_id', NEW.account_manager_id)
+    || jsonb_build_object(
+      'role', NEW.role, 
+      'account_manager_id', NEW.account_manager_id,
+      'aliado_tipo', NEW.aliado_tipo,
+      'lider_grupo', NEW.lider_grupo
+    )
   WHERE id = NEW.id;
   RETURN NEW;
 END;
@@ -320,3 +327,33 @@ ALTER TABLE documents ADD COLUMN IF NOT EXISTS uploaded_by uuid REFERENCES profi
 
 -- MIGRACIÓN: Soporte para Crédito de Nómina en Simulación
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS credito_nomina numeric DEFAULT 0;
+
+-- =============================================================================
+-- MIGRACIÓN: Módulo de Liderazgo (Asignación de Aliados a Líderes)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.lider_aliados (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lider_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  aliado_asignado_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  grupo_nombre VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  UNIQUE(lider_id, aliado_asignado_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lider_id ON public.lider_aliados(lider_id);
+CREATE INDEX IF NOT EXISTS idx_aliado_asignado_id ON public.lider_aliados(aliado_asignado_id);
+
+ALTER TABLE public.lider_aliados ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lideres_ven_aliados_asignados"
+  ON public.lider_aliados FOR SELECT USING (auth.uid() = lider_id);
+
+CREATE POLICY "Aliados_no_ven_relaciones"
+  ON public.lider_aliados FOR SELECT USING (false);
+
+CREATE POLICY "Admins_y_AMs_gestionan_relaciones"
+  ON public.lider_aliados FOR ALL USING (
+    public.get_user_role(auth.uid()) IN ('admin', 'director', 'account_manager')
+  );

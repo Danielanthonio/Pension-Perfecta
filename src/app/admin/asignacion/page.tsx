@@ -12,13 +12,19 @@ import {
   Clock,
   Check,
   X,
+  Shield,
+  Briefcase,
+  Save,
 } from "lucide-react";
 
 export default function AsignacionAliados() {
   const {
     profiles,
     prospects,
+    user,
     updateProfileAdmin,
+    changeAllyType,
+    assignAllyToLider,
     triggerPushNotification,
   } = useApp();
 
@@ -30,10 +36,26 @@ export default function AsignacionAliados() {
   const [updatingRow, setUpdatingRow] = useState<string | null>(null);
   const [successRow, setSuccessRow] = useState<string | null>(null);
 
-  const allies = profiles.filter((p) => p.role === "aliado");
-  const accountManagers = profiles.filter((p) => p.role === "account_manager");
+  // Local state for tracking unsaved leader-type changes and group name inputs per row
+  const [rowTypes, setRowTypes] = useState<Record<string, "aliado" | "lider">>({});
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
 
-  // Handle immediate database update when changing assignment
+  const isAM = user?.role === "account_manager";
+  const isDirector = user?.role === "director";
+
+  // Filter profiles based on access: AMs only see allies/leaders managed by them
+  const allies = profiles.filter(
+    (p) => p.role === "aliado" && (!isAM || p.account_manager_id === user?.id)
+  );
+  
+  const accountManagers = profiles.filter((p) => p.role === "account_manager");
+  
+  // Dynamic list of active leaders for assignment dropdown (under this AM, or all if Director)
+  const activeLeaders = profiles.filter(
+    (p) => p.role === "aliado" && p.aliado_tipo === "lider" && (!isAM || p.account_manager_id === user?.id)
+  );
+
+  // Handle immediate database update when changing account manager (Directors only)
   const handleSelectAM = async (allyId: string, value: string) => {
     setUpdatingRow(allyId);
     setSuccessRow(null);
@@ -60,6 +82,69 @@ export default function AsignacionAliados() {
     } finally {
       setUpdatingRow(null);
     }
+  };
+
+  // Handle immediate leader assignment for normal allies
+  const handleSelectLider = async (allyId: string, liderId: string) => {
+    setUpdatingRow(allyId);
+    setSuccessRow(null);
+    try {
+      const selectedLiderId = liderId === "" ? null : liderId;
+      await assignAllyToLider(allyId, selectedLiderId);
+      
+      setSuccessRow(allyId);
+      setTimeout(() => setSuccessRow(null), 3000);
+    } catch (e) {
+      console.error(e);
+      alert("Error al guardar la asignación del Líder");
+    } finally {
+      setUpdatingRow(null);
+    }
+  };
+
+  // Handle saving the Ally Type and Group Name
+  const handleSaveType = async (allyId: string) => {
+    const nextTipo = rowTypes[allyId] || "aliado";
+    const nextGrupo = groupNames[allyId] || "";
+
+    if (nextTipo === "lider" && !nextGrupo.trim()) {
+      alert("Nombre del grupo es obligatorio para tipo 'Líder'");
+      return;
+    }
+
+    setUpdatingRow(allyId);
+    setSuccessRow(null);
+    try {
+      await changeAllyType(allyId, nextTipo, nextTipo === "lider" ? nextGrupo.trim() : undefined);
+      
+      setSuccessRow(allyId);
+      setTimeout(() => setSuccessRow(null), 3000);
+
+      // Clear row local edit state
+      const newTypes = { ...rowTypes };
+      delete newTypes[allyId];
+      setRowTypes(newTypes);
+
+      const newGroups = { ...groupNames };
+      delete newGroups[allyId];
+      setGroupNames(newGroups);
+    } catch (e) {
+      console.error(e);
+      // Keep state on failure so they don't lose typed text
+    } finally {
+      setUpdatingRow(null);
+    }
+  };
+
+  // Cancel pending type edits
+  const handleCancelTypeEdit = (allyId: string) => {
+    const newTypes = { ...rowTypes };
+    delete newTypes[allyId];
+    setRowTypes(newTypes);
+
+    const newGroups = { ...groupNames };
+    delete newGroups[allyId];
+    setGroupNames(newGroups);
   };
 
   // Helper to count active prospects of an ally
@@ -94,7 +179,10 @@ export default function AsignacionAliados() {
     return a.account_manager_id !== null && a.account_manager_id !== undefined;
   }).length;
   const unassignedCount = totalAllies - assignedCount;
-  const totalAMs = accountManagers.length;
+  
+  // Account Managers list workload filtering
+  const visibleAMs = isAM ? accountManagers.filter(am => am.id === user?.id) : accountManagers;
+  const totalAMs = visibleAMs.length;
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
@@ -104,7 +192,9 @@ export default function AsignacionAliados() {
         <div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Asignación de Aliados</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Asigna aliados comerciales a sus respectivos Account Managers. Confirma o declina los cambios manualmente antes de guardarlos.
+            {isAM 
+              ? "Gestiona tu cartera de aliados, desígnalos como líderes o asígnales un líder de grupo."
+              : "Asigna aliados comerciales a sus respectivos Account Managers y gestiona la estructura de liderazgo de grupos."}
           </p>
         </div>
       </div>
@@ -113,53 +203,53 @@ export default function AsignacionAliados() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
           <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Aliados Comerciales</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Mis Aliados</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-              Total en sistema
+            <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
+              Total asignado
             </span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
           <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Aliados Sin Asignar</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Sin Supervisor</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-amber-600 dark:text-amber-500">{unassignedCount}</span>
             <span className="text-[9px] bg-amber-50 dark:bg-amber-955/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">
-              Requieren Atención
+              En mesa Director
             </span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
           <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Aliados Asignados</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Bajo mi supervisión</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-500">{assignedCount}</span>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-955/30 text-emerald-650 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">
-              Bajo Gestión de AM
+            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-955/30 text-emerald-650 dark:text-emerald-450 px-2 py-0.5 rounded-full font-bold">
+              Bajo Gestión AM
             </span>
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
           <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Account Managers</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Líderes de Grupo</span>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400">{totalAMs}</span>
+            <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400">{activeLeaders.length}</span>
             <span className="text-[9px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">
-              Supervisores
+              Líderes Activos
             </span>
           </div>
         </div>
       </div>
 
-      {/* Main Content Layout: Assignment Matrix + AM Performance */}
+      {/* Main Content Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         
-        {/* Left Area (2/3 width): Ally List & Assignment dropdowns */}
+        {/* Left Area (2/3 width): Ally List & Assignment matrix */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
             
@@ -168,7 +258,7 @@ export default function AsignacionAliados() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Matriz de Asignaciones</span>
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-1 block">Asigna supervisores a cada aliado comercial. Los cambios requieren confirmación manual.</span>
+                  <span className="text-xs font-bold text-slate-655 dark:text-slate-400 mt-1 block">Asigna supervisores a cada aliado comercial. Los cambios requieren confirmación manual.</span>
                 </div>
                 
                 <div className="relative w-full sm:w-64">
@@ -202,7 +292,7 @@ export default function AsignacionAliados() {
                       assignmentFilter === "unassigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
                     }`}
                   >
-                    Sin Asignar ({unassignedCount})
+                    Sin Supervisor ({unassignedCount})
                   </button>
                   <button
                     onClick={() => setAssignmentFilter("assigned")}
@@ -210,24 +300,26 @@ export default function AsignacionAliados() {
                       assignmentFilter === "assigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
                     }`}
                   >
-                    Asignados ({assignedCount})
+                    Supervisados ({assignedCount})
                   </button>
                 </div>
 
-                {/* Filter by Specific AM */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 dark:text-slate-550 font-bold text-[10px] uppercase">Account Manager:</span>
-                  <select
-                    value={selectedAMFilter}
-                    onChange={(e) => setSelectedAMFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Todos los AM</option>
-                    {accountManagers.map((am) => (
-                      <option key={am.id} value={am.id}>{am.full_name}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Filter by Specific AM (Only useful for Directors) */}
+                {!isAM && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400 dark:text-slate-550 font-bold text-[10px] uppercase">Account Manager:</span>
+                    <select
+                      value={selectedAMFilter}
+                      onChange={(e) => setSelectedAMFilter(e.target.value)}
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-705 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
+                    >
+                      <option value="all">Todos los AM</option>
+                      {accountManagers.map((am) => (
+                        <option key={am.id} value={am.id}>{am.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -247,11 +339,13 @@ export default function AsignacionAliados() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-[10px] font-bold text-slate-550 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Aliado Comercial</th>
-                      <th className="px-6 py-4">Información de Contacto</th>
-                      <th className="px-6 py-4 text-center">Prospectos Activos</th>
-                      <th className="px-6 py-4">Asignar Account Manager</th>
-                      <th className="px-6 py-4 text-center">Estado / Acción</th>
+                      <th className="px-5 py-4">Aliado Comercial</th>
+                      <th className="px-5 py-4">Contacto</th>
+                      <th className="px-5 py-4 text-center">Prospectos</th>
+                      <th className="px-5 py-4">Supervisor AM</th>
+                      <th className="px-5 py-4">Tipo de Aliado</th>
+                      <th className="px-5 py-4">Asignar a Líder</th>
+                      <th className="px-5 py-4 text-center">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
@@ -262,15 +356,32 @@ export default function AsignacionAliados() {
                       const isUpdating = updatingRow === a.id;
                       const isSuccess = successRow === a.id;
 
+                      // Edit state for type
+                      const currentTipo = rowTypes[a.id] !== undefined ? rowTypes[a.id] : (a.aliado_tipo || "aliado");
+                      const currentGrupo = groupNames[a.id] !== undefined ? groupNames[a.id] : (a.lider_grupo || "");
+                      const hasTypeChanged = currentTipo !== (a.aliado_tipo || "aliado") || (currentTipo === "lider" && currentGrupo !== (a.lider_grupo || ""));
+
                       return (
-                        <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors text-xs">
+                          {/* 1. Ally Info */}
+                          <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs font-black border border-emerald-250/25">
+                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border ${
+                                a.aliado_tipo === "lider"
+                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-250/20"
+                                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-250/20"
+                              }`}>
                                 {a.full_name.charAt(0)}
                               </div>
                               <div>
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{a.full_name}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{a.full_name}</span>
+                                  {a.aliado_tipo === "lider" && (
+                                    <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
+                                      LÍDER
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">
                                   Registrado: {new Date(a.created_at).toLocaleDateString()}
                                 </span>
@@ -278,55 +389,157 @@ export default function AsignacionAliados() {
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-300 block">{a.email}</span>
+                          {/* 2. Contact details */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <span className="font-semibold text-slate-650 dark:text-slate-300 block">{a.email}</span>
                             <span className="text-[10px] text-slate-450 block mt-0.5">{a.phone || "Sin Celular"}</span>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 text-[10px] font-bold rounded-full">
-                              {currentProspects} {currentProspects === 1 ? "prospecto" : "prospectos"}
+                          {/* 3. Prospects count */}
+                          <td className="px-5 py-4 whitespace-nowrap text-center">
+                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-655 dark:text-slate-300 text-[10px] font-bold rounded-full">
+                              {currentProspects}
                             </span>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <select
-                              value={currentSelectedVal}
-                              onChange={(e) => handleSelectAM(a.id, e.target.value)}
-                              disabled={isUpdating}
-                              className={`text-xs font-semibold rounded-xl px-2.5 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
-                                isAssignedNow
-                                  ? "border-emerald-200/50 bg-emerald-50/10 text-slate-705 dark:text-slate-200" 
-                                  : "border-amber-250/50 bg-amber-50/10 text-amber-705 dark:text-amber-400"
-                              }`}
-                            >
-                              <option value="" className="text-slate-500 dark:bg-slate-900">⚠️ Sin Asignar (Director)</option>
-                              {accountManagers.map((am) => (
-                                <option key={am.id} value={am.id} className="text-slate-850 dark:bg-slate-900">
-                                  👤 {am.full_name}
-                                </option>
-                              ))}
-                            </select>
+                          {/* 4. Assign Account Manager */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {isAM ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-505 dark:text-slate-400 rounded-xl font-bold">
+                                👤 {accountManagers.find(m => m.id === currentSelectedVal)?.full_name || "Sin Supervisor"}
+                              </span>
+                            ) : (
+                              <select
+                                value={currentSelectedVal}
+                                onChange={(e) => handleSelectAM(a.id, e.target.value)}
+                                disabled={isUpdating}
+                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
+                                  isAssignedNow
+                                    ? "border-emerald-200/50 bg-emerald-50/10 text-slate-705 dark:text-slate-200" 
+                                    : "border-amber-250/50 bg-amber-50/10 text-amber-705 dark:text-amber-400"
+                                }`}
+                              >
+                                <option value="" className="text-slate-500 dark:bg-slate-900">⚠️ Sin AM (Director)</option>
+                                {accountManagers.map((am) => (
+                                  <option key={am.id} value={am.id} className="text-slate-800 dark:bg-slate-900">
+                                    👤 {am.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-xs font-bold">
+                          {/* 5. Tipo de Aliado */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="flex flex-col gap-1">
+                              <select
+                                value={currentTipo}
+                                onChange={(e) => {
+                                  setRowTypes({ ...rowTypes, [a.id]: e.target.value as any });
+                                }}
+                                disabled={isUpdating}
+                                className="font-bold rounded-xl px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:border-blue-500 cursor-pointer"
+                              >
+                                <option value="aliado">Aliado</option>
+                                <option value="lider">Líder</option>
+                              </select>
+                              
+                              {currentTipo === "lider" && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <input
+                                    type="text"
+                                    value={currentGrupo}
+                                    onChange={(e) => {
+                                      setGroupNames({ ...groupNames, [a.id]: e.target.value });
+                                    }}
+                                    placeholder="Ej. Enfoque Total"
+                                    className={`w-28 px-2 py-0.5 text-[10px] rounded-lg border outline-none bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 ${
+                                      !currentGrupo.trim()
+                                        ? "border-red-500 focus:border-red-650"
+                                        : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
+                                    }`}
+                                  />
+                                </div>
+                              )}
+                              {a.aliado_tipo === "lider" && currentTipo === "lider" && !hasTypeChanged && (
+                                <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight px-1 mt-0.5">
+                                  Grupo: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 6. Asignar a Líder */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {currentTipo === "lider" ? (
+                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica para Líderes</span>
+                            ) : (
+                              <select
+                                value={a.lider_id || ""}
+                                onChange={(e) => handleSelectLider(a.id, e.target.value)}
+                                disabled={isUpdating || !a.account_manager_id}
+                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-indigo-500 transition-all cursor-pointer ${
+                                  !a.account_manager_id 
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : a.lider_id 
+                                      ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-705 dark:text-indigo-400"
+                                      : "border-slate-200/50 bg-slate-50/10 text-slate-500"
+                                }`}
+                                title={!a.account_manager_id ? "Asigna primero un Account Manager a este aliado" : ""}
+                              >
+                                <option value="" className="text-slate-405 dark:bg-slate-900">👥 Sin asignar a Líder</option>
+                                {activeLeaders
+                                  // Leaders must have the same Account Manager to be assignable
+                                  .filter(l => l.account_manager_id === a.account_manager_id)
+                                  .map((l) => (
+                                    <option key={l.id} value={l.id} className="text-slate-850 dark:bg-slate-900">
+                                      Líder: {l.lider_grupo}
+                                    </option>
+                                  ))}
+                              </select>
+                            )}
+                          </td>
+
+                          {/* 7. Action Status / Save trigger */}
+                          <td className="px-5 py-4 whitespace-nowrap text-center text-xs font-bold">
                             {isUpdating ? (
                               <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
                                 <span className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                                 Guardando...
                               </span>
+                            ) : hasTypeChanged ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleSaveType(a.id)}
+                                  className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+                                  title="Guardar tipo"
+                                >
+                                  <Save className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleCancelTypeEdit(a.id)}
+                                  className="p-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 rounded-lg transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             ) : isSuccess ? (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 animate-pulse">
                                 <CheckCircle className="h-3.5 w-3.5" />
                                 Guardado
                               </span>
+                            ) : a.lider_id ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400 border border-indigo-150 dark:border-indigo-900">
+                                <Shield className="h-2.5 w-2.5" /> Líder: {activeLeaders.find(l => l.id === a.lider_id)?.lider_grupo || "Grupo"}
+                              </span>
                             ) : isAssignedNow ? (
                               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
-                                <UserCheck className="h-3 w-3" /> Asignado
+                                <UserCheck className="h-3 w-3" /> Supervisado
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-450 border border-amber-100 dark:border-amber-900">
-                                <Clock className="h-3 w-3" /> En Espera
+                                <Clock className="h-3 w-3" /> Director
                               </span>
                             )}
                           </td>
@@ -349,14 +562,14 @@ export default function AsignacionAliados() {
             </div>
 
             <div className="space-y-3">
-              {accountManagers.length === 0 ? (
+              {totalAMs === 0 ? (
                 <div className="text-center py-8 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl text-slate-450 text-xs">
-                  No hay Account Managers registrados. Crea uno en la sección "Gestión de Usuarios".
+                  No hay Account Managers a mostrar.
                 </div>
               ) : (
-                accountManagers.map((am) => {
+                visibleAMs.map((am) => {
                   // Calculate using current DB assigned state to avoid premature UI change on sidebar
-                  const assignedAllies = allies.filter((a) => a.account_manager_id === am.id);
+                  const assignedAllies = profiles.filter((a) => a.role === "aliado" && a.account_manager_id === am.id);
                   const totalProspects = assignedAllies.reduce((sum, a) => sum + getProspectCount(a.id), 0);
 
                   return (
@@ -402,8 +615,8 @@ export default function AsignacionAliados() {
             <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
             <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
             <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
-            <p className="text-[11px] text-slate-550 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
-              Al seleccionar un Account Manager para un aliado comercial, la asignación se actualizará y guardará en la base de datos de manera inmediata. Se enviará automáticamente una notificación push de aviso al aliado comercial.
+            <p className="text-[11px] text-slate-555 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
+              Al seleccionar un Account Manager o un Líder de Grupo, la asignación se actualizará y guardará inmediatamente. Se enviará automáticamente una notificación al aliado comercial correspondiente.
             </p>
           </div>
         </div>

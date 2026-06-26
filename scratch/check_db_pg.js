@@ -1,16 +1,17 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv6first');
+
 const { Client } = require('pg');
 
+const connectionString = 'postgresql://postgres:Villouta2026.@db.gxovfywzftiirdpcskbc.supabase.co:5432/postgres';
+
 const client = new Client({
-  user: 'postgres.gxovfywzftiirdpcskbc',
-  host: 'aws-0-us-east-1.pooler.supabase.com',
-  database: 'postgres',
-  password: 'Villouta2026.',
-  port: 6543,
+  connectionString,
   ssl: { rejectUnauthorized: false }
 });
 
 async function run() {
-  console.log("Connecting directly to PostgreSQL via Pooler with options object...");
+  console.log("Connecting directly to PostgreSQL (IPv6 first)...");
   await client.connect();
   console.log("Connected successfully!");
 
@@ -30,7 +31,7 @@ async function run() {
     console.log(`- ID: ${pr.id} | Name: ${pr.full_name} | Aliado ID: ${pr.aliado_id} | Aliado Name: ${pr.aliado_name} | CURP: ${pr.curp} | Status: ${pr.status} | Created: ${pr.created_at}`);
   });
 
-  // 3. Check all auth users
+  // 3. Check all auth users (if we can read from auth.users)
   console.log("\n--- AUTH USERS IN DB ---");
   try {
     const authRes = await client.query('SELECT id, email, raw_user_meta_data, email_confirmed_at, last_sign_in_at FROM auth.users;');

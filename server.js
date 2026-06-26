@@ -24,6 +24,8 @@ if (fs.existsSync(envPath)) {
 }
 
 // Hot DDL Migration to add password_provisional to profiles table
+// Commented out to prevent TCP timeout hangs on Hostinger startup
+/*
 if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
   const { Client } = require('pg');
   const connectionString = 'postgresql://postgres:Villouta2026.@db.gxovfywzftiirdpcskbc.supabase.co:5432/postgres';
@@ -45,6 +47,7 @@ if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
       console.error('DDL check failed:', err);
     });
 }
+*/
 
 
 

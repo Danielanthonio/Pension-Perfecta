@@ -18,6 +18,10 @@ export interface UserProfile {
   is_active?: boolean;
   account_manager_id?: string | null;
   password_provisional?: string | null;
+  aliado_tipo?: "aliado" | "lider";
+  lider_grupo?: string | null;
+  lider_id?: string | null;
+  lider_aliado_rel_id?: string | null;
 }
 
 export interface DocumentItem {
@@ -171,6 +175,8 @@ interface AppContextType {
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
   deleteProfile: (id: string) => Promise<void>;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
+  changeAllyType: (allyId: string, tipo: "aliado" | "lider", grupoNombre?: string) => Promise<void>;
+  assignAllyToLider: (allyId: string, liderId: string | null) => Promise<void>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearToast: () => void;
@@ -466,6 +472,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       ...dbProfile,
       role: dbProfile.role === "account_manager" ? "account_manager" : (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : dbProfile.role,
       is_active: dbProfile.is_active !== false,
+      aliado_tipo: dbProfile.aliado_tipo || "aliado",
+      lider_grupo: dbProfile.lider_grupo || null,
     };
   };
 
@@ -672,26 +680,69 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const storedNotifs = localStorage.getItem("pensionflow_notifications");
       const storedProfiles = localStorage.getItem("pensionflow_profiles");
 
-      if (storedProfiles) {
+      let localLiderAliados: any[] = [];
+      const storedLiderAliados = localStorage.getItem("pensionflow_lider_aliados");
+      if (storedLiderAliados) {
         try {
-          const parsed = JSON.parse(storedProfiles).map((p: any) => ({
-            ...p,
-            is_active: p.is_active !== false,
-          }));
-          setProfiles(parsed);
+          localLiderAliados = JSON.parse(storedLiderAliados);
         } catch (e) {
-          setProfiles(INITIAL_PROFILES);
+          localLiderAliados = [];
         }
       } else {
-        setProfiles(INITIAL_PROFILES);
-        localStorage.setItem("pensionflow_profiles", JSON.stringify(INITIAL_PROFILES));
+        localStorage.setItem("pensionflow_lider_aliados", JSON.stringify([]));
+      }
+
+      let parsedProfilesList: UserProfile[] = [];
+      if (storedProfiles) {
+        try {
+          parsedProfilesList = JSON.parse(storedProfiles).map((p: any) => {
+            const mapped = {
+              ...p,
+              is_active: p.is_active !== false,
+              aliado_tipo: p.aliado_tipo || "aliado",
+              lider_grupo: p.lider_grupo || null,
+            };
+            const rel = localLiderAliados.find((r: any) => r.aliado_asignado_id === mapped.id);
+            if (rel) {
+              mapped.lider_id = rel.lider_id;
+              mapped.lider_aliado_rel_id = rel.id;
+            } else {
+              mapped.lider_id = null;
+              mapped.lider_aliado_rel_id = null;
+            }
+            return mapped;
+          });
+          setProfiles(parsedProfilesList);
+        } catch (e) {
+          parsedProfilesList = INITIAL_PROFILES.map((p: any) => ({
+            ...p,
+            aliado_tipo: p.aliado_tipo || "aliado",
+            lider_grupo: p.lider_grupo || null,
+            lider_id: null,
+            lider_aliado_rel_id: null,
+          }));
+          setProfiles(parsedProfilesList);
+        }
+      } else {
+        parsedProfilesList = INITIAL_PROFILES.map((p: any) => ({
+          ...p,
+          aliado_tipo: p.aliado_tipo || "aliado",
+          lider_grupo: p.lider_grupo || null,
+          lider_id: null,
+          lider_aliado_rel_id: null,
+        }));
+        setProfiles(parsedProfilesList);
+        localStorage.setItem("pensionflow_profiles", JSON.stringify(parsedProfilesList));
       }
 
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        const match = parsedProfilesList.find(p => p.id === parsedUser.id);
+        setUser(match || parsedUser);
       } else {
-        setUser(INITIAL_PROFILES[0]);
-        localStorage.setItem("pensionflow_user", JSON.stringify(INITIAL_PROFILES[0]));
+        const defaultUser = parsedProfilesList[0];
+        setUser(defaultUser);
+        localStorage.setItem("pensionflow_user", JSON.stringify(defaultUser));
       }
 
       if (storedRole) {
@@ -898,7 +949,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               console.error("Error fetching profiles:", profilesError);
               setDbError(prev => prev ? `${prev} | Error perfiles: ${profilesError.message}` : `Error perfiles: ${profilesError.message}`);
             }
-            const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+
+            // Fetch leader-allies relationships
+            const { data: dbLiderAliados, error: laError } = await client.from("lider_aliados").select("*");
+            if (laError) {
+              console.error("Error fetching lider_aliados:", laError);
+            }
+
+            const mappedProfiles = dbProfiles ? dbProfiles.map(dbP => {
+              const mapped = mapProfileFromDB(dbP);
+              const rel = dbLiderAliados?.find((r: any) => r.aliado_asignado_id === mapped.id);
+              if (rel) {
+                mapped.lider_id = rel.lider_id;
+                mapped.lider_aliado_rel_id = rel.id;
+              } else {
+                mapped.lider_id = null;
+                mapped.lider_aliado_rel_id = null;
+              }
+              return mapped;
+            }) : [];
             setProfiles(mappedProfiles);
 
             // Fetch prospects (filtered by role if user is aliado or account_manager)
@@ -3021,6 +3090,231 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const changeAllyType = async (
+    allyId: string,
+    tipo: "aliado" | "lider",
+    grupoNombre?: string
+  ): Promise<void> => {
+    const profile = profiles.find((p) => p.id === allyId);
+    if (!profile) return;
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      // Local updates in demo mode
+      const updatedProfiles = profiles.map((p) => {
+        if (p.id === allyId) {
+          return {
+            ...p,
+            aliado_tipo: tipo,
+            lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+          };
+        }
+        return p;
+      });
+      setProfiles(updatedProfiles);
+      saveToStorage("pensionflow_profiles", updatedProfiles);
+
+      // If updating self (for preview)
+      if (user?.id === allyId) {
+        const updatedUser = {
+          ...user,
+          aliado_tipo: tipo,
+          lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+        };
+        setUser(updatedUser);
+        saveToStorage("pensionflow_user", updatedUser);
+      }
+
+      const msg = `Tipo de aliado actualizado a ${tipo === "lider" ? "Líder" : "Aliado"}`;
+      setToast({ id: Date.now().toString(), type: "email", recipient: profile.email, message: msg });
+    } else {
+      try {
+        const res = await fetch(`/api/aliados/${allyId}/tipo`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            aliado_tipo: tipo,
+            lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Error al actualizar tipo de aliado");
+        }
+
+        // Update local profiles list
+        setProfiles((prev) =>
+          prev.map((p) =>
+            p.id === allyId
+              ? {
+                  ...p,
+                  aliado_tipo: tipo,
+                  lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+                }
+              : p
+          )
+        );
+
+        if (user?.id === allyId) {
+          setUser((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  aliado_tipo: tipo,
+                  lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+                }
+              : null
+          );
+        }
+
+        // Notify
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Tipo de Aliado Actualizado 👤⚙️",
+          message: `El aliado ${profile.full_name} ahora es ${tipo === "lider" ? `Líder del grupo '${grupoNombre}'` : "Aliado estándar"}.`,
+          type: "success",
+          read: false,
+        });
+      } catch (err: any) {
+        console.error("Error updating ally type:", err);
+        alert(err.message || "Error al cambiar tipo de aliado");
+        throw err;
+      }
+    }
+  };
+
+  const assignAllyToLider = async (
+    allyId: string,
+    liderId: string | null
+  ): Promise<void> => {
+    const ally = profiles.find((p) => p.id === allyId);
+    if (!ally) return;
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      // Local updates in demo mode
+      let localLiderAliados: any[] = [];
+      const storedLiderAliados = localStorage.getItem("pensionflow_lider_aliados");
+      if (storedLiderAliados) {
+        try {
+          localLiderAliados = JSON.parse(storedLiderAliados);
+        } catch (e) {
+          localLiderAliados = [];
+        }
+      }
+
+      // Remove existing relation for this ally
+      localLiderAliados = localLiderAliados.filter((r) => r.aliado_asignado_id !== allyId);
+
+      let groupName = null;
+      let relationId = null;
+
+      if (liderId) {
+        const lider = profiles.find((p) => p.id === liderId);
+        groupName = lider?.lider_grupo || "Grupo Demo";
+        relationId = `rel-${Math.random().toString(36).substr(2, 9)}`;
+
+        localLiderAliados.push({
+          id: relationId,
+          lider_id: liderId,
+          aliado_asignado_id: allyId,
+          grupo_nombre: groupName,
+        });
+      }
+
+      localStorage.setItem("pensionflow_lider_aliados", JSON.stringify(localLiderAliados));
+
+      // Update profiles local state
+      const updatedProfiles = profiles.map((p) => {
+        if (p.id === allyId) {
+          return {
+            ...p,
+            lider_id: liderId,
+            lider_aliado_rel_id: relationId,
+          };
+        }
+        return p;
+      });
+      setProfiles(updatedProfiles);
+      saveToStorage("pensionflow_profiles", updatedProfiles);
+
+      const msg = liderId ? `Asignado a Líder` : `Retirado de Líder`;
+      setToast({ id: Date.now().toString(), type: "email", recipient: ally.email, message: msg });
+    } else {
+      try {
+        if (liderId) {
+          // POST to create assignment
+          const res = await fetch("/api/lider-aliados", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lider_id: liderId,
+              aliado_asignado_id: allyId,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Error al asignar líder");
+          }
+
+          // Update local profile state
+          setProfiles((prev) =>
+            prev.map((p) =>
+              p.id === allyId
+                ? {
+                    ...p,
+                    lider_id: liderId,
+                    lider_aliado_rel_id: data.id,
+                  }
+                : p
+            )
+          );
+        } else {
+          // DELETE existing relationship
+          if (ally.lider_aliado_rel_id) {
+            const res = await fetch(`/api/lider-aliados/${ally.lider_aliado_rel_id}`, {
+              method: "DELETE",
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data.error || "Error al desasignar líder");
+            }
+          }
+
+          // Update local profile state
+          setProfiles((prev) =>
+            prev.map((p) =>
+              p.id === allyId
+                ? {
+                    ...p,
+                    lider_id: null,
+                    lider_aliado_rel_id: null,
+                  }
+                : p
+            )
+          );
+        }
+
+        // Notify
+        const lider = profiles.find((p) => p.id === liderId);
+        await supabase.from("notifications").insert({
+          user_id: user?.id,
+          title: "Asignación de Líder Actualizada 👥🔄",
+          message: liderId
+            ? `El aliado ${ally.full_name} ha sido asignado al líder ${lider?.full_name || "Desconocido"}.`
+            : `El aliado ${ally.full_name} ha sido desasignado de su líder.`,
+          type: "info",
+          read: false,
+        });
+      } catch (err: any) {
+        console.error("Error updating leader assignment:", err);
+        alert(err.message || "Error al asignar líder");
+        throw err;
+      }
+    }
+  };
+
   const getFileContent = async (doc: DocumentItem): Promise<string | null> => {
     if (isDemoMode || !supabase) {
       return getFile(doc.id);
@@ -3150,6 +3444,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         createProfile,
         deleteProfile,
         updateProfileAdmin,
+        changeAllyType,
+        assignAllyToLider,
         markNotificationRead,
         markAllNotificationsRead,
         clearToast,
