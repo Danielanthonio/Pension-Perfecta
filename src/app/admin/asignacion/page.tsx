@@ -26,6 +26,7 @@ export default function AsignacionAliados() {
     changeAllyType,
     assignAllyToLider,
     triggerPushNotification,
+    empresasMultialiado,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -105,17 +106,17 @@ export default function AsignacionAliados() {
   // Handle saving the Ally Type and Group Name
   const handleSaveType = async (allyId: string) => {
     const nextTipo = rowTypes[allyId] || "aliado";
-    const nextGrupo = groupNames[allyId] || "";
+    const nextEmpresaId = groupNames[allyId] || "";
 
-    if (nextTipo === "lider" && !nextGrupo.trim()) {
-      alert("Nombre del grupo es obligatorio para tipo 'Líder'");
+    if (nextTipo === "lider" && !nextEmpresaId.trim()) {
+      alert("Seleccionar una empresa es obligatorio para tipo 'Líder'");
       return;
     }
 
     setUpdatingRow(allyId);
     setSuccessRow(null);
     try {
-      await changeAllyType(allyId, nextTipo, nextTipo === "lider" ? nextGrupo.trim() : undefined);
+      await changeAllyType(allyId, nextTipo, nextTipo === "lider" ? nextEmpresaId : undefined);
       
       setSuccessRow(allyId);
       setTimeout(() => setSuccessRow(null), 3000);
@@ -358,8 +359,8 @@ export default function AsignacionAliados() {
 
                       // Edit state for type
                       const currentTipo = rowTypes[a.id] !== undefined ? rowTypes[a.id] : (a.aliado_tipo || "aliado");
-                      const currentGrupo = groupNames[a.id] !== undefined ? groupNames[a.id] : (a.lider_grupo || "");
-                      const hasTypeChanged = currentTipo !== (a.aliado_tipo || "aliado") || (currentTipo === "lider" && currentGrupo !== (a.lider_grupo || ""));
+                      const currentEmpresaId = groupNames[a.id] !== undefined ? groupNames[a.id] : (a.empresa_multialiado_id || "");
+                      const hasTypeChanged = currentTipo !== (a.aliado_tipo || "aliado") || (currentTipo === "lider" && currentEmpresaId !== (a.empresa_multialiado_id || ""));
 
                       return (
                         <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors text-xs">
@@ -446,24 +447,29 @@ export default function AsignacionAliados() {
                               
                               {currentTipo === "lider" && (
                                 <div className="flex items-center gap-1 mt-1">
-                                  <input
-                                    type="text"
-                                    value={currentGrupo}
+                                  <select
+                                    value={currentEmpresaId}
                                     onChange={(e) => {
                                       setGroupNames({ ...groupNames, [a.id]: e.target.value });
                                     }}
-                                    placeholder="Ej. Enfoque Total"
-                                    className={`w-28 px-2 py-0.5 text-[10px] rounded-lg border outline-none bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 ${
-                                      !currentGrupo.trim()
+                                    className={`w-28 px-1.5 py-0.5 text-[10px] rounded-lg border outline-none bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 ${
+                                      !currentEmpresaId
                                         ? "border-red-500 focus:border-red-650"
                                         : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
                                     }`}
-                                  />
+                                  >
+                                    <option value="" className="text-slate-500">Selecciona Empresa</option>
+                                    {empresasMultialiado.map((emp) => (
+                                      <option key={emp.id} value={emp.id} className="text-slate-805 dark:text-slate-100">
+                                        {emp.nombre}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
                               )}
                               {a.aliado_tipo === "lider" && currentTipo === "lider" && !hasTypeChanged && (
                                 <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight px-1 mt-0.5">
-                                  Grupo: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
+                                  Empresa: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
                                 </span>
                               )}
                             </div>

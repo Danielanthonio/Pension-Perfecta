@@ -22,20 +22,30 @@ export async function PATCH(
 
     // Get request body
     const body = await req.json();
-    const { aliado_tipo, lider_grupo } = body;
+    const { aliado_tipo, empresa_multialiado_id } = body;
 
     if (aliado_tipo !== "aliado" && aliado_tipo !== "lider") {
       return NextResponse.json({ error: "Tipo de aliado inválido" }, { status: 400 });
     }
 
-    // Validate leader group (RT-4 rule 1 and 2)
+    let empresaNombre: string | null = null;
+
+    // Validate company (empresa_multialiado_id)
     if (aliado_tipo === "lider") {
-      if (!lider_grupo || !lider_grupo.trim()) {
-        return NextResponse.json({ error: "Nombre del grupo es obligatorio para tipo 'lider'" }, { status: 400 });
+      if (!empresa_multialiado_id) {
+        return NextResponse.json({ error: "Seleccionar una empresa es obligatorio para tipo 'lider'" }, { status: 400 });
       }
-      if (lider_grupo.length > 255) {
-        return NextResponse.json({ error: "El nombre del grupo no puede superar los 255 caracteres" }, { status: 400 });
+      
+      const { data: empresa, error: empError } = await supabase
+        .from("empresas_multialiado")
+        .select("nombre")
+        .eq("id", empresa_multialiado_id)
+        .single();
+
+      if (empError || !empresa) {
+        return NextResponse.json({ error: "La empresa seleccionada no existe" }, { status: 400 });
       }
+      empresaNombre = empresa.nombre;
     }
 
     // Fetch caller user's profile role
@@ -93,34 +103,11 @@ export async function PATCH(
       }
     }
 
-    // Validation RT-4 rule 4: No permitir duplicar nombre de grupo para mismo Account Manager
-    if (aliado_tipo === "lider") {
-      const { data: duplicateGroups, error: dupError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("role", "aliado")
-        .eq("aliado_tipo", "lider")
-        .eq("account_manager_id", allyProfile.account_manager_id)
-        .ilike("lider_grupo", lider_grupo.trim())
-        .neq("id", allyId)
-        .limit(1);
-
-      if (dupError) {
-        console.error("Error checking duplicate groups:", dupError);
-        return NextResponse.json({ error: "Error al validar nombre de grupo duplicado" }, { status: 500 });
-      }
-
-      if (duplicateGroups && duplicateGroups.length > 0) {
-        return NextResponse.json({
-          error: `Ya existe un grupo con el nombre '${lider_grupo}' para este Account Manager`
-        }, { status: 400 });
-      }
-    }
-
     // Perform the update
     const updateData: any = {
       aliado_tipo,
-      lider_grupo: aliado_tipo === "lider" ? lider_grupo.trim() : null,
+      empresa_multialiado_id: aliado_tipo === "lider" ? empresa_multialiado_id : null,
+      lider_grupo: aliado_tipo === "lider" ? empresaNombre : null, // For backward compatibility
     };
 
     const { data: updatedProfile, error: updateError } = await supabase
@@ -139,7 +126,8 @@ export async function PATCH(
       id: updatedProfile.id,
       name: updatedProfile.full_name,
       aliado_tipo: updatedProfile.aliado_tipo,
-      lider_grupo: updatedProfile.lider_grupo,
+      empresa_multialiado_id: updatedProfile.empresa_multialiado_id,
+      empresa_nombre: updatedProfile.lider_grupo,
       updated_at: new Date().toISOString(),
     });
   } catch (err: any) {

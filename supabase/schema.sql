@@ -20,6 +20,7 @@ CREATE TABLE profiles (
   account_manager_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
   aliado_tipo text DEFAULT 'aliado' CHECK (aliado_tipo IN ('aliado', 'lider')),
   lider_grupo text,
+  empresa_multialiado_id uuid, -- Referencia a empresas_multialiado (añadida vía alter o definida después)
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
@@ -131,7 +132,8 @@ BEGIN
       'role', NEW.role, 
       'account_manager_id', NEW.account_manager_id,
       'aliado_tipo', NEW.aliado_tipo,
-      'lider_grupo', NEW.lider_grupo
+      'lider_grupo', NEW.lider_grupo,
+      'empresa_multialiado_id', NEW.empresa_multialiado_id
     )
   WHERE id = NEW.id;
   RETURN NEW;

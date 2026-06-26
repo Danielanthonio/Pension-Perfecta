@@ -148,7 +148,7 @@ function DashboardContent() {
               <div className="min-w-0">
                 <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{user?.full_name}</span>
                 <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-semibold">
-                  {user?.aliado_tipo === "lider" ? `Grupo: ${user.lider_grupo || "Sin Grupo"}` : "Asesor Independiente"}
+                  {user?.aliado_tipo === "lider" ? `Empresa: ${user.lider_grupo || "Sin Empresa"}` : "Asesor Independiente"}
                 </span>
               </div>
             </div>
@@ -257,7 +257,7 @@ function DashboardContent() {
                 <Users className="h-4.5 w-4.5 text-blue-500" /> Mis Aliados Asignados
               </span>
               <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">
-                Visualiza los asesores comerciales asignados bajo tu liderazgo en el grupo <strong className="text-blue-550 dark:text-blue-400">"{user.lider_grupo}"</strong>.
+                Visualiza los asesores comerciales asignados bajo tu liderazgo en la empresa <strong className="text-blue-550 dark:text-blue-400">"{user.lider_grupo}"</strong>.
               </span>
             </div>
           </div>

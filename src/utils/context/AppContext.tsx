@@ -22,7 +22,18 @@ export interface UserProfile {
   lider_grupo?: string | null;
   lider_id?: string | null;
   lider_aliado_rel_id?: string | null;
+  empresa_multialiado_id?: string | null;
 }
+
+export interface EmpresaMultialiado {
+  id: string;
+  nombre: string;
+  lideres_count?: number;
+  created_by?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
 
 export interface DocumentItem {
   id: string;
@@ -175,8 +186,12 @@ interface AppContextType {
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
   deleteProfile: (id: string) => Promise<void>;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
-  changeAllyType: (allyId: string, tipo: "aliado" | "lider", grupoNombre?: string) => Promise<void>;
+  changeAllyType: (allyId: string, tipo: "aliado" | "lider", empresaMultialiadoId?: string | null) => Promise<void>;
   assignAllyToLider: (allyId: string, liderId: string | null) => Promise<void>;
+  empresasMultialiado: EmpresaMultialiado[];
+  createEmpresa: (nombre: string) => Promise<EmpresaMultialiado>;
+  updateEmpresa: (id: string, nombre: string) => Promise<void>;
+  deleteEmpresa: (id: string) => Promise<void>;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearToast: () => void;
@@ -458,6 +473,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [invitationCodes, setInvitationCodes] = useState<InvitationCode[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [empresasMultialiado, setEmpresasMultialiado] = useState<EmpresaMultialiado[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isProvisionalSession, setIsProvisionalSession] = useState<boolean>(false);
@@ -474,6 +490,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       is_active: dbProfile.is_active !== false,
       aliado_tipo: dbProfile.aliado_tipo || "aliado",
       lider_grupo: dbProfile.lider_grupo || null,
+      empresa_multialiado_id: dbProfile.empresa_multialiado_id || null,
     };
   };
 
@@ -692,6 +709,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         localStorage.setItem("pensionflow_lider_aliados", JSON.stringify([]));
       }
 
+      let localEmpresas: EmpresaMultialiado[] = [];
+      const storedEmpresas = localStorage.getItem("pensionflow_empresas_multialiado");
+      if (storedEmpresas) {
+        try {
+          localEmpresas = JSON.parse(storedEmpresas);
+        } catch (e) {
+          localEmpresas = [];
+        }
+      }
+      if (localEmpresas.length === 0) {
+        localEmpresas = [
+          { id: "empresa-apoyamax", nombre: "Apoyamax", created_by: "Sistema", created_at: new Date().toISOString() },
+          { id: "empresa-pensium", nombre: "Pensium", created_by: "Sistema", created_at: new Date().toISOString() }
+        ];
+        localStorage.setItem("pensionflow_empresas_multialiado", JSON.stringify(localEmpresas));
+      }
+
       let parsedProfilesList: UserProfile[] = [];
       if (storedProfiles) {
         try {
@@ -701,6 +735,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               is_active: p.is_active !== false,
               aliado_tipo: p.aliado_tipo || "aliado",
               lider_grupo: p.lider_grupo || null,
+              empresa_multialiado_id: p.empresa_multialiado_id || null,
             };
             const rel = localLiderAliados.find((r: any) => r.aliado_asignado_id === mapped.id);
             if (rel) {
@@ -718,6 +753,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             ...p,
             aliado_tipo: p.aliado_tipo || "aliado",
             lider_grupo: p.lider_grupo || null,
+            empresa_multialiado_id: p.empresa_multialiado_id || null,
             lider_id: null,
             lider_aliado_rel_id: null,
           }));
@@ -728,12 +764,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           ...p,
           aliado_tipo: p.aliado_tipo || "aliado",
           lider_grupo: p.lider_grupo || null,
+          empresa_multialiado_id: p.empresa_multialiado_id || null,
           lider_id: null,
           lider_aliado_rel_id: null,
         }));
         setProfiles(parsedProfilesList);
         localStorage.setItem("pensionflow_profiles", JSON.stringify(parsedProfilesList));
       }
+
+      const countMap: Record<string, number> = {};
+      parsedProfilesList.forEach((p: any) => {
+        if (p.aliado_tipo === "lider" && p.empresa_multialiado_id) {
+          countMap[p.empresa_multialiado_id] = (countMap[p.empresa_multialiado_id] || 0) + 1;
+        }
+      });
+      const localEmpresasWithCounts = localEmpresas.map((e: any) => ({
+        ...e,
+        lideres_count: countMap[e.id] || 0
+      }));
+      setEmpresasMultialiado(localEmpresasWithCounts);
 
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
@@ -969,6 +1018,35 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               return mapped;
             }) : [];
             setProfiles(mappedProfiles);
+
+            // Fetch empresas_multialiado
+            const { data: dbEmpresas, error: empresasError } = await client
+              .from("empresas_multialiado")
+              .select("*");
+
+            if (empresasError) {
+              console.error("Error fetching empresas_multialiado:", empresasError);
+            }
+
+            const countMap: Record<string, number> = {};
+            mappedProfiles.forEach((p) => {
+              if (p.aliado_tipo === "lider" && p.empresa_multialiado_id) {
+                countMap[p.empresa_multialiado_id] = (countMap[p.empresa_multialiado_id] || 0) + 1;
+              }
+            });
+
+            const mappedEmpresas = (dbEmpresas || []).map((c: any) => {
+              const creatorProfile = mappedProfiles.find(p => p.id === c.created_by);
+              return {
+                id: c.id,
+                nombre: c.nombre,
+                created_by: creatorProfile?.full_name || "Sistema",
+                created_at: c.created_at,
+                updated_at: c.updated_at,
+                lideres_count: countMap[c.id] || 0
+              };
+            });
+            setEmpresasMultialiado(mappedEmpresas);
 
             // Fetch prospects (filtered by role if user is aliado or account_manager)
             let prospectsQuery = client.from("prospects").select("*, documents(*)");
@@ -3093,19 +3171,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const changeAllyType = async (
     allyId: string,
     tipo: "aliado" | "lider",
-    grupoNombre?: string
+    empresaMultialiadoId?: string | null
   ): Promise<void> => {
     const profile = profiles.find((p) => p.id === allyId);
     if (!profile) return;
 
     if (isDemoMode || isProvisionalSession || !supabase) {
       // Local updates in demo mode
+      const company = empresasMultialiado.find(e => e.id === empresaMultialiadoId);
+      const companyName = tipo === "lider" ? (company?.nombre || "Sin Empresa") : null;
+
       const updatedProfiles = profiles.map((p) => {
         if (p.id === allyId) {
           return {
             ...p,
             aliado_tipo: tipo,
-            lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+            empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+            lider_grupo: companyName,
           };
         }
         return p;
@@ -3118,13 +3200,26 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const updatedUser = {
           ...user,
           aliado_tipo: tipo,
-          lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+          empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+          lider_grupo: companyName,
         };
         setUser(updatedUser);
         saveToStorage("pensionflow_user", updatedUser);
       }
 
-      const msg = `Tipo de aliado actualizado a ${tipo === "lider" ? "Líder" : "Aliado"}`;
+      // Re-calculate leader counts locally
+      const countMap: Record<string, number> = {};
+      updatedProfiles.forEach((p: any) => {
+        if (p.aliado_tipo === "lider" && p.empresa_multialiado_id) {
+          countMap[p.empresa_multialiado_id] = (countMap[p.empresa_multialiado_id] || 0) + 1;
+        }
+      });
+      setEmpresasMultialiado(prev => prev.map(e => ({
+        ...e,
+        lideres_count: countMap[e.id] || 0
+      })));
+
+      const msg = `Tipo de aliado actualizado a ${tipo === "lider" ? `Líder de ${companyName}` : "Aliado"}`;
       setToast({ id: Date.now().toString(), type: "email", recipient: profile.email, message: msg });
     } else {
       try {
@@ -3133,7 +3228,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             aliado_tipo: tipo,
-            lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+            empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
           }),
         });
 
@@ -3142,18 +3237,20 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           throw new Error(data.error || "Error al actualizar tipo de aliado");
         }
 
+        const companyName = data.empresa_nombre || null;
+
         // Update local profiles list
-        setProfiles((prev) =>
-          prev.map((p) =>
-            p.id === allyId
-              ? {
-                  ...p,
-                  aliado_tipo: tipo,
-                  lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
-                }
-              : p
-          )
+        const updatedProfiles = profiles.map((p) =>
+          p.id === allyId
+            ? {
+                ...p,
+                aliado_tipo: tipo,
+                empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+                lider_grupo: companyName,
+              }
+            : p
         );
+        setProfiles(updatedProfiles);
 
         if (user?.id === allyId) {
           setUser((prev) =>
@@ -3161,17 +3258,30 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               ? {
                   ...prev,
                   aliado_tipo: tipo,
-                  lider_grupo: tipo === "lider" ? (grupoNombre || "Grupo Demo") : null,
+                  empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+                  lider_grupo: companyName,
                 }
               : null
           );
         }
 
+        // Re-calculate leader counts
+        const countMap: Record<string, number> = {};
+        updatedProfiles.forEach((p: any) => {
+          if (p.aliado_tipo === "lider" && p.empresa_multialiado_id) {
+            countMap[p.empresa_multialiado_id] = (countMap[p.empresa_multialiado_id] || 0) + 1;
+          }
+        });
+        setEmpresasMultialiado(prev => prev.map(e => ({
+          ...e,
+          lideres_count: countMap[e.id] || 0
+        })));
+
         // Notify
         await supabase.from("notifications").insert({
           user_id: user?.id,
           title: "Tipo de Aliado Actualizado 👤⚙️",
-          message: `El aliado ${profile.full_name} ahora es ${tipo === "lider" ? `Líder del grupo '${grupoNombre}'` : "Aliado estándar"}.`,
+          message: `El aliado ${profile.full_name} ahora es ${tipo === "lider" ? `Líder de la empresa '${companyName}'` : "Aliado estándar"}.`,
           type: "success",
           read: false,
         });
@@ -3315,6 +3425,161 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const createEmpresa = async (nombre: string): Promise<EmpresaMultialiado> => {
+    if (!nombre || !nombre.trim()) throw new Error("El nombre de la empresa es obligatorio");
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const storedEmpresas = localStorage.getItem("pensionflow_empresas_multialiado");
+      let list: EmpresaMultialiado[] = [];
+      if (storedEmpresas) {
+        try { list = JSON.parse(storedEmpresas); } catch (e) {}
+      }
+
+      if (list.some(e => e.nombre.toLowerCase() === nombre.trim().toLowerCase())) {
+        throw new Error(`La empresa '${nombre.trim()}' ya existe`);
+      }
+
+      const newEmpresa: EmpresaMultialiado = {
+        id: "empresa-" + Date.now().toString(),
+        nombre: nombre.trim(),
+        created_by: user?.full_name || "Sistema",
+        created_at: new Date().toISOString(),
+        lideres_count: 0
+      };
+
+      const updatedList = [...list, newEmpresa];
+      setEmpresasMultialiado(updatedList);
+      saveToStorage("pensionflow_empresas_multialiado", updatedList);
+
+      setToast({
+        id: Date.now().toString(),
+        type: "email",
+        recipient: user?.email || "",
+        message: `Empresa '${nombre.trim()}' creada (Modo Demo)`
+      });
+
+      return newEmpresa;
+    } else {
+      const res = await fetch("/api/empresas-multialiado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al crear la empresa");
+
+      const newEmp: EmpresaMultialiado = {
+        id: data.id,
+        nombre: data.nombre,
+        created_by: data.created_by,
+        created_at: data.created_at,
+        lideres_count: 0
+      };
+
+      setEmpresasMultialiado(prev => [...prev, newEmp]);
+      return newEmp;
+    }
+  };
+
+  const updateEmpresa = async (id: string, nombre: string): Promise<void> => {
+    if (!nombre || !nombre.trim()) throw new Error("El nombre de la empresa es obligatorio");
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const storedEmpresas = localStorage.getItem("pensionflow_empresas_multialiado");
+      let list: EmpresaMultialiado[] = [];
+      if (storedEmpresas) {
+        try { list = JSON.parse(storedEmpresas); } catch (e) {}
+      }
+
+      if (list.some(e => e.nombre.toLowerCase() === nombre.trim().toLowerCase() && e.id !== id)) {
+        throw new Error(`La empresa '${nombre.trim()}' ya existe`);
+      }
+
+      const updatedList = list.map(e => {
+        if (e.id === id) {
+          return { ...e, nombre: nombre.trim(), updated_at: new Date().toISOString() };
+        }
+        return e;
+      });
+
+      setEmpresasMultialiado(updatedList);
+      saveToStorage("pensionflow_empresas_multialiado", updatedList);
+
+      // Also update company name in profiles and user for backward compatibility (lider_grupo)
+      setProfiles(prev => prev.map(p => {
+        if (p.empresa_multialiado_id === id) {
+          return { ...p, lider_grupo: nombre.trim() };
+        }
+        return p;
+      }));
+      if (user && user.empresa_multialiado_id === id) {
+        setUser({ ...user, lider_grupo: nombre.trim() });
+      }
+
+      setToast({
+        id: Date.now().toString(),
+        type: "email",
+        recipient: user?.email || "",
+        message: `Empresa actualizada a '${nombre.trim()}' (Modo Demo)`
+      });
+    } else {
+      const res = await fetch(`/api/empresas-multialiado/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al actualizar la empresa");
+
+      // Update locally
+      setEmpresasMultialiado(prev => prev.map(e => e.id === id ? { ...e, nombre: data.nombre } : e));
+      setProfiles(prev => prev.map(p => {
+        if (p.empresa_multialiado_id === id) {
+          return { ...p, lider_grupo: data.nombre };
+        }
+        return p;
+      }));
+      if (user && user.empresa_multialiado_id === id) {
+        setUser(prev => prev ? { ...prev, lider_grupo: data.nombre } : null);
+      }
+    }
+  };
+
+  const deleteEmpresa = async (id: string): Promise<void> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      // Check if any leaders are assigned in local profiles
+      const hasLeaders = profiles.some(p => p.aliado_tipo === "lider" && p.empresa_multialiado_id === id);
+      if (hasLeaders) {
+        throw new Error("No se puede eliminar la empresa porque tiene líderes asignados");
+      }
+
+      const storedEmpresas = localStorage.getItem("pensionflow_empresas_multialiado");
+      let list: EmpresaMultialiado[] = [];
+      if (storedEmpresas) {
+        try { list = JSON.parse(storedEmpresas); } catch (e) {}
+      }
+
+      const updatedList = list.filter(e => e.id !== id);
+      setEmpresasMultialiado(updatedList);
+      saveToStorage("pensionflow_empresas_multialiado", updatedList);
+
+      setToast({
+        id: Date.now().toString(),
+        type: "email",
+        recipient: user?.email || "",
+        message: "Empresa eliminada (Modo Demo)"
+      });
+    } else {
+      const res = await fetch(`/api/empresas-multialiado/${id}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al eliminar la empresa");
+
+      setEmpresasMultialiado(prev => prev.filter(e => e.id !== id));
+    }
+  };
+
   const getFileContent = async (doc: DocumentItem): Promise<string | null> => {
     if (isDemoMode || !supabase) {
       return getFile(doc.id);
@@ -3446,6 +3711,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         updateProfileAdmin,
         changeAllyType,
         assignAllyToLider,
+        empresasMultialiado,
+        createEmpresa,
+        updateEmpresa,
+        deleteEmpresa,
         markNotificationRead,
         markAllNotificationsRead,
         clearToast,

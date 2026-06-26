@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  Building2,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -44,6 +45,7 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
   const isUsuarios = cleanPath === "/admin/usuarios";
   const isAMs = cleanPath === "/admin/account-managers";
   const isAsignacion = cleanPath === "/admin/asignacion";
+  const isEmpresas = cleanPath === "/admin/empresas-multialiado";
 
   const isAM = user?.role === "account_manager";
   const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
@@ -52,6 +54,7 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
   const clientesHref = currentParamsString ? `/admin/clientes?${currentParamsString}` : "/admin/clientes";
   const aliadosHref = currentParamsString ? `/admin/aliados?${currentParamsString}` : "/admin/aliados";
   const asignacionHref = currentParamsString ? `/admin/asignacion?${currentParamsString}` : "/admin/asignacion";
+  const empresasHref = currentParamsString ? `/admin/empresas-multialiado?${currentParamsString}` : "/admin/empresas-multialiado";
   const accountManagersHref = currentParamsString ? `/admin/account-managers?${currentParamsString}` : "/admin/account-managers";
   const usuariosHref = currentParamsString ? `/admin/usuarios?${currentParamsString}` : "/admin/usuarios";
 
@@ -107,6 +110,19 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
       >
         <ArrowRightLeft className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
         Asignación Aliados
+      </Link>
+
+      <Link
+        href={empresasHref}
+        onClick={onLinkClick}
+        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+          isEmpresas
+            ? `${themeColor} text-white shadow-md`
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+        }`}
+      >
+        <Building2 className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+        Empresas Multialiado
       </Link>
 
       {!isAM && (

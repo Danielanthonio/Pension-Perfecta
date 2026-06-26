@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
       .insert({
         lider_id,
         aliado_asignado_id,
+        empresa_multialiado_id: leader.empresa_multialiado_id,
         grupo_nombre: leader.lider_grupo || "Sin Grupo",
       })
       .select()
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
       id: newRelation.id,
       lider_id: newRelation.lider_id,
       aliado_asignado_id: newRelation.aliado_asignado_id,
+      empresa_multialiado_id: newRelation.empresa_multialiado_id,
       grupo_nombre: newRelation.grupo_nombre,
       created_at: newRelation.created_at,
     }, { status: 201 });

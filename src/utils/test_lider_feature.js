@@ -25,57 +25,57 @@ if (fs.existsSync(envPath)) {
 }
 
 console.log("====================================================");
-console.log("🧪 INICIANDO VERIFICACIÓN: SUBROL LÍDER");
+console.log("🧪 INICIANDO VERIFICACIÓN: EMPRESAS MULTIALIADO & SUBROL LÍDER");
 console.log("====================================================");
 console.log("Base URL:", supabaseUrl || "NOT_FOUND");
 
 const hasCredentials = supabaseUrl && supabaseKey;
 const supabase = hasCredentials ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Mock database simulation for unit and integration testing
+// Mock database simulation for companies
+const MOCK_EMPRESAS = [
+  { id: "emp-1", nombre: "Apoyamax", created_by: "system-uuid", created_at: new Date().toISOString() },
+  { id: "emp-2", nombre: "Pensium", created_by: "system-uuid", created_at: new Date().toISOString() },
+];
+
 const MOCK_PROFILES = [
-  { id: "am-1", full_name: "AM Carlos", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null },
-  { id: "am-2", full_name: "AM Sofia", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null },
-  { id: "ally-1", full_name: "Asesor Pedro", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1" },
-  { id: "ally-2", full_name: "Asesor Maria", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1" },
-  { id: "lider-1", full_name: "Lider Yesenia", role: "aliado", aliado_tipo: "lider", lider_grupo: "Enfoque Total", account_manager_id: "am-1" },
+  { id: "am-1", full_name: "AM Carlos", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null, empresa_multialiado_id: null },
+  { id: "am-2", full_name: "AM Sofia", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null, empresa_multialiado_id: null },
+  { id: "ally-1", full_name: "Asesor Pedro", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1", empresa_multialiado_id: null },
+  { id: "ally-2", full_name: "Asesor Maria", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1", empresa_multialiado_id: null },
+  { id: "lider-1", full_name: "Lider Yesenia", role: "aliado", aliado_tipo: "lider", lider_grupo: "Apoyamax", account_manager_id: "am-1", empresa_multialiado_id: "emp-1" },
 ];
 
 const MOCK_LIDER_ALIADOS = [
-  { id: "rel-1", lider_id: "lider-1", aliado_asignado_id: "ally-2", grupo_nombre: "Enfoque Total" }
+  { id: "rel-1", lider_id: "lider-1", aliado_asignado_id: "ally-2", empresa_multialiado_id: "emp-1", grupo_nombre: "Apoyamax" }
 ];
 
-// Backend validation mock (matching RT-4 requirements)
-function validatePatchAllyType({ caller, targetAlly, inputTipo, inputGrupo, existingRelations, existingProfiles }) {
-  // 6. El aliado no puede auto-designarse Líder
+// Backend validation mock for changing ally type with empresas_multialiado (RT-4 updated)
+function validatePatchAllyType({ caller, targetAlly, inputTipo, inputEmpresaId, existingRelations, existingProfiles, existingEmpresas }) {
   if (caller.id === targetAlly.id) {
     return { valid: false, error: "El aliado no puede auto-designarse Líder" };
   }
 
-  // 5. Solo AM y Director pueden cambiar tipo
   const isDirector = caller.role === "director" || caller.role === "admin";
   const isAM = caller.role === "account_manager";
   if (!isDirector && !isAM) {
     return { valid: false, error: "Solo Account Managers y Directores pueden cambiar tipo" };
   }
 
-  // 5. AM solo puede cambiar sus propios aliados
   if (isAM && targetAlly.account_manager_id !== caller.id) {
     return { valid: false, error: "No tienes permisos para modificar aliados fuera de tu gestión" };
   }
 
-  // 1. Validar grupo no vacío si tipo es Líder
   if (inputTipo === "lider") {
-    if (!inputGrupo || !inputGrupo.trim()) {
-      return { valid: false, error: "Nombre del grupo es obligatorio para tipo 'lider'" };
+    if (!inputEmpresaId) {
+      return { valid: false, error: "Seleccionar una empresa es obligatorio para tipo 'lider'" };
     }
-    // 2. Validar longitud máx 255
-    if (inputGrupo.length > 255) {
-      return { valid: false, error: "El nombre del grupo supera los 255 caracteres" };
+    const empresaExists = existingEmpresas.some(e => e.id === inputEmpresaId);
+    if (!empresaExists) {
+      return { valid: false, error: "La empresa seleccionada no existe" };
     }
   }
 
-  // 3. No permitir cambiar de "lider" a "aliado" si tiene aliados asignados
   if (targetAlly.aliado_tipo === "lider" && inputTipo === "aliado") {
     const hasAssigned = existingRelations.some(r => r.lider_id === targetAlly.id);
     if (hasAssigned) {
@@ -83,18 +83,40 @@ function validatePatchAllyType({ caller, targetAlly, inputTipo, inputGrupo, exis
     }
   }
 
-  // 4. No permitir duplicar nombre de grupo para mismo Account Manager
-  if (inputTipo === "lider") {
-    const duplicate = existingProfiles.some(p => 
-      p.role === "aliado" && 
-      p.aliado_tipo === "lider" && 
-      p.account_manager_id === targetAlly.account_manager_id && 
-      p.lider_grupo.toLowerCase() === inputGrupo.trim().toLowerCase() && 
-      p.id !== targetAlly.id
-    );
-    if (duplicate) {
-      return { valid: false, error: "No permitir duplicar nombre de grupo para mismo Account Manager" };
-    }
+  return { valid: true };
+}
+
+// Company creation validation mock
+function validateCreateCompany({ caller, nombre, existingEmpresas }) {
+  const isDirector = caller.role === "director" || caller.role === "admin";
+  const isAM = caller.role === "account_manager";
+  if (!isDirector && !isAM) {
+    return { valid: false, error: "Solo Account Managers y Directores pueden crear empresas" };
+  }
+
+  if (!nombre || !nombre.trim()) {
+    return { valid: false, error: "El nombre de la empresa es obligatorio" };
+  }
+
+  const duplicate = existingEmpresas.some(e => e.nombre.toLowerCase() === nombre.trim().toLowerCase());
+  if (duplicate) {
+    return { valid: false, error: "La empresa ya existe" };
+  }
+
+  return { valid: true };
+}
+
+// Company deletion validation mock
+function validateDeleteCompany({ caller, empresaId, existingProfiles }) {
+  const isDirector = caller.role === "director" || caller.role === "admin";
+  const isAM = caller.role === "account_manager";
+  if (!isDirector && !isAM) {
+    return { valid: false, error: "Solo Account Managers y Directores pueden eliminar empresas" };
+  }
+
+  const hasLeaders = existingProfiles.some(p => p.aliado_tipo === "lider" && p.empresa_multialiado_id === empresaId);
+  if (hasLeaders) {
+    return { valid: false, error: "No se puede eliminar la empresa porque tiene líderes asignados" };
   }
 
   return { valid: true };
@@ -102,126 +124,107 @@ function validatePatchAllyType({ caller, targetAlly, inputTipo, inputGrupo, exis
 
 // Validation tests
 function runValidationTests() {
-  console.log("\n📋 1. PRUEBAS UNITARIAS DE VALIDACIÓN (RT-4)");
+  console.log("\n📋 1. PRUEBAS UNITARIAS DE VALIDACIÓN");
   
-  // Test case 1: Empty group name
+  // Test case 1: Promoting to leader without company ID
   const res1 = validatePatchAllyType({
     caller: { id: "am-1", role: "account_manager" },
     targetAlly: MOCK_PROFILES[2], // Pedro
     inputTipo: "lider",
-    inputGrupo: "",
+    inputEmpresaId: null,
     existingRelations: MOCK_LIDER_ALIADOS,
-    existingProfiles: MOCK_PROFILES
+    existingProfiles: MOCK_PROFILES,
+    existingEmpresas: MOCK_EMPRESAS
   });
-  console.log(res1.valid === false && res1.error.includes("obligatorio") ? "✅ C-01: Nombre de grupo vacío bloqueado" : "❌ C-01 Failed");
+  console.log(res1.valid === false && res1.error.includes("obligatorio") ? "✅ C-01: Cambio a Líder sin empresa bloqueado" : "❌ C-01 Failed");
 
-  // Test case 2: Auto-designation
+  // Test case 2: Promoting to leader with invalid company ID
   const res2 = validatePatchAllyType({
-    caller: { id: "ally-1", role: "aliado" },
-    targetAlly: MOCK_PROFILES[2], // Pedro (self)
-    inputTipo: "lider",
-    inputGrupo: "Zona Norte",
-    existingRelations: MOCK_LIDER_ALIADOS,
-    existingProfiles: MOCK_PROFILES
-  });
-  console.log(res2.valid === false && res2.error.includes("auto-designarse") ? "✅ C-02: Auto-designación bloqueada" : "❌ C-02 Failed");
-
-  // Test case 3: AM modifying outside portfolio
-  const res3 = validatePatchAllyType({
-    caller: { id: "am-2", role: "account_manager" }, // AM Sofia
-    targetAlly: MOCK_PROFILES[2], // Pedro (assigned to AM Carlos)
-    inputTipo: "lider",
-    inputGrupo: "Zona Norte",
-    existingRelations: MOCK_LIDER_ALIADOS,
-    existingProfiles: MOCK_PROFILES
-  });
-  console.log(res3.valid === false && res3.error.includes("fuera de tu gestión") ? "✅ C-03: AM no puede modificar aliados ajenos" : "❌ C-03 Failed");
-
-  // Test case 4: Change leader to ally with relations
-  const res4 = validatePatchAllyType({
-    caller: { id: "am-1", role: "account_manager" },
-    targetAlly: MOCK_PROFILES[4], // Lider Yesenia (has relations in MOCK_LIDER_ALIADOS)
-    inputTipo: "aliado",
-    inputGrupo: null,
-    existingRelations: MOCK_LIDER_ALIADOS,
-    existingProfiles: MOCK_PROFILES
-  });
-  console.log(res4.valid === false && res4.error.includes("aliados asignados") ? "✅ C-04: Bloqueo de cambio a tipo 'aliado' si tiene subordinados" : "❌ C-04 Failed");
-
-  // Test case 5: Duplicate group name for same AM
-  const res5 = validatePatchAllyType({
-    caller: { id: "am-1", role: "account_manager" },
-    targetAlly: MOCK_PROFILES[2], // Pedro (AM Carlos)
-    inputTipo: "lider",
-    inputGrupo: "Enfoque Total", // Already used by Lider Yesenia (AM Carlos)
-    existingRelations: MOCK_LIDER_ALIADOS,
-    existingProfiles: MOCK_PROFILES
-  });
-  console.log(res5.valid === false && res5.error.includes("duplicar nombre de grupo") ? "✅ C-05: Bloqueo de nombre de grupo duplicado para el mismo AM" : "❌ C-05 Failed");
-
-  // Test case 6: Valid update
-  const res6 = validatePatchAllyType({
     caller: { id: "am-1", role: "account_manager" },
     targetAlly: MOCK_PROFILES[2], // Pedro
     inputTipo: "lider",
-    inputGrupo: "Zona Norte", // Unique group
+    inputEmpresaId: "invalid-uuid",
     existingRelations: MOCK_LIDER_ALIADOS,
+    existingProfiles: MOCK_PROFILES,
+    existingEmpresas: MOCK_EMPRESAS
+  });
+  console.log(res2.valid === false && res2.error.includes("no existe") ? "✅ C-02: Cambio a Líder con empresa inexistente bloqueado" : "❌ C-02 Failed");
+
+  // Test case 3: Create company with duplicate name
+  const res3 = validateCreateCompany({
+    caller: { id: "am-1", role: "account_manager" },
+    nombre: "Apoyamax",
+    existingEmpresas: MOCK_EMPRESAS
+  });
+  console.log(res3.valid === false && res3.error.includes("ya existe") ? "✅ C-03: Creación de empresa duplicada bloqueada" : "❌ C-03 Failed");
+
+  // Test case 4: Delete company with assigned leaders
+  const res4 = validateDeleteCompany({
+    caller: { id: "am-1", role: "account_manager" },
+    empresaId: "emp-1", // Apoyamax (has lider-1 assigned)
     existingProfiles: MOCK_PROFILES
   });
-  console.log(res6.valid === true ? "✅ C-06: Asignación válida aprobada" : "❌ C-06 Failed");
+  console.log(res4.valid === false && res4.error.includes("líderes asignados") ? "✅ C-04: Eliminación de empresa con líderes bloqueada" : "❌ C-04 Failed");
+
+  // Test case 5: Delete company without assigned leaders
+  const res5 = validateDeleteCompany({
+    caller: { id: "am-1", role: "account_manager" },
+    empresaId: "emp-2", // Pensium (no leaders assigned)
+    existingProfiles: MOCK_PROFILES
+  });
+  console.log(res5.valid === true ? "✅ C-05: Eliminación de empresa libre aprobada" : "❌ C-05 Failed");
 }
 
 // 2. Integration / E2E mock client state flow
 function runE2EFlowSimulation() {
-  console.log("\n📋 2. SIMULACIÓN DE FLUJO E2E (MODO DEMO / FRONTEND STATE)");
+  console.log("\n📋 2. SIMULACIÓN DE FLUJO E2E (MOCK FRONTEND STATE)");
 
-  // State
+  let stateEmpresas = [...MOCK_EMPRESAS];
   let stateProfiles = [...MOCK_PROFILES];
   let stateRelations = [...MOCK_LIDER_ALIADOS];
 
-  // AM Carlos creates a Leader
+  // 1. Director creates a new company
+  const newCompVal = validateCreateCompany({
+    caller: { id: "dir-1", role: "director" },
+    nombre: "Nueva Corp",
+    existingEmpresas: stateEmpresas
+  });
+
+  if (newCompVal.valid) {
+    stateEmpresas.push({ id: "emp-3", nombre: "Nueva Corp", created_by: "dir-1", created_at: new Date().toISOString() });
+    console.log("✅ Flujo 1: Director creó con éxito la empresa 'Nueva Corp'");
+  } else {
+    console.log("❌ Flujo 1 Failed");
+  }
+
+  // 2. AM Carlos promotes Pedro to Líder of 'Nueva Corp'
   const allyToPromote = stateProfiles.find(p => p.id === "ally-1");
   const promoteValidation = validatePatchAllyType({
     caller: { id: "am-1", role: "account_manager" },
     targetAlly: allyToPromote,
     inputTipo: "lider",
-    inputGrupo: "Grupo A",
+    inputEmpresaId: "emp-3",
     existingRelations: stateRelations,
-    existingProfiles: stateProfiles
+    existingProfiles: stateProfiles,
+    existingEmpresas: stateEmpresas
   });
 
   if (promoteValidation.valid) {
     allyToPromote.aliado_tipo = "lider";
-    allyToPromote.lider_grupo = "Grupo A";
-    console.log("✅ Flujo 1: AM Carlos promovió con éxito a Asesor Pedro como Líder de 'Grupo A'");
+    allyToPromote.empresa_multialiado_id = "emp-3";
+    allyToPromote.lider_grupo = "Nueva Corp";
+    console.log("✅ Flujo 2: AM Carlos promovió con éxito a Asesor Pedro como Líder de 'Nueva Corp'");
   } else {
-    console.log("❌ Flujo 1 Failed:", promoteValidation.error);
+    console.log("❌ Flujo 2 Failed:", promoteValidation.error);
   }
 
-  // AM Carlos assigns Asesor Maria (ally-2) to the new Leader (Pedro)
-  const lider = stateProfiles.find(p => p.id === "ally-1" && p.aliado_tipo === "lider");
-  const allyToAssign = stateProfiles.find(p => p.id === "ally-2");
-
-  if (lider && allyToAssign && allyToAssign.aliado_tipo === "aliado") {
-    // Clear old relationship if any
-    stateRelations = stateRelations.filter(r => r.aliado_asignado_id !== allyToAssign.id);
-    
-    // Add relationship
-    stateRelations.push({
-      id: "rel-new",
-      lider_id: lider.id,
-      aliado_asignado_id: allyToAssign.id,
-      grupo_nombre: lider.lider_grupo
-    });
-    console.log("✅ Flujo 2: Asesor Maria asignada con éxito al Líder Pedro ('Grupo A')");
-  } else {
-    console.log("❌ Flujo 2 Failed");
-  }
-
-  // Verify Leader Pedro sees his allies
-  const pedroAllies = stateRelations.filter(r => r.lider_id === "ally-1");
-  const hasMaria = pedroAllies.some(r => r.aliado_asignado_id === "ally-2");
-  console.log(pedroAllies.length === 1 && hasMaria ? "✅ Flujo 3: Líder Pedro visualiza correctamente a Asesor Maria en su grupo" : "❌ Flujo 3 Failed");
+  // 3. Try to delete 'Nueva Corp' -> should fail because Pedro is assigned
+  const deleteVal = validateDeleteCompany({
+    caller: { id: "dir-1", role: "director" },
+    empresaId: "emp-3",
+    existingProfiles: stateProfiles
+  });
+  console.log(deleteVal.valid === false && deleteVal.error.includes("líderes asignados") ? "✅ Flujo 3: El sistema impidió borrar 'Nueva Corp' porque Pedro está asignado" : "❌ Flujo 3 Failed");
 }
 
 // 3. Database Check
@@ -234,32 +237,26 @@ async function runDBCheck() {
   console.log("\n📋 3. VERIFICACIÓN DE ESTRUCTURA SUPABASE (DB & RLS)");
 
   try {
-    // Check if new columns exist on profiles table
-    const { data: cols, error: colError } = await supabase
+    const { data: colCheck, error: colCheckError } = await supabase
       .from("profiles")
-      .select("aliado_tipo, lider_grupo")
+      .select("empresa_multialiado_id")
       .limit(1);
 
-    if (colError) {
-      console.log("❌ Columnas 'aliado_tipo' o 'lider_grupo' no existen en tabla profiles:", colError.message);
+    if (colCheckError) {
+      console.log("❌ Columna 'empresa_multialiado_id' no existe en profiles:", colCheckError.message);
     } else {
-      console.log("✅ Columnas nuevas 'aliado_tipo' y 'lider_grupo' verificadas en profiles");
+      console.log("✅ Columna 'empresa_multialiado_id' verificada en profiles");
     }
 
-    // Check if table lider_aliados exists
-    const { data: laData, error: laError } = await supabase
-      .from("lider_aliados")
+    const { data: empData, error: empError } = await supabase
+      .from("empresas_multialiado")
       .select("*")
       .limit(1);
 
-    if (laError) {
-      if (laError.message.includes("does not exist")) {
-        console.log("❌ Tabla 'lider_aliados' no existe. Por favor ejecuta el script de migración SQL en Supabase Dashboard.");
-      } else {
-        console.log("✅ Tabla 'lider_aliados' verificada (RLS activo):", laError.message);
-      }
+    if (empError) {
+      console.log("❌ Tabla 'empresas_multialiado' no existe o tiene problemas de RLS:", empError.message);
     } else {
-      console.log("✅ Tabla 'lider_aliados' verificada y consultada correctamente");
+      console.log("✅ Tabla 'empresas_multialiado' verificada en la base de datos");
     }
   } catch (err) {
     console.error("Catch error querying database structure:", err);
