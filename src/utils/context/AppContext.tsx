@@ -72,7 +72,8 @@ export interface Prospect {
     | "pendiente_documentos"
     | "cerrado_perdido"
     | "falta_semanas"
-    | "falta_afore_cuenta";
+    | "falta_afore_cuenta"
+    | "posible_simulacion";
   notes_aliado?: string;
   notes_director?: string;
   simulation?: Simulation;
@@ -119,6 +120,7 @@ interface AppContextType {
   profiles: UserProfile[];
   toast: ToastMessage | null;
   isDemoMode: boolean;
+  isProvisionalSession: boolean;
   isLoading: boolean;
   dbError?: string | null;
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
@@ -452,6 +454,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
+  const [isProvisionalSession, setIsProvisionalSession] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [dbError, setDbError] = useState<string | null>(null);
   const [supabase, setSupabase] = useState<any>(null);
@@ -820,6 +823,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                       setUser(profile);
                       setActiveRole(profile.role);
                     }
+                  } else if (storedUser.password_provisional) {
+                    // Provisional session bypass: RLS blocks profiles query when anonymous.
+                    // Keep the local storage session intact.
+                    console.warn("Restoring user with provisional session from localStorage fallback:", storedUser.email);
+                    currentUser = storedUser;
+                    setUser(storedUser);
+                    setActiveRole(storedUser.role);
                   } else if (fetchError) {
                     // DB/network error: restore from localStorage anyway to prevent drop!
                     console.warn("DB error when restoring session, keeping localStorage user");
@@ -841,107 +851,147 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             return;
           }
 
-          // Fetch all profiles
-          const { data: dbProfiles, error: profilesError } = await client.from("profiles").select("*");
-          if (profilesError) {
-            console.error("Error fetching profiles:", profilesError);
-            setDbError(prev => prev ? `${prev} | Error perfiles: ${profilesError.message}` : `Error perfiles: ${profilesError.message}`);
-          }
-          const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
-          setProfiles(mappedProfiles);
+          // Fetch profiles, prospects, notifications, invitation codes
+          const isProvisional = !session?.user && !!currentUser?.password_provisional;
+          setIsProvisionalSession(isProvisional);
 
-          // Fetch prospects (filtered by role if user is aliado or account_manager)
-          let prospectsQuery = client.from("prospects").select("*, documents(*)");
-          if (currentUser && currentUser.role === "aliado") {
-            prospectsQuery = prospectsQuery.eq("aliado_id", currentUser.id);
-          } else if (currentUser && currentUser.role === "account_manager") {
-            const assignedAllyIds = mappedProfiles
-              .filter(p => p.role === "aliado" && p.account_manager_id === currentUser.id)
-              .map(p => p.id);
-            if (assignedAllyIds.length > 0) {
-              prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+          if (isProvisional) {
+            setProfiles([currentUser]);
+
+            const storedProspects = localStorage.getItem("pensionflow_prospects");
+            if (storedProspects) {
+              try {
+                setProspects(JSON.parse(storedProspects));
+              } catch (e) {
+                console.error("Error loading local prospects in provisional session:", e);
+                setProspects([]);
+              }
             } else {
-              prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+              setProspects([]);
             }
-          }
-          const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
-          if (prospectsError) {
-            console.error("Error fetching prospects:", prospectsError);
-            setDbError(prev => prev ? `${prev} | Error prospectos: ${prospectsError.message}` : `Error prospectos: ${prospectsError.message}`);
-          }
-          if (dbProspects) {
-            const mappedProspects = dbProspects.map(transformProspectFromDB);
-            setProspects(mappedProspects);
 
-            // Clean up old soft-deleted or purged prospects in background if director/admin
-            if (currentUser && currentUser.role === "director") {
-              const now = new Date();
-              const toPurge = mappedProspects.filter((p: Prospect) => {
-                const deletedAt = getProspectDeletedAt(p);
-                const isPurged = isProspectPurged(p);
-                if (isPurged) return true;
-                if (deletedAt) {
-                  const diffTime = Math.abs(now.getTime() - deletedAt.getTime());
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  return diffDays > 7;
-                }
-                return false;
-              });
+            const storedCodes = localStorage.getItem("pensionflow_invitation_codes");
+            if (storedCodes) {
+              try {
+                setInvitationCodes(JSON.parse(storedCodes));
+              } catch (e) {
+                setInvitationCodes([]);
+              }
+            } else {
+              setInvitationCodes([]);
+            }
 
-              if (toPurge.length > 0) {
-                for (const p of toPurge) {
-                  const driveFolderId = p.drive_folder_id || p.google_drive_folder;
-                  if (driveFolderId) {
+            const storedNotifs = localStorage.getItem("pensionflow_notifications");
+            if (storedNotifs) {
+              try {
+                setNotifications(JSON.parse(storedNotifs));
+              } catch (e) {
+                setNotifications([]);
+              }
+            } else {
+              setNotifications([]);
+            }
+          } else {
+            // Fetch all profiles
+            const { data: dbProfiles, error: profilesError } = await client.from("profiles").select("*");
+            if (profilesError) {
+              console.error("Error fetching profiles:", profilesError);
+              setDbError(prev => prev ? `${prev} | Error perfiles: ${profilesError.message}` : `Error perfiles: ${profilesError.message}`);
+            }
+            const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+            setProfiles(mappedProfiles);
+
+            // Fetch prospects (filtered by role if user is aliado or account_manager)
+            let prospectsQuery = client.from("prospects").select("*, documents(*)");
+            if (currentUser && currentUser.role === "aliado") {
+              prospectsQuery = prospectsQuery.eq("aliado_id", currentUser.id);
+            } else if (currentUser && currentUser.role === "account_manager") {
+              const assignedAllyIds = mappedProfiles
+                .filter(p => p.role === "aliado" && p.account_manager_id === currentUser.id)
+                .map(p => p.id);
+              if (assignedAllyIds.length > 0) {
+                prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+              } else {
+                prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+              }
+            }
+            const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
+            if (prospectsError) {
+              console.error("Error fetching prospects:", prospectsError);
+              setDbError(prev => prev ? `${prev} | Error prospectos: ${prospectsError.message}` : `Error prospectos: ${prospectsError.message}`);
+            }
+            if (dbProspects) {
+              const mappedProspects = dbProspects.map(transformProspectFromDB);
+              setProspects(mappedProspects);
+
+              // Clean up old soft-deleted or purged prospects in background if director/admin
+              if (currentUser && currentUser.role === "director") {
+                const now = new Date();
+                const toPurge = mappedProspects.filter((p: Prospect) => {
+                  const deletedAt = getProspectDeletedAt(p);
+                  const isPurged = isProspectPurged(p);
+                  if (isPurged) return true;
+                  if (deletedAt) {
+                    const diffTime = Math.abs(now.getTime() - deletedAt.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays > 7;
+                  }
+                  return false;
+                });
+
+                if (toPurge.length > 0) {
+                  for (const p of toPurge) {
+                    const driveFolderId = p.drive_folder_id || p.google_drive_folder;
+                    if (driveFolderId) {
+                      try {
+                        await fetch("/api/drive", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "deleteFile",
+                            fileId: driveFolderId,
+                          }),
+                        });
+                      } catch (err) {
+                        console.error("Cleanup: GDrive error:", err);
+                      }
+                    }
                     try {
-                      await fetch("/api/drive", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          action: "deleteFile",
-                          fileId: driveFolderId,
-                        }),
-                      });
+                      await client.from("prospects").delete().eq("id", p.id);
                     } catch (err) {
-                      console.error("Cleanup: GDrive error:", err);
+                      console.error("Cleanup: Supabase error:", err);
                     }
                   }
-                  try {
-                    await client.from("prospects").delete().eq("id", p.id);
-                  } catch (err) {
-                    console.error("Cleanup: Supabase error:", err);
+                  // Refetch prospects after background purge
+                  const { data: refetched } = await prospectsQuery.order("created_at", { ascending: false });
+                  if (refetched) {
+                    setProspects(refetched.map(transformProspectFromDB));
                   }
-                }
-                // Refetch prospects after background purge
-                const { data: refetched } = await prospectsQuery.order("created_at", { ascending: false });
-                if (refetched) {
-                  setProspects(refetched.map(transformProspectFromDB));
                 }
               }
             }
-          }
 
-          // Fetch invitation codes
-          const { data: dbCodes, error: codesError } = await client.from("invitation_codes").select("*");
-          if (codesError) {
-            console.error("Error fetching invitation codes:", codesError);
-            setDbError(prev => prev ? `${prev} | Error códigos: ${codesError.message}` : `Error códigos: ${codesError.message}`);
-          }
-          if (dbCodes) {
-            setInvitationCodes(dbCodes.map((c: any) => {
-              const userWhoUsedIt = mappedProfiles.find(p => p.invitation_code_used === c.code);
-              return {
-                id: c.id,
-                code: c.code,
-                created_by: c.created_by,
-                is_used: c.is_used || !!userWhoUsedIt,
-                used_by: c.used_by || userWhoUsedIt?.id,
-                created_at: c.created_at
-              };
-            }));
-          }
+            // Fetch invitation codes
+            const { data: dbCodes, error: codesError } = await client.from("invitation_codes").select("*");
+            if (codesError) {
+              console.error("Error fetching invitation codes:", codesError);
+              setDbError(prev => prev ? `${prev} | Error códigos: ${codesError.message}` : `Error códigos: ${codesError.message}`);
+            }
+            if (dbCodes) {
+              setInvitationCodes(dbCodes.map((c: any) => {
+                const userWhoUsedIt = mappedProfiles.find(p => p.invitation_code_used === c.code);
+                return {
+                  id: c.id,
+                  code: c.code,
+                  created_by: c.created_by,
+                  is_used: c.is_used || !!userWhoUsedIt,
+                  used_by: c.used_by || userWhoUsedIt?.id,
+                  created_at: c.created_at
+                };
+              }));
+            }
 
-          // Fetch notifications for the user
-          if (currentUser) {
+            // Fetch notifications for the user
             const { data: dbNotifs } = await client
               .from("notifications")
               .select("*")
@@ -974,7 +1024,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   };
 
   const sendPasswordReset = async (email: string): Promise<void> => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       setToast({ id: Date.now().toString(), type: "email", recipient: email, message: "Simulación de correo de recuperación enviada." });
       return;
     }
@@ -988,7 +1038,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   };
 
   const updateUserPassword = async (newPassword: string): Promise<void> => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       setToast({ id: Date.now().toString(), type: "email", recipient: "Sistema", message: "Simulación de cambio de contraseña exitosa." });
       return;
     }
@@ -1011,7 +1061,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     setProfiles(updatedProfiles);
     saveToStorage("pensionflow_profiles", updatedProfiles);
     
-    if (!isDemoMode && supabase) {
+    if (!isDemoMode && !isProvisionalSession && supabase) {
       const { error } = await supabase
         .from("profiles")
         .update({ full_name: fullName, phone })
@@ -1054,7 +1104,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           if (targetProspect) {
             targetProspect.drive_folder_id = folderId;
             targetProspect.drive_folder_url = folderUrl;
-            if (!isDemoMode && supabase) {
+            if (!isDemoMode && !isProvisionalSession && supabase) {
               await supabase
                 .from("prospects")
                 .update({
@@ -1112,7 +1162,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
     await saveFile(docId, fileDataUrl);
 
-    if (!isDemoMode && supabase) {
+    if (!isDemoMode && !isProvisionalSession && supabase) {
       const { error: dbErr } = await supabase.from("documents").insert({
         id: docId,
         prospect_id: prospectId,
@@ -1182,7 +1232,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updatedProspects = prospects.map((p) => {
         if (p.id === prospectId) {
           return {
@@ -1244,6 +1294,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         
         // 1. Pre-cargar el perfil de la base de datos para la validación de contraseña provisional
         let dbProfileData: any = null;
+        let authUser: any = null;
         try {
           const { data, error } = await supabase.from("profiles").select("*").eq("email", email.toLowerCase()).maybeSingle();
           if (!error && data) {
@@ -1259,7 +1310,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                                    dbProfileData.password_provisional === password;
 
         if (password) {
-          let authUser: any = null;
           let authSessionError = false;
 
           try {
@@ -1314,70 +1364,110 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           saveToStorage("pensionflow_user", profile);
           saveToStorage("pensionflow_active_role", profile.role);
           
-          // Reload all user data (profiles, invitation codes, prospects, notifications)
-          const { data: dbProfiles, error: profilesError } = await supabase.from("profiles").select("*");
-          if (profilesError) {
-            console.error("Error fetching profiles on login:", profilesError);
-          }
-          const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
-          setProfiles(mappedProfiles);
+          const isProvisional = !authUser && !!profile.password_provisional;
+          setIsProvisionalSession(isProvisional);
 
-          // Fetch prospects (filtered by role if user is aliado or account_manager)
-          let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
-          if (profile.role === "aliado") {
-            prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
-          } else if (profile.role === "account_manager") {
-            const assignedAllyIds = mappedProfiles
-              .filter((p: any) => p.role === "aliado" && p.account_manager_id === profile.id)
-              .map((p: any) => p.id);
-            if (assignedAllyIds.length > 0) {
-              prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+          if (isProvisional) {
+            setProfiles([profile]);
+
+            const storedProspects = localStorage.getItem("pensionflow_prospects");
+            if (storedProspects) {
+              try {
+                setProspects(JSON.parse(storedProspects));
+              } catch (e) {
+                setProspects([]);
+              }
             } else {
-              prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+              setProspects([]);
             }
-          }
-          const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
-          if (prospectsError) {
-            console.error("Error fetching prospects on login:", prospectsError);
-          }
-          if (dbProspects) {
-            setProspects(dbProspects.map(transformProspectFromDB));
-          }
 
-          // Fetch invitation codes
-          const { data: dbCodes, error: codesError } = await supabase.from("invitation_codes").select("*");
-          if (codesError) {
-            console.error("Error fetching codes on login:", codesError);
-          }
-          if (dbCodes) {
-            setInvitationCodes(dbCodes.map((c: any) => {
-              const userWhoUsedIt = mappedProfiles.find((p: any) => p.invitation_code_used === c.code);
-              return {
-                id: c.id,
-                code: c.code,
-                created_by: c.created_by,
-                is_used: c.is_used || !!userWhoUsedIt,
-                used_by: c.used_by || userWhoUsedIt?.id,
-                created_at: c.created_at
-              };
-            }));
-          }
+            const storedCodes = localStorage.getItem("pensionflow_invitation_codes");
+            if (storedCodes) {
+              try {
+                setInvitationCodes(JSON.parse(storedCodes));
+              } catch (e) {
+                setInvitationCodes([]);
+              }
+            } else {
+              setInvitationCodes([]);
+            }
 
-          // Fetch notifications
-          const { data: dbNotifs } = await supabase
-            .from("notifications")
-            .select("*")
-            .eq("user_id", profile.id)
-            .order("created_at", { ascending: false });
-          if (dbNotifs) {
-            setNotifications(dbNotifs.map((n: any) => ({
-              id: n.id,
-              title: n.title,
-              message: n.message,
-              type: n.type as any,
-              read: n.read,
-              created_at: n.created_at
-            })));
+            const storedNotifs = localStorage.getItem("pensionflow_notifications");
+            if (storedNotifs) {
+              try {
+                setNotifications(JSON.parse(storedNotifs));
+              } catch (e) {
+                setNotifications([]);
+              }
+            } else {
+              setNotifications([]);
+            }
+          } else {
+            // Reload all user data (profiles, invitation codes, prospects, notifications)
+            const { data: dbProfiles, error: profilesError } = await supabase.from("profiles").select("*");
+            if (profilesError) {
+              console.error("Error fetching profiles on login:", profilesError);
+            }
+            const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+            setProfiles(mappedProfiles);
+
+            // Fetch prospects (filtered by role if user is aliado or account_manager)
+            let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
+            if (profile.role === "aliado") {
+              prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
+            } else if (profile.role === "account_manager") {
+              const assignedAllyIds = mappedProfiles
+                .filter((p: any) => p.role === "aliado" && p.account_manager_id === profile.id)
+                .map((p: any) => p.id);
+              if (assignedAllyIds.length > 0) {
+                prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+              } else {
+                prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+              }
+            }
+            const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
+            if (prospectsError) {
+              console.error("Error fetching prospects on login:", prospectsError);
+            }
+            if (dbProspects) {
+              setProspects(dbProspects.map(transformProspectFromDB));
+            }
+
+            // Fetch invitation codes
+            const { data: dbCodes, error: codesError } = await supabase.from("invitation_codes").select("*");
+            if (codesError) {
+              console.error("Error fetching codes on login:", codesError);
+            }
+            if (dbCodes) {
+              setInvitationCodes(dbCodes.map((c: any) => {
+                const userWhoUsedIt = mappedProfiles.find((p: any) => p.invitation_code_used === c.code);
+                return {
+                  id: c.id,
+                  code: c.code,
+                  created_by: c.created_by,
+                  is_used: c.is_used || !!userWhoUsedIt,
+                  used_by: c.used_by || userWhoUsedIt?.id,
+                  created_at: c.created_at
+                };
+              }));
+            }
+
+            // Fetch notifications
+            const { data: dbNotifs } = await supabase
+              .from("notifications")
+              .select("*")
+              .eq("user_id", profile.id)
+              .order("created_at", { ascending: false });
+            if (dbNotifs) {
+              setNotifications(dbNotifs.map((n: any) => ({
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                type: n.type as any,
+                read: n.read,
+                created_at: n.created_at
+              })));
+            }
           }
           setIsLoading(false);
           return profile.role;
@@ -1469,7 +1559,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return { id: fakeId, url: `https://drive.google.com/open?id=${fakeId}` };
     };
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const newId = `prospect-${Math.random().toString(36).substr(2, 9)}`;
       const docs: DocumentItem[] = [];
       const aforeName = typeof aforeFile === "string" ? aforeFile : aforeFile?.name;
@@ -1695,7 +1785,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const deletionMarker = `[DELETED:${new Date().toISOString()}]`;
     const updatedNotes = `${deletionMarker}${target.notes_director || ""}`;
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -1761,7 +1851,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -1835,7 +1925,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.filter((p) => p.id !== id);
       setProspects(updated);
       saveToStorage("pensionflow_prospects", updated);
@@ -1898,7 +1988,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       email: string;
     }
   ): Promise<void> => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -1941,7 +2031,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     newStatus: Prospect["status"],
     comments?: string
   ) => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           const notesDir = comments ? comments : p.notes_director;
@@ -2067,7 +2157,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       creditoNomina,
     };
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -2140,7 +2230,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
     const newStatus = aportacion > 0 ? ("aportacion" as const) : ("aprobado_listo" as const);
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -2255,7 +2345,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       ? "Asesoría agendada vía LeadConnector"
       : `Asesoría agendada para el día ${date} a las ${time} hrs.`;
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
           return {
@@ -2339,7 +2429,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   };
 
   const generateInvitationCode = async (): Promise<InvitationCode> => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const randomHex = Math.random().toString(16).substr(2, 4).toUpperCase();
       const randomDigits = Math.floor(1000 + Math.random() * 9000);
       const newCodeString = `AL-2026-${randomHex}${randomDigits}`;
@@ -2620,7 +2710,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const createProfile = async (
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const newProfile: UserProfile = {
         ...profileData,
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
@@ -2782,7 +2872,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const profile = profiles.find((p) => p.id === id);
     if (!profile) return;
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       // Filter profiles
       const updatedProfiles = profiles.filter((p) => p.id !== id);
       setProfiles(updatedProfiles);
@@ -2849,7 +2939,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const profile = profiles.find((p) => p.id === id);
     if (!profile) return;
 
-    if (isDemoMode || !supabase) {
+    if (isDemoMode || isProvisionalSession || !supabase) {
       const updatedProfiles = profiles.map((p) => {
         if (p.id === id) {
           return {
@@ -3031,6 +3121,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         profiles: exposedProfiles,
         toast,
         isDemoMode,
+        isProvisionalSession,
         isLoading,
         dbError,
         login,
@@ -3090,7 +3181,7 @@ export const STAGES_LIST = [
 export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: ["Falta Reporte", "Falta Afore", "Pendiente Documentos"],
   rechazado: ["No aplica"],
-  condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore"],
+  condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral"],
   aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada", "Pagado / Cerrado"],
   cerrado_perdido: ["No acepta propuesta"]
 };
@@ -3113,6 +3204,8 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
       return { stage: "condicionado", subStage: "Falta detallado de semanas" };
     case "falta_afore_cuenta":
       return { stage: "condicionado", subStage: "Falta estado cuenta afore" };
+    case "posible_simulacion":
+      return { stage: "condicionado", subStage: "Posible simulación laboral" };
     case "asesoria_agendada":
       return { stage: "aprobado", subStage: "Agenda Asesoria" };
     case "doc_proceso":
@@ -3146,6 +3239,7 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     if (subStage === "Aportación") return "aportacion";
     if (subStage === "Falta detallado de semanas") return "falta_semanas";
     if (subStage === "Falta estado cuenta afore") return "falta_afore_cuenta";
+    if (subStage === "Posible simulación laboral") return "posible_simulacion";
     return "aportacion";
   }
   if (stage === "aprobado") {

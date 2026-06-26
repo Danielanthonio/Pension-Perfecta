@@ -45,7 +45,7 @@ export default function GestionAccountManagers() {
     ).length;
 
     const condicionados = groupProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
     ).length;
 
     const rechazados = groupProspects.filter((p) =>

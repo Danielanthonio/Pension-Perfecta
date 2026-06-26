@@ -39,7 +39,10 @@ const PROSPECT_STATUSES = [
   "falta_reporte",
   "falta_afore",
   "pendiente_documentos",
-  "cerrado_perdido"
+  "cerrado_perdido",
+  "falta_semanas",
+  "falta_afore_cuenta",
+  "posible_simulacion"
 ] as const;
 
 const ProspectStatusEnum = z.enum(PROSPECT_STATUSES);

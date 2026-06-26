@@ -129,9 +129,11 @@ function ClientesAdminContent() {
       case "pendiente_documentos":
         return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/40 shadow-sm";
       case "falta_semanas":
-        return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/40 shadow-sm";
+        return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50 shadow-sm";
       case "falta_afore_cuenta":
         return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-805/40 shadow-sm";
+      case "posible_simulacion":
+        return "bg-rose-50 dark:bg-rose-955/15 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-800/50 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700";
       default:

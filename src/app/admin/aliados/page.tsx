@@ -72,7 +72,7 @@ export default function GestorAliados() {
     const evaluation = allyProspects.filter((p) => p.status === "evaluacion_pendiente").length;
     
     const conditioned = allyProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
     ).length;
 
     const approved = allyProspects.filter((p) =>
@@ -140,7 +140,7 @@ export default function GestorAliados() {
   const globalEvaluation = filteredProspectsGlobal.filter((p) => p.status === "evaluacion_pendiente").length;
   
   const globalConditioned = filteredProspectsGlobal.filter((p) =>
-    ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
   ).length;
 
   const globalApproved = filteredProspectsGlobal.filter((p) =>
@@ -685,7 +685,7 @@ export default function GestorAliados() {
                                 className={`px-2 py-0.5 rounded-full text-[8px] font-black border ${
                                   p.status === "pagado_comision"
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-150"
-                                    : ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+                                    : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
                                     ? "bg-amber-50 text-amber-700 border-amber-150"
                                     : ["rechazado", "cerrado_perdido"].includes(p.status)
                                     ? "bg-rose-50 text-rose-600 border-rose-150"
@@ -696,7 +696,7 @@ export default function GestorAliados() {
                                   ? "Financiado"
                                   : p.status === "evaluacion_pendiente"
                                   ? "Evaluación"
-                                  : ["falta_reporte", "falta_afore", "pendiente_documentos"].includes(p.status)
+                                  : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
                                   ? "Condicionado"
                                   : ["rechazado", "cerrado_perdido"].includes(p.status)
                                   ? "Rechazado"

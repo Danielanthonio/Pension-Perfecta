@@ -145,7 +145,7 @@ function ClientesContent() {
 
   // Tab grouping
   const enEvaluacion = filteredActive.filter((p) =>
-    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta"].includes(p.status)
+    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
   );
 
   const listoPresentar = filteredActive.filter((p) =>

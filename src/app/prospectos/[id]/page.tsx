@@ -94,6 +94,8 @@ export default function ProspectoDetalle() {
         return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
       case "falta_afore_cuenta":
         return "bg-amber-50 text-amber-700 border-amber-100 shadow-sm";
+      case "posible_simulacion":
+        return "bg-rose-50 text-rose-700 border-rose-100 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 text-slate-600 border-slate-200";
       default:
@@ -1428,7 +1430,8 @@ export default function ProspectoDetalle() {
         comments,
       });
     } else {
-      await updateProspectStatus(prospect.id, selectedConditionOption, "Expediente condicionado por el Director");
+      const reviewerLabel = user?.role === "account_manager" ? "Account Manager" : "Director";
+      await updateProspectStatus(prospect.id, selectedConditionOption, `Expediente condicionado por el ${reviewerLabel}`);
     }
 
     setShowConditionModal(false);
@@ -2518,6 +2521,13 @@ export default function ProspectoDetalle() {
                   desc: "Requiere documento oficial de saldo afore",
                   iconColor: "text-amber-600",
                   icon: FileText,
+                },
+                {
+                  id: "posible_simulacion",
+                  label: "Posible simulación laboral",
+                  desc: "Sospecha o indicios de simulación de relación laboral",
+                  iconColor: "text-rose-500",
+                  icon: AlertCircle,
                 },
               ].map((opt) => {
                 const isSelected = selectedConditionOption === opt.id;

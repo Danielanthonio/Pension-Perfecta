@@ -59,7 +59,10 @@ CREATE TABLE prospects (
       'falta_reporte',
       'falta_afore',
       'pendiente_documentos',
-      'cerrado_perdido'
+      'cerrado_perdido',
+      'falta_semanas',
+      'falta_afore_cuenta',
+      'posible_simulacion'
     )),
   notes_aliado text,
   notes_director text,
