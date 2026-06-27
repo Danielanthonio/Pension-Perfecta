@@ -72,7 +72,7 @@ export default function GestorAliados() {
     const evaluation = allyProspects.filter((p) => p.status === "evaluacion_pendiente").length;
     
     const conditioned = allyProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
     ).length;
 
     const approved = allyProspects.filter((p) =>
@@ -82,7 +82,6 @@ export default function GestorAliados() {
         "doc_proceso",
         "analisis_riesgo",
         "firma_programada",
-        "aportacion",
       ].includes(p.status)
     ).length;
 
@@ -140,7 +139,7 @@ export default function GestorAliados() {
   const globalEvaluation = filteredProspectsGlobal.filter((p) => p.status === "evaluacion_pendiente").length;
   
   const globalConditioned = filteredProspectsGlobal.filter((p) =>
-    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
   ).length;
 
   const globalApproved = filteredProspectsGlobal.filter((p) =>
@@ -150,7 +149,6 @@ export default function GestorAliados() {
       "doc_proceso",
       "analisis_riesgo",
       "firma_programada",
-      "aportacion",
     ].includes(p.status)
   ).length;
 

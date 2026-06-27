@@ -102,11 +102,11 @@ function PipelineManagerContent() {
       ).length;
 
       const aprobados = amProspects.filter((p) =>
-        ["aprobado_listo", "asesoria_agendada", "firma_programada", "aportacion"].includes(p.status)
+        ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
       ).length;
 
       const condicionados = amProspects.filter((p) =>
-        ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+        ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
       ).length;
 
       const rechazados = amProspects.filter((p) =>
