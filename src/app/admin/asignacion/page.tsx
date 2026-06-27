@@ -247,11 +247,75 @@ export default function AsignacionAliados() {
         </div>
       </div>
 
+      {/* Allocation Tip banner */}
+      <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/15 dark:border-emerald-500/10 rounded-3xl p-6 relative overflow-hidden">
+        <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
+        <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
+        <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
+        <p className="text-[11px] text-slate-555 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
+          Al seleccionar un Account Manager o un Líder de Grupo, la asignación se actualizará y guardará inmediatamente. Se enviará automáticamente una notificación al aliado comercial correspondiente.
+        </p>
+      </div>
+
+      {/* Cartera de Supervisores Section */}
+      <div className="space-y-4">
+        <div>
+          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Cartera de Supervisores</span>
+          <span className="text-xs font-bold text-slate-650 dark:text-slate-400 block mt-0.5">Distribución de aliados comerciales asignados por Account Manager.</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {totalAMs === 0 ? (
+            <div className="col-span-full text-center py-8 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl text-slate-450 text-xs">
+              No hay Account Managers a mostrar.
+            </div>
+          ) : (
+            visibleAMs.map((am) => {
+              // Calculate using current DB assigned state to avoid premature UI change on sidebar
+              const assignedAllies = profiles.filter((a) => a.role === "aliado" && a.account_manager_id === am.id);
+              const totalProspects = assignedAllies.reduce((sum, a) => sum + getProspectCount(a.id), 0);
+
+              return (
+                <div key={am.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl transition-colors shadow-sm flex flex-col justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-250/25 shrink-0">
+                      {am.full_name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">{am.full_name}</span>
+                      <span className="text-[9px] text-slate-400 font-semibold block uppercase truncate">
+                        {am.email}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Workload Stats */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-850">
+                    <div className="text-center p-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-150 dark:border-slate-850">
+                      <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Aliados</span>
+                      <span className="block text-sm font-black text-indigo-650 dark:text-indigo-400 mt-1">
+                        {assignedAllies.length}
+                      </span>
+                    </div>
+                    <div className="text-center p-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-150 dark:border-slate-850">
+                      <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Clientes</span>
+                      <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                        {totalProspects}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
       {/* Main Content Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="space-y-6">
         
-        {/* Left Area (2/3 width): Ally List & Assignment matrix */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Full Width Area: Ally List & Assignment matrix */}
+        <div className="w-full space-y-6">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
             
             {/* Search and Filters Bar */}
@@ -556,74 +620,6 @@ export default function AsignacionAliados() {
                 </table>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Right Area (1/3 width): AM Workload Overview */}
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4 transition-colors">
-            <div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Cartera de Supervisores</span>
-              <span className="text-xs font-bold text-slate-650 dark:text-slate-400 block mt-0.5">Distribución de aliados comerciales asignados por Account Manager.</span>
-            </div>
-
-            <div className="space-y-3">
-              {totalAMs === 0 ? (
-                <div className="text-center py-8 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl text-slate-450 text-xs">
-                  No hay Account Managers a mostrar.
-                </div>
-              ) : (
-                visibleAMs.map((am) => {
-                  // Calculate using current DB assigned state to avoid premature UI change on sidebar
-                  const assignedAllies = profiles.filter((a) => a.role === "aliado" && a.account_manager_id === am.id);
-                  const totalProspects = assignedAllies.reduce((sum, a) => sum + getProspectCount(a.id), 0);
-
-                  return (
-                    <div key={am.id} className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                           <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-250/25">
-                            {am.full_name.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">{am.full_name}</span>
-                            <span className="text-[9px] text-slate-400 font-semibold block uppercase">
-                              {am.email}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Workload Stats */}
-                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-850">
-                        <div className="text-center p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-850">
-                          <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Aliados</span>
-                          <span className="block text-sm font-black text-indigo-650 dark:text-indigo-400 mt-1">
-                            {assignedAllies.length}
-                          </span>
-                        </div>
-                        <div className="text-center p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-150 dark:border-slate-850">
-                          <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Clientes</span>
-                          <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                            {totalProspects}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Allocation Tip banner */}
-          <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/15 dark:border-emerald-500/10 rounded-3xl p-6 relative overflow-hidden">
-            <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
-            <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
-            <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
-            <p className="text-[11px] text-slate-555 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
-              Al seleccionar un Account Manager o un Líder de Grupo, la asignación se actualizará y guardará inmediatamente. Se enviará automáticamente una notificación al aliado comercial correspondiente.
-            </p>
           </div>
         </div>
       </div>
