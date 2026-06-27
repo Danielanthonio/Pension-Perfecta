@@ -39,10 +39,6 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
   // 1. Filter counts according to the specific mappings
   const proyectosCount = prospects.length;
 
-  const enEvaluacionCount = prospects.filter((p) =>
-    ["evaluacion_pendiente", "analisis_riesgo", "doc_proceso"].includes(p.status)
-  ).length;
-
   const aprobadosCount = prospects.filter((p) =>
     ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
   ).length;
@@ -58,6 +54,8 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
   const otorgadosCount = prospects.filter((p) =>
     p.status === "pagado_comision"
   ).length;
+
+  const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
 
   // Financiamientos Aprobados: sum of simulation.financiamiento for any approved/active/closed project
   const approvedStatuses = [
