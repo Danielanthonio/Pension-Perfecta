@@ -88,9 +88,20 @@ function ClientesContent() {
   };
 
   const getSubStageBadgeColor = (status: Prospect["status"]) => {
-    const { subStage } = getStageAndSubStage(status);
+    const { stage, subStage } = getStageAndSubStage(status);
     if (!subStage) return "bg-slate-50 text-slate-400 dark:bg-slate-900/50 dark:text-slate-600";
-    return "bg-emerald-50/70 text-emerald-600 border-emerald-100 dark:bg-emerald-950/15 dark:text-emerald-400 dark:border-emerald-900/30";
+    
+    switch (stage) {
+      case "evaluacion_pendiente":
+        return "bg-slate-900 text-white border-slate-700 dark:bg-black dark:text-slate-300 dark:border-slate-800";
+      case "rechazado":
+      case "condicionado":
+        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
+      case "aprobado":
+        return "bg-emerald-50/70 text-emerald-600 border-emerald-100 dark:bg-emerald-950/15 dark:text-emerald-400 dark:border-emerald-900/30";
+      default:
+        return "bg-slate-50 text-slate-500 border-slate-100 dark:bg-slate-800 dark:text-slate-400";
+    }
   };
 
   // Filter Active vs Deleted

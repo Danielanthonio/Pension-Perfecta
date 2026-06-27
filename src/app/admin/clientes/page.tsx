@@ -103,37 +103,16 @@ function ClientesAdminContent() {
   };
 
   const getStageColor = (status: Prospect["status"]) => {
-    switch (status) {
+    const { stage } = getStageAndSubStage(status);
+    switch (stage) {
       case "evaluacion_pendiente":
         return "bg-blue-50 dark:bg-blue-955/15 text-blue-600 dark:text-blue-400 border-blue-105 dark:border-blue-800/40";
       case "rechazado":
         return "bg-red-50 dark:bg-red-955/20 text-red-655 dark:text-red-400 border-red-105 dark:border-red-800/40";
-      case "aprobado_listo":
+      case "condicionado":
+        return "bg-amber-50 text-amber-700 dark:bg-amber-955/20 dark:text-amber-400 border-amber-100 dark:border-amber-800/40";
+      case "aprobado":
         return "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-105 dark:border-emerald-800/40";
-      case "asesoria_agendada":
-        return "bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border-purple-105 dark:border-purple-800/40";
-      case "doc_proceso":
-        return "bg-amber-50 dark:bg-amber-955/10 text-amber-600 dark:text-amber-400 border-amber-105 dark:border-amber-800/40";
-      case "analisis_riesgo":
-        return "bg-cyan-50 dark:bg-cyan-955/20 text-cyan-600 dark:text-cyan-400 border-cyan-105 dark:border-cyan-800/40";
-      case "firma_programada":
-        return "bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-105 dark:border-indigo-808/40";
-      case "pagado_comision":
-        return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 dark:border-amber-800/40 shadow-sm";
-      case "aportacion":
-        return "bg-teal-50 dark:bg-teal-955/15 text-teal-705 dark:text-teal-400 border-teal-100 dark:border-teal-800/40 shadow-sm";
-      case "falta_reporte":
-        return "bg-rose-50 dark:bg-rose-955/15 text-rose-600 dark:text-rose-450 border-rose-100 dark:border-rose-800/40";
-      case "falta_afore":
-        return "bg-orange-50 dark:bg-orange-955/15 text-orange-600 dark:text-orange-450 border-orange-100 dark:border-orange-800/40";
-      case "pendiente_documentos":
-        return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/40 shadow-sm";
-      case "falta_semanas":
-        return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50 shadow-sm";
-      case "falta_afore_cuenta":
-        return "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-805/40 shadow-sm";
-      case "posible_simulacion":
-        return "bg-rose-50 dark:bg-rose-955/15 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-800/50 shadow-sm";
       case "cerrado_perdido":
         return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700";
       default:
