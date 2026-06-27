@@ -92,8 +92,9 @@ export default function ProspectoDetalle() {
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isEditingApproved, setIsEditingApproved] = useState(false);
+  const [showCalculatorModal, setShowCalculatorModal] = useState(false);
 
-  const isApproved = prospect?.status === "aprobado_listo" || prospect?.status === "aportacion";
+  const isApproved = prospect ? (getStageAndSubStage(prospect.status).stage === "aprobado" || prospect.status === "aportacion") : false;
 
   // Simulation calculator input states
   const [semanas, setSemanas] = useState<number>(0);
@@ -1240,7 +1241,7 @@ export default function ProspectoDetalle() {
             {/* Respuesta del Director Feedback Card */}
             {(() => {
               const status = prospect.status;
-              const isApproved = ["aprobado_listo", "firma_programada", "pagado_comision", "aportacion"].includes(status);
+              const isApproved = getStageAndSubStage(status).stage === "aprobado" || status === "aportacion";
               const isRejected = status === "rechazado";
 
               let cardStyles = "";
@@ -1291,7 +1292,13 @@ export default function ProspectoDetalle() {
                   {/* Projections summary if approved - display clean non-editable details */}
                   {isApproved && prospect.simulation && (
                     <div className="space-y-4">
-                      {renderCalculator("h-auto mb-4")}
+                      <button
+                        onClick={() => setShowCalculatorModal(true)}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-[#0c4e34] to-[#167d53] hover:from-[#0e5c3c] hover:to-[#1da86f] text-[#9bf2cc] font-black rounded-2xl border border-[#1da86f]/40 transition-all flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <Calculator className="h-5 w-5" />
+                        VER CALCULADORA
+                      </button>
 
                       {/* Direct scheduling button for Aliado */}
                       {prospect.status === "aprobado_listo" && (
@@ -1415,7 +1422,7 @@ export default function ProspectoDetalle() {
                 {/* Stage 4: Dictamen Oficial */}
                 {(() => {
                   const status = prospect.status;
-                  const isApproved = ["aprobado_listo", "firma_programada", "pagado_comision", "aportacion"].includes(status);
+                  const isApproved = getStageAndSubStage(status).stage === "aprobado" || status === "aportacion";
                   const isRejected = status === "rechazado";
                   const isConditioned = !isApproved && !isRejected && !["evaluacion_pendiente"].includes(status) && prospect.documents.length > 0;
                   
@@ -1462,6 +1469,22 @@ export default function ProspectoDetalle() {
           </div>
 
         </div>
+
+        {/* Calculator Modal */}
+        {showCalculatorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowCalculatorModal(false)} />
+            <div className="relative w-full max-w-2xl bg-[#070e1b] rounded-[28px] border border-[#1b2b48] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+              <button 
+                onClick={() => setShowCalculatorModal(false)}
+                className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors z-20"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+              {renderCalculator("h-full border-none shadow-none rounded-none")}
+            </div>
+          </div>
+        )}
 
         {/* User Settings Modal */}
         <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
