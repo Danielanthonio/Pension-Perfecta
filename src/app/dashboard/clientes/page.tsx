@@ -22,6 +22,7 @@ import {
   Trash2,
   X,
   AlertCircle,
+  Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -80,6 +81,8 @@ function ClientesContent() {
         return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-800/40";
       case "aprobado":
         return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-955/20 dark:text-emerald-400 dark:border-emerald-800/40";
+      case "otorgado":
+        return "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-955/20 dark:text-teal-400 dark:border-teal-800/40";
       case "cerrado_perdido":
         return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-770";
       default:
@@ -98,6 +101,7 @@ function ClientesContent() {
       case "condicionado":
         return "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
       case "aprobado":
+      case "otorgado":
         return "bg-emerald-50/70 text-emerald-600 border-emerald-100 dark:bg-emerald-950/15 dark:text-emerald-400 dark:border-emerald-900/30";
       default:
         return "bg-slate-50 text-slate-500 border-slate-100 dark:bg-slate-800 dark:text-slate-400";
@@ -229,7 +233,8 @@ function ClientesContent() {
                 : "text-slate-555 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
             }`}
           >
-            En Evaluación ({enEvaluacion.length})
+            <Layers className="h-4 w-4" />
+            Evaluados ({enEvaluacion.length})
           </button>
           <button
             onClick={() => setActiveTab("listo")}
@@ -289,20 +294,21 @@ function ClientesContent() {
       {/* Tab Panels */}
       <div className="space-y-6">
         
-        {/* TAB 1: EN EVALUACIÓN */}
+        {/* TAB 1: EVALUADOS */}
         {activeTab === "evaluacion" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-909/50">
-              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">En Evaluación Técnica</h3>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 mb-6">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Evaluados Técnicamente</h3>
             </div>
 
             {enEvaluacion.length === 0 ? (
               <div className="py-16 text-center">
-                <Clock className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos en evaluación</h4>
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm">
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos evaluados</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.
                 </p>
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">

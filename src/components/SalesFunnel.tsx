@@ -123,7 +123,7 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
       textColor: "text-slate-550 dark:text-slate-400",
     },
     {
-      label: "EN EVALUACIÓN",
+      label: "EVALUADOS",
       value: enEvaluacionCount,
       icon: Hourglass,
       iconColor: "text-blue-500 bg-blue-50 dark:bg-blue-950/40",

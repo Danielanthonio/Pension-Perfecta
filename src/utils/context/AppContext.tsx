@@ -888,16 +888,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                 };
               }
               
-              // Only sign out if email is not confirmed AND user does not have a provisional password bypass active
-              if (!session.user.email_confirmed_at && (!profile || !profile.password_provisional)) {
-                console.warn("User has active session but email is not confirmed, signing out");
-                await client.auth.signOut();
-              } else {
-                if (profile) {
-                  currentUser = profile;
-                  setUser(profile);
-                  setActiveRole(profile.role);
-                }
+              // Accept the session regardless of email confirmation
+              if (profile) {
+                currentUser = profile;
+                setUser(profile);
+                setActiveRole(profile.role);
               }
             } catch (err) {
               console.error("Error loading session profile:", err);
@@ -1480,11 +1475,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
           
           if (authUser) {
-            // Ignorar la comprobación de confirmación de email si coincide la contraseña provisional
-            if (!authUser.email_confirmed_at && !isProvisionalMatch) {
-              await supabase.auth.signOut();
-              throw new Error("PENDING_CONFIRMATION: Debes confirmar tu correo electrónico antes de poder acceder.");
-            }
+            // Se eliminó la comprobación obligatoria de email_confirmed_at
             profile = await ensureProfileExists(supabase, authUser);
           } else if (isProvisionalMatch && dbProfileData) {
             // Bypass completo con el perfil de base de datos
@@ -2238,7 +2229,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const updateData: any = { status: newStatus };
         if (comments) updateData.notes_director = comments;
 
-        await supabase.from("prospects").update(updateData).eq("id", id);
+        const { error } = await supabase.from("prospects").update(updateData).eq("id", id);
+        if (error) throw error;
 
         setProspects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: newStatus, notes_director: comments || p.notes_director } : p))
@@ -2320,7 +2312,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       saveToStorage("pensionflow_prospects", updated);
     } else {
       try {
-        await supabase
+        const { error } = await supabase
           .from("prospects")
           .update({
             sim_semanas: simulationData.semanas,
@@ -2335,6 +2327,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             credito_nomina: creditoNomina,
           })
           .eq("id", id);
+          
+        if (error) throw error;
 
         setProspects((prev) =>
           prev.map((p) => {
@@ -2424,7 +2418,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       try {
-        await supabase
+        const { error } = await supabase
           .from("prospects")
           .update({
             status: newStatus,
@@ -2440,6 +2434,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             credito_nomina: creditoNomina,
           })
           .eq("id", id);
+          
+        if (error) throw error;
 
         setProspects((prev) =>
           prev.map((p) => {
@@ -2533,13 +2529,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       try {
-        await supabase
+        const { error } = await supabase
           .from("prospects")
           .update({
             status: "asesoria_agendada",
             notes_aliado: notesText,
           })
           .eq("id", id);
+          
+        if (error) throw error;
 
         setProspects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: "asesoria_agendada" as const, notes_aliado: notesText } : p))
@@ -3740,6 +3738,7 @@ export const STAGES_LIST = [
   { id: "rechazado", label: "Rechazado" },
   { id: "condicionado", label: "Condicionado" },
   { id: "aprobado", label: "Aprobado" },
+  { id: "otorgado", label: "Otorgado" },
   { id: "cerrado_perdido", label: "Cerrado Perdido" }
 ];
 
@@ -3747,7 +3746,8 @@ export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: ["Falta Reporte", "Falta Afore", "Pendiente Documentos"],
   rechazado: ["No aplica"],
   condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral"],
-  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada", "Pagado / Cerrado"],
+  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada"],
+  otorgado: ["Pagado / Cerrado"],
   cerrado_perdido: ["No acepta propuesta"]
 };
 
@@ -3780,7 +3780,7 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
     case "firma_programada":
       return { stage: "aprobado", subStage: "Cerrada Ganada" };
     case "pagado_comision":
-      return { stage: "aprobado", subStage: "Pagado / Cerrado" };
+      return { stage: "otorgado", subStage: "Pagado / Cerrado" };
     case "aprobado_listo":
       return { stage: "aprobado", subStage: "" };
     case "cerrado_perdido":
@@ -3812,8 +3812,11 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     if (subStage === "Firma Carta Compromiso") return "doc_proceso";
     if (subStage === "Analisis de Riesgo") return "analisis_riesgo";
     if (subStage === "Cerrada Ganada") return "firma_programada";
-    if (subStage === "Pagado / Cerrado") return "pagado_comision";
     return "aprobado_listo";
+  }
+  if (stage === "otorgado") {
+    if (subStage === "Pagado / Cerrado") return "pagado_comision";
+    return "pagado_comision";
   }
   if (stage === "cerrado_perdido") {
     return "cerrado_perdido";

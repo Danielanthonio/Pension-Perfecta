@@ -303,9 +303,9 @@ export default function GestorAliados() {
             </div>
           </div>
 
-          {/* Stage 2: En Evaluación */}
-          <div className="bg-indigo-50/20 border border-indigo-100 p-4 rounded-2xl text-center space-y-1 relative overflow-hidden flex flex-col justify-between">
-            <span className="text-[9px] text-indigo-550 font-extrabold uppercase tracking-wider block">2. En Evaluación</span>
+          {/* Stage 2: Evaluados */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm transition-all hover:shadow-md">
+            <span className="text-[9px] text-indigo-550 font-extrabold uppercase tracking-wider block">2. Evaluados</span>
             <div className="py-2">
               <span className="text-3xl font-black text-indigo-600">{globalEvaluation}</span>
               <span className="block text-[10px] text-indigo-500 font-bold mt-1">

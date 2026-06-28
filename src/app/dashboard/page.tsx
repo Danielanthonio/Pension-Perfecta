@@ -337,7 +337,7 @@ function DashboardContent() {
             <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 animate-pulse" />
             <div>
               <h4 className="text-xs font-bold text-amber-900 dark:text-amber-300">Prospectos Incompletos ({faltaDocumentos.length})</h4>
-              <p className="text-[11px] text-amber-700 dark:text-amber-405 mt-0.5">Se han detectado expedientes en evaluación con documentación faltante. Completa los requisitos para emitir dictamen.</p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-405 mt-0.5">Se han detectado expedientes evaluados con documentación faltante. Completa los requisitos para emitir dictamen.</p>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">

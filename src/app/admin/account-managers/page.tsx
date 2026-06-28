@@ -229,11 +229,11 @@ export default function GestionAccountManagers() {
                     </div>
                   </div>
 
-                  {/* En Evaluación */}
+                  {/* Evaluados */}
                   <div className="p-2.5 bg-blue-50/20 dark:bg-blue-950/10 border border-blue-100/50 dark:border-blue-900/20 rounded-xl">
                     <div className="flex items-center justify-between text-[10px] font-bold text-blue-600 dark:text-blue-400">
                       <span className="flex items-center gap-1">
-                        <Layers className="h-3.5 w-3.5" /> En Evaluación
+                        <Layers className="h-3.5 w-3.5" /> Evaluados
                       </span>
                       <span>{m.enEvaluacion}</span>
                     </div>
