@@ -97,9 +97,7 @@ function PipelineManagerContent() {
 
       const totalClientes = amProspects.length;
 
-      const evaluados = amProspects.filter((p) =>
-        ["evaluacion_pendiente", "analisis_riesgo", "doc_proceso"].includes(p.status)
-      ).length;
+      const evaluados = totalClientes;
 
       const aprobados = amProspects.filter((p) =>
         ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)

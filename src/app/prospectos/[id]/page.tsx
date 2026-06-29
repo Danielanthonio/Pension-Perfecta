@@ -2277,16 +2277,7 @@ export default function ProspectoDetalle() {
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                {/* Evaluación Pendiente */}
-                <button
-                  onClick={() => setShowPendingModal(true)}
-                  className="w-full py-4.5 px-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-blue-800 flex items-center justify-center gap-2.5 shadow-md shadow-blue-500/25 active:shadow-sm"
-                >
-                  <Clock className="h-5 w-5 stroke-[2.5]" />
-                  Evaluación Pendiente
-                </button>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full">
                 {/* Rechazar */}
                 <button
                   onClick={() => setShowRejectionModal(true)}

@@ -55,7 +55,7 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
     p.status === "pagado_comision"
   ).length;
 
-  const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
+  const enEvaluacionCount = proyectosCount;
 
   // Financiamientos Aprobados: sum of simulation.financiamiento for any approved/active/closed project
   const approvedStatuses = [
