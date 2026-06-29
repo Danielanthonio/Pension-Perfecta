@@ -40,6 +40,9 @@ export default function AsignacionAliados() {
   // Local state for tracking unsaved leader-type changes and group name inputs per row
   const [rowTypes, setRowTypes] = useState<Record<string, "aliado" | "lider">>({});
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  
+  // State for multiple leader selection dropdown
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const isAM = user?.role === "account_manager";
   const isDirector = user?.role === "director";
@@ -86,12 +89,17 @@ export default function AsignacionAliados() {
   };
 
   // Handle immediate leader assignment for normal allies
-  const handleSelectLider = async (allyId: string, liderId: string) => {
+  const handleToggleLider = async (allyId: string, currentLiderIds: string[], clickedLiderId: string) => {
     setUpdatingRow(allyId);
     setSuccessRow(null);
     try {
-      const selectedLiderId = liderId === "" ? null : liderId;
-      await assignAllyToLider(allyId, selectedLiderId);
+      let newLiderIds: string[];
+      if (currentLiderIds.includes(clickedLiderId)) {
+        newLiderIds = currentLiderIds.filter(id => id !== clickedLiderId);
+      } else {
+        newLiderIds = [...currentLiderIds, clickedLiderId];
+      }
+      await assignAllyToLider(allyId, newLiderIds);
       
       setSuccessRow(allyId);
       setTimeout(() => setSuccessRow(null), 3000);
@@ -540,33 +548,75 @@ export default function AsignacionAliados() {
                           </td>
 
                           {/* 6. Asignar a Líder */}
-                          <td className="px-5 py-4 whitespace-nowrap">
+                          <td className="px-5 py-4 whitespace-nowrap relative">
                             {currentTipo === "lider" ? (
                               <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica para Líderes</span>
                             ) : (
-                              <select
-                                value={a.lider_id || ""}
-                                onChange={(e) => handleSelectLider(a.id, e.target.value)}
-                                disabled={isUpdating || !a.account_manager_id}
-                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-indigo-500 transition-all cursor-pointer ${
-                                  !a.account_manager_id 
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : a.lider_id 
-                                      ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-705 dark:text-indigo-400"
-                                      : "border-slate-200/50 bg-slate-50/10 text-slate-500"
-                                }`}
-                                title={!a.account_manager_id ? "Asigna primero un Account Manager a este aliado" : ""}
-                              >
-                                <option value="" className="text-slate-405 dark:bg-slate-900">👥 Sin asignar a Líder</option>
-                                {activeLeaders
-                                  // Directors can assign any leader globally, AMs can only assign leaders under their management
-                                  .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
-                                  .map((l) => (
-                                    <option key={l.id} value={l.id} className="text-slate-850 dark:bg-slate-900">
-                                      {l.full_name} ({l.lider_grupo || "Sin Grupo"})
-                                    </option>
-                                  ))}
-                              </select>
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenDropdownId(openDropdownId === a.id ? null : a.id)}
+                                  disabled={isUpdating || !a.account_manager_id}
+                                  className={`w-full text-left font-semibold rounded-xl px-3 py-1.5 border outline-none flex justify-between items-center transition-all cursor-pointer ${
+                                    !a.account_manager_id 
+                                      ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
+                                      : (a.lider_ids && a.lider_ids.length > 0)
+                                        ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-705 dark:text-indigo-400"
+                                        : "border-slate-200/50 bg-slate-50/10 text-slate-500"
+                                  }`}
+                                  title={!a.account_manager_id ? "Asigna primero un Account Manager a este aliado" : ""}
+                                >
+                                  <span className="truncate max-w-[150px]">
+                                    {(a.lider_ids && a.lider_ids.length > 0) 
+                                      ? `👥 ${a.lider_ids.length} Líder${a.lider_ids.length > 1 ? 'es' : ''} asignado${a.lider_ids.length > 1 ? 's' : ''}` 
+                                      : "👥 Sin asignar a Líder"}
+                                  </span>
+                                  <span className="ml-2 text-xs">▼</span>
+                                </button>
+                                
+                                {openDropdownId === a.id && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-10" 
+                                      onClick={() => setOpenDropdownId(null)}
+                                    />
+                                    <div className="absolute z-20 mt-2 w-64 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl shadow-xl overflow-hidden left-0 max-h-64 overflow-y-auto">
+                                      <div className="p-2 space-y-1">
+                                        {activeLeaders
+                                          .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
+                                          .length === 0 ? (
+                                            <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 text-center">
+                                              No hay líderes disponibles
+                                            </div>
+                                          ) : (
+                                          activeLeaders
+                                            .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
+                                            .map((l) => {
+                                              const isSelected = a.lider_ids?.includes(l.id) || false;
+                                              return (
+                                                <button
+                                                  key={l.id}
+                                                  type="button"
+                                                  onClick={() => handleToggleLider(a.id, a.lider_ids || [], l.id)}
+                                                  className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${
+                                                    isSelected 
+                                                      ? "bg-blue-500 text-white font-bold" 
+                                                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                                  }`}
+                                                >
+                                                  <span className="truncate">
+                                                    {isSelected && <span className="mr-1.5">✓</span>}
+                                                    {l.full_name} <span className={`text-[10px] ${isSelected ? "text-blue-100" : "text-slate-400 dark:text-slate-500"}`}>({l.lider_grupo || "Sin Grupo"})</span>
+                                                  </span>
+                                                </button>
+                                              );
+                                            })
+                                        )}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             )}
                           </td>
 

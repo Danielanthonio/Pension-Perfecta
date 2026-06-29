@@ -21,6 +21,8 @@ export interface UserProfile {
   aliado_tipo?: "aliado" | "lider";
   lider_grupo?: string | null;
   lider_id?: string | null;
+  lider_ids?: string[];
+  lider_aliado_rels?: { id: string; lider_id: string }[];
   lider_aliado_rel_id?: string | null;
   empresa_multialiado_id?: string | null;
 }
@@ -187,7 +189,7 @@ interface AppContextType {
   deleteProfile: (id: string) => Promise<void>;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
   changeAllyType: (allyId: string, tipo: "aliado" | "lider", empresaMultialiadoId?: string | null) => Promise<void>;
-  assignAllyToLider: (allyId: string, liderId: string | null) => Promise<void>;
+  assignAllyToLider: (allyId: string, liderIds: string[]) => Promise<void>;
   empresasMultialiado: EmpresaMultialiado[];
   createEmpresa: (nombre: string) => Promise<EmpresaMultialiado>;
   updateEmpresa: (id: string, nombre: string) => Promise<void>;
@@ -3293,7 +3295,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   const assignAllyToLider = async (
     allyId: string,
-    liderId: string | null
+    liderIds: string[]
   ): Promise<void> => {
     const ally = profiles.find((p) => p.id === allyId);
     if (!ally) return;
@@ -3310,24 +3312,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         }
       }
 
-      // Remove existing relation for this ally
+      // Remove existing relations for this ally
       localLiderAliados = localLiderAliados.filter((r) => r.aliado_asignado_id !== allyId);
 
-      let groupName = null;
-      let relationId = null;
+      const newRels: any[] = [];
 
-      if (liderId) {
-        const lider = profiles.find((p) => p.id === liderId);
-        groupName = lider?.lider_grupo || "Grupo Demo";
-        relationId = `rel-${Math.random().toString(36).substr(2, 9)}`;
+      liderIds.forEach((lId) => {
+        const lider = profiles.find((p) => p.id === lId);
+        const groupName = lider?.lider_grupo || "Grupo Demo";
+        const relationId = `rel-${Math.random().toString(36).substr(2, 9)}`;
 
-        localLiderAliados.push({
+        const newRel = {
           id: relationId,
-          lider_id: liderId,
+          lider_id: lId,
           aliado_asignado_id: allyId,
           grupo_nombre: groupName,
-        });
-      }
+        };
+        localLiderAliados.push(newRel);
+        newRels.push(newRel);
+      });
 
       localStorage.setItem("pensionflow_lider_aliados", JSON.stringify(localLiderAliados));
 
@@ -3336,8 +3339,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (p.id === allyId) {
           return {
             ...p,
-            lider_id: liderId,
-            lider_aliado_rel_id: relationId,
+            lider_ids: liderIds,
+            lider_aliado_rels: newRels.map(r => ({ id: r.id, lider_id: r.lider_id })),
+            // Keep for backwards compatibility with single leader logic if any
+            lider_id: liderIds.length > 0 ? liderIds[0] : null,
+            lider_aliado_rel_id: newRels.length > 0 ? newRels[0].id : null,
           };
         }
         return p;
@@ -3345,73 +3351,48 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       setProfiles(updatedProfiles);
       saveToStorage("pensionflow_profiles", updatedProfiles);
 
-      const msg = liderId ? `Asignado a Líder` : `Retirado de Líder`;
+      const msg = liderIds.length > 0 ? `Asignado a ${liderIds.length} Líder(es)` : `Retirado de Líderes`;
       setToast({ id: Date.now().toString(), type: "email", recipient: ally.email, message: msg });
     } else {
       try {
-        if (liderId) {
-          // POST to create assignment
-          const res = await fetch("/api/lider-aliados", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lider_id: liderId,
-              aliado_asignado_id: allyId,
-            }),
-          });
+        // We will send the array to the API and let the API sync it
+        const res = await fetch("/api/lider-aliados", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lider_ids: liderIds,
+            aliado_asignado_id: allyId,
+          }),
+        });
 
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || "Error al asignar líder");
-          }
-
-          // Update local profile state
-          setProfiles((prev) =>
-            prev.map((p) =>
-              p.id === allyId
-                ? {
-                    ...p,
-                    lider_id: liderId,
-                    lider_aliado_rel_id: data.id,
-                  }
-                : p
-            )
-          );
-        } else {
-          // DELETE existing relationship
-          if (ally.lider_aliado_rel_id) {
-            const res = await fetch(`/api/lider-aliados/${ally.lider_aliado_rel_id}`, {
-              method: "DELETE",
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-              throw new Error(data.error || "Error al desasignar líder");
-            }
-          }
-
-          // Update local profile state
-          setProfiles((prev) =>
-            prev.map((p) =>
-              p.id === allyId
-                ? {
-                    ...p,
-                    lider_id: null,
-                    lider_aliado_rel_id: null,
-                  }
-                : p
-            )
-          );
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Error al asignar líderes");
         }
 
+        // Update local profile state with the returned new relationships
+        const newRels = data.relations || [];
+        setProfiles((prev) =>
+          prev.map((p) =>
+            p.id === allyId
+              ? {
+                  ...p,
+                  lider_ids: liderIds,
+                  lider_aliado_rels: newRels.map((r: any) => ({ id: r.id, lider_id: r.lider_id })),
+                  lider_id: liderIds.length > 0 ? liderIds[0] : null,
+                  lider_aliado_rel_id: newRels.length > 0 ? newRels[0].id : null,
+                }
+              : p
+          )
+        );
+
         // Notify
-        const lider = profiles.find((p) => p.id === liderId);
         await supabase.from("notifications").insert({
           user_id: user?.id,
           title: "Asignación de Líder Actualizada 👥🔄",
-          message: liderId
-            ? `El aliado ${ally.full_name} ha sido asignado al líder ${lider?.full_name || "Desconocido"}.`
-            : `El aliado ${ally.full_name} ha sido desasignado de su líder.`,
+          message: liderIds.length > 0
+            ? `El aliado ${ally.full_name} ha sido asignado a ${liderIds.length} líder(es).`
+            : `El aliado ${ally.full_name} ha sido desasignado de sus líderes.`,
           type: "info",
           read: false,
         });
