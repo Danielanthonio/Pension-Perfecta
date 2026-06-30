@@ -169,7 +169,7 @@ export default function SubirProspecto() {
   // Validate CURP uniqueness in real-time
   useEffect(() => {
     let active = true;
-    if (curp.length === 18 && /^[A-Z0-9]{18}$/i.test(curp)) {
+    if (user?.empresa_multialiado_id && curp.length === 18 && /^[A-Z0-9]{18}$/i.test(curp)) {
       setCheckingCurp(true);
       checkCurpExists(curp).then((exists) => {
         if (active) {
@@ -194,7 +194,7 @@ export default function SubirProspecto() {
     return () => {
       active = false;
     };
-  }, [curp, checkCurpExists]);
+  }, [curp, checkCurpExists, user]);
 
   // Real-time Validations
   const nssValid = nss.length === 11 && /^\d+$/.test(nss);
@@ -283,7 +283,7 @@ export default function SubirProspecto() {
   const handleSave = async () => {
     setFormSubmitted(true);
 
-    if (curpValid) {
+    if (user?.empresa_multialiado_id && curpValid) {
       setSaving(true);
       const exists = await checkCurpExists(curp);
       if (exists) {
