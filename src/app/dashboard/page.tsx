@@ -549,7 +549,7 @@ function DashboardContent() {
       )}
 
       {/* Sales Funnel and Rates */}
-      <SalesFunnel prospects={filteredProspects} />
+      <SalesFunnel prospects={filteredProspects} assignedAllies={liderAliadosData?.aliados_asignados} />
 
       {/* Hierarchical Efficiency Indicators Table (Solo para Líderes) */}
       {user?.aliado_tipo === "lider" && (

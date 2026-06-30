@@ -22,9 +22,10 @@ import {
 
 interface SalesFunnelProps {
   prospects: Prospect[];
+  assignedAllies?: any[];
 }
 
-export default function SalesFunnel({ prospects }: SalesFunnelProps) {
+export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesProp }: SalesFunnelProps) {
   const { user, profiles } = useApp();
   const [funnelView, setFunnelView] = useState<"consolidated" | "personal" | "team_all" | string>("consolidated");
 
@@ -41,9 +42,15 @@ export default function SalesFunnel({ prospects }: SalesFunnelProps) {
 
   // Find allies assigned to this leader
   const assignedAllies = useMemo(() => {
+    if (assignedAlliesProp && assignedAlliesProp.length > 0) {
+      return assignedAlliesProp.map((a: any) => ({
+        id: a.id,
+        full_name: a.name || a.full_name || "Asesor Comercial",
+      }));
+    }
     if (!user || user.aliado_tipo !== "lider") return [];
     return profiles.filter((p) => p.role === "aliado" && p.lider_ids?.includes(user.id));
-  }, [profiles, user]);
+  }, [profiles, user, assignedAlliesProp]);
 
   const assignedAllyIds = useMemo(() => {
     return assignedAllies.map((a) => a.id);
