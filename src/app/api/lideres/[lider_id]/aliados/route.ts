@@ -61,7 +61,10 @@ export async function GET(
         profiles!lider_aliados_aliado_asignado_id_fkey (
           id,
           full_name,
-          email
+          email,
+          lider_grupo,
+          empresa_multialiado_id,
+          account_manager_id
         )
       `)
       .eq("lider_id", liderId);
@@ -79,9 +82,7 @@ export async function GET(
       const ally = r.profiles as any;
       if (!ally) continue;
 
-      // Count active prospects for this ally (ignoring deleted/purged ones, let's see how active prospects are identified)
-      // Active prospects are those whose notes_director does NOT start with "[DELETED:" or "[PURGED:"
-      // We can count all prospects where aliado_id = ally.id, and filter in code or using query
+      // Count active prospects for this ally (ignoring deleted/purged ones)
       const { data: prospects, error: prospectsError } = await supabase
         .from("prospects")
         .select("notes_director")
@@ -97,12 +98,28 @@ export async function GET(
 
       total_prospectos += activeProspectsCount;
 
+      // Look up Account Manager name
+      let accountManagerName = "Mesa de Operaciones";
+      if (ally.account_manager_id) {
+        const { data: amProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", ally.account_manager_id)
+          .maybeSingle();
+        if (amProfile) {
+          accountManagerName = amProfile.full_name;
+        }
+      }
+
       aliados_asignados.push({
         id: ally.id,
         name: ally.full_name,
         email: ally.email,
         prospectos_activos: activeProspectsCount,
         assigned_at: new Date(r.created_at).toISOString().split("T")[0],
+        empresa_nombre: ally.lider_grupo || leader.lider_grupo || "Sin Empresa",
+        account_manager_name: accountManagerName,
+        lider_nombre: leader.full_name,
       });
     }
 

@@ -119,6 +119,7 @@ function DashboardContent() {
         const matchedRels = localRels.filter((r: any) => r.lider_id === user.id);
         const mappedAllies = matchedRels.map((r: any) => {
           const allyProfile = profiles.find((p) => p.id === r.aliado_asignado_id);
+          const amProfile = profiles.find((p) => p.id === allyProfile?.account_manager_id);
           // Look up all prospects of this ally
           const allyProspects = prospects.filter((p) => p.aliado_id === r.aliado_asignado_id && !isProspectDeleted(p) && !isProspectPurged(p));
           
@@ -127,7 +128,10 @@ function DashboardContent() {
             name: allyProfile?.full_name || "Asesor Comercial Demo",
             email: allyProfile?.email || "demo@aliado.com",
             prospectos_activos: allyProspects.length,
-            assigned_at: new Date(r.created_at || Date.now()).toISOString().split("T")[0]
+            assigned_at: new Date(r.created_at || Date.now()).toISOString().split("T")[0],
+            empresa_nombre: allyProfile?.lider_grupo || user.lider_grupo || "Sin Empresa",
+            account_manager_name: amProfile?.full_name || "Mesa de Operaciones",
+            lider_nombre: user.full_name
           };
         });
 
@@ -167,8 +171,7 @@ function DashboardContent() {
       {/* 1. Mi Información / Profile Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Profile Card */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
+        {/* Profile Card */}        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
           <div className="absolute top-0 right-0 h-28 w-28 bg-gradient-to-bl from-emerald-500/10 to-teal-500/5 rounded-full blur-2xl pointer-events-none" />
           
           <div className="space-y-4">
@@ -176,7 +179,7 @@ function DashboardContent() {
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Mi Información</span>
               {user?.aliado_tipo === "lider" ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/10">
-                  <Award className="h-3 w-3" /> Líder
+                  <Award className="h-3 w-3" /> Líder de empresa: {user.lider_grupo || "Sin Empresa"}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
@@ -214,6 +217,13 @@ function DashboardContent() {
               {/* Company membership details & Leaders list */}
               <div className="border-t border-slate-100 dark:border-slate-850 pt-2 mt-2 space-y-2 text-[10px]">
                 <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-bold uppercase text-[9px]">Account Manager Asignado:</span>
+                  <span className="text-slate-550 dark:text-slate-400 font-extrabold text-[9px]">
+                    {assignedAM?.full_name || "Mesa de Operaciones"}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between">
                   <span className="text-slate-400 font-bold uppercase text-[9px]">Pertenece a Empresa:</span>
                   <span className={`px-2 py-0.5 rounded-full font-extrabold uppercase text-[9px] ${
                     user?.empresa_multialiado_id 
@@ -227,6 +237,13 @@ function DashboardContent() {
                 {user?.empresa_multialiado_id && (
                   <>
                     <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold uppercase text-[9px]">Empresa:</span>
+                      <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400 rounded-full font-bold text-[9px] uppercase">
+                        {user.lider_grupo || "Sin Empresa"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
                       <span className="text-slate-400 font-bold uppercase text-[9px]">Rol en Empresa:</span>
                       <span className={`px-2 py-0.5 rounded-full font-black uppercase text-[9px] ${
                         user?.aliado_tipo === "lider" 
@@ -236,6 +253,15 @@ function DashboardContent() {
                         {user?.aliado_tipo === "lider" ? "Líder" : "Aliado"}
                       </span>
                     </div>
+
+                    {user?.aliado_tipo === "lider" && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-bold uppercase text-[9px]">Líder de Empresa:</span>
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-955 dark:text-blue-405 rounded-full font-black uppercase text-[9px]">
+                          {user.lider_grupo || "Sin Empresa"}
+                        </span>
+                      </div>
+                    )}
 
                     {user?.aliado_tipo === "aliado" && (
                       <div className="flex flex-col gap-1.5 pt-1">
@@ -381,6 +407,9 @@ function DashboardContent() {
                       <th className="px-6 py-4">Email</th>
                       <th className="px-6 py-4 text-center">Prospectos Activos</th>
                       <th className="px-6 py-4">Fecha Asignación</th>
+                      <th className="px-6 py-4">Empresa</th>
+                      <th className="px-6 py-4">Account Manager</th>
+                      <th className="px-6 py-4">Líder Asignado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-150 dark:divide-slate-850 text-xs">
@@ -404,6 +433,15 @@ function DashboardContent() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-slate-450 dark:text-slate-500 font-semibold">
                           {new Date(a.assigned_at + "T00:00:00").toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
+                          {a.empresa_nombre}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
+                          {a.account_manager_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-indigo-600 dark:text-indigo-400 font-extrabold">
+                          {a.lider_nombre || user.full_name}
                         </td>
                       </tr>
                     ))}
