@@ -387,19 +387,19 @@ function DashboardContent() {
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12">
-      
-      {/* 1. Mi Información / Profile Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           {/* 1. Mi Información / Profile Info Cards */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm relative overflow-hidden transition-all">
+        <div className="absolute top-0 right-0 h-40 w-40 bg-gradient-to-bl from-blue-500/5 via-indigo-500/5 to-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
         
-        {/* Profile Card */}        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
-          <div className="absolute top-0 right-0 h-28 w-28 bg-gradient-to-bl from-emerald-500/10 to-teal-500/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:divide-x divide-slate-150 dark:divide-slate-800">
           
-          <div className="space-y-4">
+          {/* Section 1: Mi Información */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Mi Información</span>
               {user?.aliado_tipo === "lider" ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/10">
-                  <Award className="h-3 w-3" /> Líder de empresa: {user.lider_grupo || "Sin Empresa"}
+                  <Award className="h-3 w-3" /> Líder de empresa
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
@@ -409,7 +409,7 @@ function DashboardContent() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-sm font-black border ${
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-black border shrink-0 ${
                 user?.aliado_tipo === "lider"
                   ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200/20"
                   : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200/20"
@@ -418,175 +418,111 @@ function DashboardContent() {
               </div>
               <div className="min-w-0">
                 <span className="block text-sm font-extrabold text-slate-855 dark:text-white truncate leading-tight">{user?.full_name}</span>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
+                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-bold">
                   {user?.empresa_multialiado_id ? `Empresa: ${user.lider_grupo || "Sin Empresa"}` : "Asesor Independiente"}
                 </span>
               </div>
             </div>
 
-            <div className="border-t border-slate-100 dark:border-slate-850 pt-4 space-y-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-              <div className="flex items-center gap-2">
-                <Mail className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1.5 truncate">
+                <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span className="truncate">{user?.email}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Phone className="h-3.5 w-3.5 text-slate-400" />
+              <span className="hidden sm:inline text-slate-350 dark:text-slate-700">•</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span>{user?.phone || "Sin Celular"}</span>
               </div>
-
-              {/* Company membership details & Leaders list */}
-              <div className="border-t border-slate-100 dark:border-slate-850 pt-2 mt-2 space-y-2 text-[10px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Account Manager Asignado:</span>
-                  <span className="text-slate-550 dark:text-slate-400 font-extrabold text-[9px]">
-                    {assignedAM?.full_name || "Mesa de Operaciones"}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Pertenece a Empresa:</span>
-                  <span className={`px-2 py-0.5 rounded-full font-extrabold uppercase text-[9px] ${
-                    user?.empresa_multialiado_id 
-                      ? "bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400" 
-                      : "bg-slate-50 dark:bg-slate-800 text-slate-500"
-                  }`}>
-                    {user?.empresa_multialiado_id ? "Sí" : "No (Independiente)"}
-                  </span>
-                </div>
-
-                {user?.empresa_multialiado_id && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[9px]">Empresa:</span>
-                      <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400 rounded-full font-bold text-[9px] uppercase">
-                        {user.lider_grupo || "Sin Empresa"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[9px]">Rol en Empresa:</span>
-                      <span className={`px-2 py-0.5 rounded-full font-black uppercase text-[9px] ${
-                        user?.aliado_tipo === "lider" 
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-955 dark:text-blue-400" 
-                          : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
-                      }`}>
-                        {user?.aliado_tipo === "lider" ? "Líder" : "Aliado"}
-                      </span>
-                    </div>
-
-                    {user?.aliado_tipo === "lider" && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 font-bold uppercase text-[9px]">Líder de Empresa:</span>
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-955 dark:text-blue-405 rounded-full font-black uppercase text-[9px]">
-                          {user.lider_grupo || "Sin Empresa"}
-                        </span>
-                      </div>
-                    )}
-
-                    {user?.aliado_tipo === "aliado" && (
-                      <div className="flex flex-col gap-1.5 pt-1">
-                        <span className="text-slate-400 font-bold uppercase text-[9px]">Mis Líderes Asignados:</span>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {assignedLeaders.length > 0 ? (
-                            assignedLeaders.map((l) => (
-                              <span key={l.id} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-extrabold border border-indigo-100 dark:border-indigo-900/40">
-                                👤 {l.full_name}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-slate-400 italic">Ningún líder asignado</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Assigned Account Manager */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
-          <div className="absolute top-0 right-0 h-28 w-28 bg-gradient-to-bl from-blue-500/10 to-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
-          
-          <div className="space-y-4">
+            {/* Display assigned leaders only for allies in a compact row */}
+            {user?.aliado_tipo === "aliado" && user?.empresa_multialiado_id && assignedLeaders.length > 0 && (
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-850 flex flex-wrap items-center gap-1.5 text-[9px]">
+                <span className="text-slate-400 font-bold uppercase mr-1">Líderes:</span>
+                {assignedLeaders.map((l) => (
+                  <span key={l.id} className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-bold border border-indigo-100/50 dark:border-indigo-900/40">
+                    {l.full_name.split(" ")[0]}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Account Manager */}
+          <div className="space-y-3 lg:pl-6">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Account Manager Asignado</span>
 
             {assignedAM ? (
               <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-sm font-black border border-indigo-200/25">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-sm font-black border border-indigo-200/25 shrink-0">
                   {assignedAM.full_name.charAt(0)}
                 </div>
                 <div className="min-w-0">
                   <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{assignedAM.full_name}</span>
-                  <span className="block text-[10px] text-slate-400 dark:text-slate-550 mt-1 font-semibold uppercase tracking-wider">
+                  <span className="block text-[10px] text-slate-400 dark:text-slate-550 mt-0.5 font-semibold uppercase tracking-wider">
                     Soporte B2B y Dictámenes
                   </span>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-sm font-black border border-slate-200/30">
+                <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-sm font-black border border-slate-200/30 shrink-0">
                   ?
                 </div>
                 <div className="min-w-0">
                   <span className="block text-sm font-extrabold text-slate-650 dark:text-slate-400 truncate leading-tight">Mesa de Operaciones</span>
-                  <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-semibold">
+                  <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-semibold">
                     Espera de asignación del director
                   </span>
                 </div>
               </div>
             )}
 
-            <div className="border-t border-slate-100 dark:border-slate-850 pt-4 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] leading-relaxed text-slate-505 dark:text-slate-450 font-medium">
               {assignedAM 
-                ? `Tu supervisor directo es ${assignedAM.full_name}. Contáctale para dudas sobre tus clientes o liberación de dictámenes Ley 73.`
-                : "Aún no se te ha asignado un Account Manager personalizado. Tus expedientes serán evaluados directamente por el Director de Operaciones."}
+                ? `Supervisor: ${assignedAM.full_name}. Contáctale para dudas de clientes o liberación de dictámenes Ley 73.`
+                : "Aún no se te ha asignado un AM. Tus expedientes serán evaluados por el Director de Operaciones."}
             </div>
           </div>
-        </div>
 
-        {/* Stats Summary */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
-          <div className="absolute top-0 right-0 h-28 w-28 bg-gradient-to-bl from-indigo-500/10 to-purple-500/5 rounded-full blur-2xl pointer-events-none" />
-          
-          <div className="space-y-4">
+          {/* Section 3: Cartera Comercial */}
+          <div className="space-y-3 lg:pl-6">
             <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Cartera Comercial</span>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
                 <span className="block text-[8px] text-slate-400 font-extrabold uppercase">Prospectos</span>
-                <span className="block text-2xl font-black text-slate-850 dark:text-white mt-1">
+                <span className="block text-lg font-black text-slate-850 dark:text-white mt-0.5 leading-none">
                   {activeProspects.length}
                 </span>
               </div>
               
               {user?.aliado_tipo === "lider" ? (
-                <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl">
-                  <span className="block text-[8px] text-slate-400 font-extrabold uppercase">Asesores a Cargo</span>
-                  <span className="block text-2xl font-black text-blue-650 dark:text-blue-400 mt-1">
+                <div className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
+                  <span className="block text-[8px] text-slate-400 font-extrabold uppercase">Asesores</span>
+                  <span className="block text-lg font-black text-blue-650 dark:text-blue-400 mt-0.5 leading-none">
                     {liderAliadosData?.totales?.total_aliados || 0}
                   </span>
                 </div>
               ) : (
-                <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl">
+                <div className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
                   <span className="block text-[8px] text-slate-400 font-extrabold uppercase">Completados</span>
-                  <span className="block text-2xl font-black text-emerald-650 dark:text-emerald-400 mt-1">
+                  <span className="block text-lg font-black text-emerald-650 dark:text-emerald-400 mt-0.5 leading-none">
                     {activeProspects.filter(p => p.status === "pagado_comision").length}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="border-t border-slate-100 dark:border-slate-850 pt-4 text-[11px] text-slate-505 dark:text-slate-400 font-medium">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] text-slate-505 dark:text-slate-450 font-medium leading-relaxed">
               {user?.aliado_tipo === "lider" 
-                ? `Lideras un grupo de ${liderAliadosData?.totales?.total_aliados || 0} asesores comerciales, sumando un total acumulado de ${liderAliadosData?.totales?.total_prospectos || 0} prospectos.`
+                ? `Lideras un grupo de ${liderAliadosData?.totales?.total_aliados || 0} asesores comerciales, con un total de ${liderAliadosData?.totales?.total_prospectos || 0} prospectos acumulados.`
                 : `Tienes ${activeProspects.filter(p => p.status === "evaluacion_pendiente").length} expedientes pendientes de evaluar.`}
-            </div>
           </div>
         </div>
       </div>
+    </div>
 
       {/* Incidencia Alert Bar (Incompletos) */}
       {faltaDocumentos.length > 0 && (
