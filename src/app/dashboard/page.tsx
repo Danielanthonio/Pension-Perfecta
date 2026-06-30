@@ -8,7 +8,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 function DashboardContent() {
-  const { prospects, isProspectDeleted, isProspectPurged, user, profiles, isDemoMode } = useApp();
+  const { prospects, isProspectDeleted, isProspectPurged, user: contextUser, profiles, isDemoMode } = useApp();
+  const user = profiles.find((p) => p.id === contextUser?.id) || contextUser;
   const searchParams = useSearchParams();
 
   // Read URL parameters

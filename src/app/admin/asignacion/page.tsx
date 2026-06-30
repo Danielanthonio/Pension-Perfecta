@@ -437,14 +437,13 @@ export default function AsignacionAliados() {
                   <thead>
                     <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-[10px] font-bold text-slate-550 uppercase tracking-widest text-left">
                       <th className="px-5 py-4">Aliado Comercial</th>
-                      <th className="px-5 py-4">Contacto</th>
                       <th className="px-5 py-4 text-center">Prospectos</th>
                       <th className="px-5 py-4">Supervisor AM</th>
                       <th className="px-5 py-4 text-center">¿Pertenece a Empresa?</th>
                       <th className="px-5 py-4">Empresa</th>
                       <th className="px-5 py-4">Rol en Empresa</th>
                       <th className="px-5 py-4">Asignar a Líder</th>
-                      <th className="px-5 py-4 text-center">Estado</th>
+                      <th className="px-5 py-4">Líder Asignado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
@@ -502,11 +501,7 @@ export default function AsignacionAliados() {
                             </div>
                           </td>
 
-                          {/* 2. Contact details */}
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <span className="font-semibold text-slate-655 dark:text-slate-300 block">{a.email}</span>
-                            <span className="text-[10px] text-slate-450 block mt-0.5">{a.phone || "Sin Celular"}</span>
-                          </td>
+                          {/* 2. Contact details removed for spacing */}
 
                           {/* 3. Prospects count */}
                           <td className="px-5 py-4 whitespace-nowrap text-center">
@@ -684,10 +679,10 @@ export default function AsignacionAliados() {
                             )}
                           </td>
 
-                          {/* 9. Action Status / Save trigger */}
-                          <td className="px-5 py-4 whitespace-nowrap text-center text-xs font-bold">
+                          {/* 9. Líder Asignado & Save triggers */}
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {isUpdating ? (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1 font-bold">
                                 <span className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                                 Guardando...
                               </span>
@@ -695,36 +690,39 @@ export default function AsignacionAliados() {
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   onClick={() => handleSaveType(a.id)}
-                                  className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
-                                  title="Guardar tipo"
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-[10px] font-extrabold flex items-center gap-1"
                                 >
-                                  <Save className="h-3.5 w-3.5" />
+                                  <Save className="h-3 w-3" /> Guardar
                                 </button>
                                 <button
                                   onClick={() => handleCancelTypeEdit(a.id)}
-                                  className="p-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 rounded-lg transition-colors"
-                                  title="Cancelar"
+                                  className="px-2 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 rounded-lg transition-colors text-[10px] font-extrabold"
                                 >
-                                  <X className="h-3.5 w-3.5" />
+                                  Cancelar
                                 </button>
                               </div>
                             ) : isSuccess ? (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 animate-pulse">
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 font-bold animate-pulse">
                                 <CheckCircle className="h-3.5 w-3.5" />
                                 Guardado
                               </span>
-                            ) : a.lider_id ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400 border border-indigo-150 dark:border-indigo-900">
-                                <Shield className="h-2.5 w-2.5" /> Líder: {activeLeaders.find(l => l.id === a.lider_id)?.lider_grupo || "Grupo"}
-                              </span>
-                            ) : isAssignedNow ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900">
-                                <UserCheck className="h-3 w-3" /> Supervisado
-                              </span>
+                            ) : (!currentHasCompany || currentTipo === "lider") ? (
+                              <span className="text-[10px] text-slate-400 italic block py-1.5 text-center">No aplica</span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-450 border border-amber-100 dark:border-amber-900">
-                                <Clock className="h-3 w-3" /> Director
-                              </span>
+                              <div className="flex flex-wrap gap-1 justify-start">
+                                {(() => {
+                                  const assignedLeaders = activeLeaders.filter(l => a.lider_ids?.includes(l.id));
+                                  if (assignedLeaders.length > 0) {
+                                    return assignedLeaders.map(l => (
+                                      <span key={l.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-extrabold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                                        👤 {l.full_name}
+                                      </span>
+                                    ));
+                                  } else {
+                                    return <span className="text-[10px] text-slate-400 italic">Ningún líder asignado</span>;
+                                  }
+                                })()}
+                              </div>
                             )}
                           </td>
                         </tr>
