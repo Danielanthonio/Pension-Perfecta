@@ -407,3 +407,6 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Forzar la recarga del caché de esquemas de PostgREST en Supabase
+NOTIFY pgrst, 'reload schema';

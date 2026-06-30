@@ -66,3 +66,6 @@ CREATE POLICY "Admins y dueños pueden actualizar"
       )
     )
   );
+
+-- 4. Forzar la recarga del caché de esquemas de PostgREST en Supabase
+NOTIFY pgrst, 'reload schema';
