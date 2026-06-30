@@ -170,6 +170,15 @@ CREATE POLICY "Admins ven todos y AMs ven sus aliados"
       public.get_user_role(auth.uid()) = 'account_manager'
       AND account_manager_id = auth.uid()
     )
+    OR (
+      id = public.get_user_account_manager(auth.uid())
+    )
+    OR (
+      id IN (SELECT aliado_asignado_id FROM public.lider_aliados WHERE lider_id = auth.uid())
+    )
+    OR (
+      id IN (SELECT lider_id FROM public.lider_aliados WHERE aliado_asignado_id = auth.uid())
+    )
   );
 
 CREATE POLICY "Usuarios pueden actualizar su perfil"
@@ -352,8 +361,8 @@ ALTER TABLE public.lider_aliados ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Lideres_ven_aliados_asignados"
   ON public.lider_aliados FOR SELECT USING (auth.uid() = lider_id);
 
-CREATE POLICY "Aliados_no_ven_relaciones"
-  ON public.lider_aliados FOR SELECT USING (false);
+CREATE POLICY "Aliados_ven_sus_propios_lideres"
+  ON public.lider_aliados FOR SELECT USING (auth.uid() = aliado_asignado_id);
 
 CREATE POLICY "Admins_y_AMs_gestionan_relaciones"
   ON public.lider_aliados FOR ALL USING (

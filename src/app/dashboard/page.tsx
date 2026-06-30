@@ -146,9 +146,9 @@ function DashboardContent() {
                 {user?.full_name.charAt(0)}
               </div>
               <div className="min-w-0">
-                <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{user?.full_name}</span>
-                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-semibold">
-                  {user?.aliado_tipo === "lider" ? `Empresa: ${user.lider_grupo || "Sin Empresa"}` : "Asesor Independiente"}
+                <span className="block text-sm font-extrabold text-slate-855 dark:text-white truncate leading-tight">{user?.full_name}</span>
+                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
+                  {user?.empresa_multialiado_id ? `Empresa: ${user.lider_grupo || "Sin Empresa"}` : "Asesor Independiente"}
                 </span>
               </div>
             </div>
@@ -161,6 +161,54 @@ function DashboardContent() {
               <div className="flex items-center gap-2">
                 <Phone className="h-3.5 w-3.5 text-slate-400" />
                 <span>{user?.phone || "Sin Celular"}</span>
+              </div>
+
+              {/* Company membership details & Leaders list */}
+              <div className="border-t border-slate-100 dark:border-slate-850 pt-2 mt-2 space-y-2 text-[10px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-bold uppercase text-[9px]">Pertenece a Empresa:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-extrabold uppercase text-[9px] ${
+                    user?.empresa_multialiado_id 
+                      ? "bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400" 
+                      : "bg-slate-50 dark:bg-slate-800 text-slate-500"
+                  }`}>
+                    {user?.empresa_multialiado_id ? "Sí" : "No (Independiente)"}
+                  </span>
+                </div>
+
+                {user?.empresa_multialiado_id && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-bold uppercase text-[9px]">Rol en Empresa:</span>
+                      <span className={`px-2 py-0.5 rounded-full font-black uppercase text-[9px] ${
+                        user?.aliado_tipo === "lider" 
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-955 dark:text-blue-400" 
+                          : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
+                      }`}>
+                        {user?.aliado_tipo === "lider" ? "Líder" : "Aliado"}
+                      </span>
+                    </div>
+
+                    {user?.aliado_tipo === "aliado" && (
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <span className="text-slate-400 font-bold uppercase text-[9px]">Mis Líderes Asignados:</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {profiles.filter((p) => user?.lider_ids?.includes(p.id)).length > 0 ? (
+                            profiles
+                              .filter((p) => user?.lider_ids?.includes(p.id))
+                              .map((l) => (
+                                <span key={l.id} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-extrabold border border-indigo-100 dark:border-indigo-900/40">
+                                  👤 {l.full_name}
+                                </span>
+                              ))
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Ningún líder asignado</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -31,11 +31,7 @@ export async function PATCH(
     let empresaNombre: string | null = null;
 
     // Validate company (empresa_multialiado_id)
-    if (aliado_tipo === "lider") {
-      if (!empresa_multialiado_id) {
-        return NextResponse.json({ error: "Seleccionar una empresa es obligatorio para tipo 'lider'" }, { status: 400 });
-      }
-      
+    if (empresa_multialiado_id) {
       const { data: empresa, error: empError } = await supabase
         .from("empresas_multialiado")
         .select("nombre")
@@ -46,6 +42,11 @@ export async function PATCH(
         return NextResponse.json({ error: "La empresa seleccionada no existe" }, { status: 400 });
       }
       empresaNombre = empresa.nombre;
+    } else {
+      // If no company (independent), type must be 'aliado'
+      if (aliado_tipo === "lider") {
+        return NextResponse.json({ error: "Un líder debe pertenecer a una empresa" }, { status: 400 });
+      }
     }
 
     // Fetch caller user's profile role
@@ -103,11 +104,24 @@ export async function PATCH(
       }
     }
 
+    // Clear leader relationships if company changed, set to independent, or promoted to leader
+    const companyChanged = allyProfile.empresa_multialiado_id !== (empresa_multialiado_id || null);
+    const roleChangedToLider = allyProfile.aliado_tipo !== "lider" && aliado_tipo === "lider";
+    if (companyChanged || roleChangedToLider) {
+      const { error: relDeleteError } = await supabase
+        .from("lider_aliados")
+        .delete()
+        .eq("aliado_asignado_id", allyId);
+      if (relDeleteError) {
+        console.error("Error clearing old leader relations on company/role change:", relDeleteError);
+      }
+    }
+
     // Perform the update
     const updateData: any = {
       aliado_tipo,
-      empresa_multialiado_id: aliado_tipo === "lider" ? empresa_multialiado_id : null,
-      lider_grupo: aliado_tipo === "lider" ? empresaNombre : null, // For backward compatibility
+      empresa_multialiado_id: empresa_multialiado_id || null,
+      lider_grupo: empresaNombre, // For backward compatibility
     };
 
     const { data: updatedProfile, error: updateError } = await supabase

@@ -26,8 +26,15 @@ import {
 } from "lucide-react";
 
 export default function GestorAliados() {
-  const { prospects, profiles, isProspectDeleted, isProspectPurged } = useApp();
+  const { prospects, profiles, isProspectDeleted, isProspectPurged, empresasMultialiado } = useApp();
   const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+
+  // Helper to get Account Manager name
+  const getAMName = (amId?: string | null) => {
+    if (!amId) return "Sin AM (Director)";
+    const am = profiles.find((p) => p.id === amId);
+    return am ? am.full_name : "Sin AM (Director)";
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAlly, setSelectedAlly] = useState<UserProfile | null>(null);
@@ -402,7 +409,7 @@ export default function GestorAliados() {
             {/* Allies Table */}
             {filteredAllies.length === 0 ? (
               <div className="py-20 text-center space-y-3">
-                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto">
                   <Users className="h-6 w-6" />
                 </div>
                 <div>
@@ -411,116 +418,355 @@ export default function GestorAliados() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-150 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Aliado</th>
-                      <th className="px-6 py-4 text-center">Estado</th>
-                      <th className="px-6 py-4 text-center">Enviados</th>
-                      <th className="px-6 py-4 text-center">Evaluación</th>
-                      <th className="px-6 py-4 text-center">Condic.</th>
-                      <th className="px-6 py-4 text-center">Aprobados</th>
-                      <th className="px-6 py-4 text-center">Financ.</th>
-                      <th className="px-6 py-4 text-center">Rechaz.</th>
-                      <th className="px-6 py-4 text-center">Conversión</th>
-                      <th className="px-6 py-4 text-center">Lead Quality</th>
-                      <th className="px-6 py-4 text-right">Comisión</th>
-                      <th className="px-6 py-4 relative"><span className="sr-only">Detalle</span></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-150 text-xs">
-                    {filteredAllies.map((ally) => {
-                      const stats = getAllyMetrics(ally);
-                      const isAllyActive = ally.is_active !== false;
-                      return (
-                        <tr key={ally.id} className="hover:bg-slate-50/40 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black border transition-all bg-emerald-500/10 text-emerald-600 border-emerald-200`}>
-                                {ally.full_name.charAt(0)}
-                              </div>
-                              <div>
-                                <span className="font-extrabold text-slate-800 block leading-tight">{ally.full_name}</span>
-                                <span className="text-[9px] text-slate-450 block mt-0.5 leading-none">{ally.email}</span>
-                              </div>
-                            </div>
-                          </td>
+              <div className="p-6 space-y-8">
+                {/* 1. Category: Independientes */}
+                {(() => {
+                  const independentAllies = filteredAllies.filter(a => !a.empresa_multialiado_id);
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-850 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4.5 w-4.5 text-indigo-500" />
+                          <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                            Aliados Independientes
+                          </h3>
+                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-black rounded-full">
+                            {independentAllies.length}
+                          </span>
+                        </div>
+                      </div>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
-                                isAllyActive
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-150"
-                                  : "bg-slate-100 text-slate-400 border-slate-200"
-                              }`}
-                            >
-                              {isAllyActive ? "Activo" : "Inactivo"}
+                      {independentAllies.length === 0 ? (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 italic py-4 pl-2">
+                          No hay aliados independientes en esta lista.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
+                                <th className="px-6 py-4">Aliado</th>
+                                <th className="px-6 py-4">Account Manager</th>
+                                <th className="px-6 py-4 text-center">Estado</th>
+                                <th className="px-6 py-4 text-center">Enviados</th>
+                                <th className="px-6 py-4 text-center">Evaluación</th>
+                                <th className="px-6 py-4 text-center">Condic.</th>
+                                <th className="px-6 py-4 text-center">Aprobados</th>
+                                <th className="px-6 py-4 text-center">Financ.</th>
+                                <th className="px-6 py-4 text-center">Rechaz.</th>
+                                <th className="px-6 py-4 text-center">Conversión</th>
+                                <th className="px-6 py-4 text-center">Lead Quality</th>
+                                <th className="px-6 py-4 text-right">Comisión</th>
+                                <th className="px-6 py-4 relative"><span className="sr-only">Detalle</span></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-150 dark:divide-slate-800 text-xs">
+                              {independentAllies.map((ally) => {
+                                const stats = getAllyMetrics(ally);
+                                const isAllyActive = ally.is_active !== false;
+                                return (
+                                  <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black border bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                                          {ally.full_name.charAt(0)}
+                                        </div>
+                                        <div>
+                                          <span className="font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{ally.full_name}</span>
+                                          <span className="text-[9px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">{ally.email}</span>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
+                                      👤 {getAMName(ally.account_manager_id)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
+                                        isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
+                                      }`}>
+                                        {isAllyActive ? "Activo" : "Inactivo"}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{stats.total}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{stats.evaluation}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{stats.conditioned}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{stats.approved}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{stats.financed}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{stats.rejected}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{stats.conversionRate}%</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                        stats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
+                                        stats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
+                                        stats.leadQuality === "Baja" ? "bg-rose-50 text-rose-600 border border-rose-150" : "bg-slate-50 text-slate-400"
+                                      }`}>
+                                        {stats.leadQuality}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${stats.comisionTotal.toLocaleString()}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                      <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
+                                        <Eye className="h-3.5 w-3.5" /> Detalle
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Category: Empresas */}
+                <div className="space-y-6 pt-4">
+                  <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-850 pb-2">
+                    <TrendingUp className="h-4.5 w-4.5 text-blue-500" />
+                    <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                      Empresas y Líderes
+                    </h3>
+                  </div>
+
+                  {empresasMultialiado.map((company) => {
+                    const companyProfiles = filteredAllies.filter(a => a.empresa_multialiado_id === company.id);
+                    if (companyProfiles.length === 0 && searchTerm) return null; // Hide empty companies when searching
+
+                    const companyLeaders = companyProfiles.filter(a => a.aliado_tipo === "lider");
+                    const companyAlliesOnly = companyProfiles.filter(a => a.aliado_tipo === "aliado");
+                    
+                    // Allies with no leader in the same company
+                    const alliesWithoutLeader = companyAlliesOnly.filter(a => 
+                      !a.lider_ids || a.lider_ids.length === 0 || !a.lider_ids.some(id => companyLeaders.some(l => l.id === id))
+                    );
+
+                    return (
+                      <div key={company.id} className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-900">
+                        {/* Company Header */}
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 border-b border-slate-250 dark:border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                              Empresa: {company.nombre}
                             </span>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700">
-                            {stats.total}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">
-                            {stats.evaluation}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">
-                            {stats.conditioned}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">
-                            {stats.approved}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">
-                            {stats.financed}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">
-                            {stats.rejected}
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center font-bold">
-                            <span className="text-indigo-600">{stats.conversionRate}%</span>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span
-                              className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                                stats.leadQuality === "Alta"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-150"
-                                  : stats.leadQuality === "Media"
-                                  ? "bg-amber-50 text-amber-700 border border-amber-150"
-                                  : stats.leadQuality === "Baja"
-                                  ? "bg-rose-50 text-rose-600 border border-rose-150"
-                                  : "bg-slate-50 text-slate-400"
-                              }`}
-                            >
-                              {stats.leadQuality}
+                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-450 text-[9px] font-black rounded-full uppercase tracking-wider">
+                              {companyProfiles.length} Integrantes
                             </span>
-                          </td>
+                          </div>
+                        </div>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">
-                            ${stats.comisionTotal.toLocaleString()}
-                          </td>
+                        {companyProfiles.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-slate-400 italic">
+                            Esta empresa aún no cuenta con integrantes.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
+                                  <th className="px-6 py-4">Aliado / Rol</th>
+                                  <th className="px-6 py-4">Account Manager</th>
+                                  <th className="px-6 py-4 text-center">Estado</th>
+                                  <th className="px-6 py-4 text-center">Enviados</th>
+                                  <th className="px-6 py-4 text-center">Evaluación</th>
+                                  <th className="px-6 py-4 text-center">Condic.</th>
+                                  <th className="px-6 py-4 text-center">Aprobados</th>
+                                  <th className="px-6 py-4 text-center">Financ.</th>
+                                  <th className="px-6 py-4 text-center">Rechaz.</th>
+                                  <th className="px-6 py-4 text-center">Conversión</th>
+                                  <th className="px-6 py-4 text-center">Lead Quality</th>
+                                  <th className="px-6 py-4 text-right">Comisión</th>
+                                  <th className="px-6 py-4 relative"><span className="sr-only">Detalle</span></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-150 dark:divide-slate-800 text-xs">
+                                {/* Loop Leaders */}
+                                {companyLeaders.map((leader) => {
+                                  const leaderStats = getAllyMetrics(leader);
+                                  const isLeaderActive = leader.is_active !== false;
+                                  const associatedAllies = companyAlliesOnly.filter(a => a.lider_ids?.includes(leader.id));
 
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <button
-                              onClick={() => setSelectedAlly(ally)}
-                              className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Detalle
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                  return (
+                                    <React.Fragment key={leader.id}>
+                                      {/* Leader Header Row */}
+                                      <tr className="bg-blue-50/20 dark:bg-blue-955/5 font-semibold text-slate-800 dark:text-slate-200">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-200 shrink-0">
+                                              {leader.full_name.charAt(0)}
+                                            </div>
+                                            <div>
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-extrabold block leading-tight">{leader.full_name}</span>
+                                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
+                                                  LÍDER
+                                                </span>
+                                              </div>
+                                              <span className="text-[9px] text-slate-455 dark:text-slate-500 block mt-0.5 leading-none">{leader.email}</span>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                          👤 {getAMName(leader.account_manager_id)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
+                                            isLeaderActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-400 border-slate-200"
+                                          }`}>
+                                            {isLeaderActive ? "Activo" : "Inactivo"}
+                                          </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold">{leaderStats.total}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-500">{leaderStats.evaluation}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-amber-600">{leaderStats.conditioned}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-emerald-650">{leaderStats.approved}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-700">{leaderStats.financed}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-rose-500">{leaderStats.rejected}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-650">{leaderStats.conversionRate}%</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                          <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                            leaderStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
+                                            leaderStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
+                                            leaderStats.leadQuality === "Baja" ? "bg-rose-50 text-rose-600 border border-rose-150" : "bg-slate-50 text-slate-400"
+                                          }`}>
+                                            {leaderStats.leadQuality}
+                                          </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${leaderStats.comisionTotal.toLocaleString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                          <button onClick={() => setSelectedAlly(leader)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-150 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
+                                            <Eye className="h-3.5 w-3.5" /> Detalle
+                                          </button>
+                                        </td>
+                                      </tr>
+
+                                      {/* Associated Allies Rows */}
+                                      {associatedAllies.map((ally) => {
+                                        const allyStats = getAllyMetrics(ally);
+                                        const isAllyActive = ally.is_active !== false;
+                                        return (
+                                          <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <div className="flex items-center gap-3 pl-6">
+                                                <span className="text-slate-350 dark:text-slate-700 select-none">↳</span>
+                                                <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-250 shrink-0">
+                                                  {ally.full_name.charAt(0)}
+                                                </div>
+                                                <div>
+                                                  <span className="font-bold text-slate-700 dark:text-slate-300 block leading-tight">{ally.full_name}</span>
+                                                  <span className="text-[8px] text-slate-455 block mt-0.5 leading-none">{ally.email}</span>
+                                                </div>
+                                              </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-655 dark:text-slate-400">
+                                              👤 {getAMName(ally.account_manager_id)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
+                                                isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
+                                              }`}>
+                                                {isAllyActive ? "Activo" : "Inactivo"}
+                                              </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-655">{allyStats.conversionRate}%</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                              <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                                allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
+                                                allyStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
+                                                allyStats.leadQuality === "Baja" ? "bg-rose-50 text-rose-600 border border-rose-150" : "bg-slate-50 text-slate-400"
+                                              }`}>
+                                                {allyStats.leadQuality}
+                                              </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                              <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
+                                                <Eye className="h-3.5 w-3.5" /> Detalle
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </React.Fragment>
+                                  );
+                                })}
+
+                                {/* Loop Allies without leader in the company */}
+                                {alliesWithoutLeader.length > 0 && (
+                                  <>
+                                    <tr className="bg-slate-50/50 dark:bg-slate-900/50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                      <td colSpan={13} className="px-6 py-2.5 border-y border-slate-100 dark:border-slate-800">
+                                        Aliados sin Líder Asignado
+                                      </td>
+                                    </tr>
+
+                                    {alliesWithoutLeader.map((ally) => {
+                                      const allyStats = getAllyMetrics(ally);
+                                      const isAllyActive = ally.is_active !== false;
+                                      return (
+                                        <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group text-xs">
+                                          <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-3 pl-4">
+                                              <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black bg-slate-500/10 text-slate-600 border border-slate-200 shrink-0">
+                                                {ally.full_name.charAt(0)}
+                                              </div>
+                                              <div>
+                                                <span className="font-bold text-slate-700 dark:text-slate-300 block leading-tight">{ally.full_name}</span>
+                                                <span className="text-[8px] text-slate-455 block mt-0.5 leading-none">{ally.email}</span>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-655 dark:text-slate-405">
+                                            👤 {getAMName(ally.account_manager_id)}
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
+                                              isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
+                                            }`}>
+                                              {isAllyActive ? "Activo" : "Inactivo"}
+                                            </span>
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                              allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
+                                              allyStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
+                                              allyStats.leadQuality === "Baja" ? "bg-rose-50 text-rose-600 border border-rose-150" : "bg-slate-50 text-slate-400"
+                                            }`}>
+                                              {allyStats.leadQuality}
+                                            </span>
+                                          </td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
+                                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
+                                              <Eye className="h-3.5 w-3.5" /> Detalle
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

@@ -64,6 +64,11 @@ export async function POST(req: NextRequest) {
     // Fetch all requested leader profiles
     let leaders: any[] = [];
     if (lider_ids.length > 0) {
+      // Validate that the ally belongs to a company
+      if (!ally.empresa_multialiado_id) {
+        return NextResponse.json({ error: "No se pueden asignar líderes a un aliado independiente (no pertenece a empresa)" }, { status: 400 });
+      }
+
       const { data: leaderData, error: leaderDataError } = await supabase
         .from("profiles")
         .select("*")
@@ -82,6 +87,9 @@ export async function POST(req: NextRequest) {
       for (const leader of leaders) {
         if (leader.aliado_tipo !== "lider") {
           return NextResponse.json({ error: `El usuario ${leader.full_name} no es de tipo 'lider'` }, { status: 400 });
+        }
+        if (leader.empresa_multialiado_id !== ally.empresa_multialiado_id) {
+          return NextResponse.json({ error: `El líder ${leader.full_name} pertenece a una empresa diferente a la del aliado` }, { status: 400 });
         }
         if (isAM && leader.account_manager_id !== user.id) {
           return NextResponse.json({ error: `No tienes permisos para asignar al líder ${leader.full_name}` }, { status: 403 });

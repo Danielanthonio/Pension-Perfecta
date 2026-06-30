@@ -40,6 +40,7 @@ export default function AsignacionAliados() {
   // Local state for tracking unsaved leader-type changes and group name inputs per row
   const [rowTypes, setRowTypes] = useState<Record<string, "aliado" | "lider">>({});
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [rowHasCompany, setRowHasCompany] = useState<Record<string, boolean>>({});
   
   // State for multiple leader selection dropdown
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -113,18 +114,33 @@ export default function AsignacionAliados() {
 
   // Handle saving the Ally Type and Group Name
   const handleSaveType = async (allyId: string) => {
-    const nextTipo = rowTypes[allyId] || "aliado";
-    const nextEmpresaId = groupNames[allyId] || "";
+    const ally = allies.find(al => al.id === allyId);
+    if (!ally) return;
 
-    if (nextTipo === "lider" && !nextEmpresaId.trim()) {
-      alert("Seleccionar una empresa es obligatorio para tipo 'Líder'");
+    const nextHasCompany = rowHasCompany[allyId] !== undefined
+      ? rowHasCompany[allyId]
+      : !!ally.empresa_multialiado_id;
+
+    const nextTipo = rowTypes[allyId] !== undefined
+      ? rowTypes[allyId]
+      : (ally.aliado_tipo || "aliado");
+
+    const nextEmpresaId = groupNames[allyId] !== undefined
+      ? groupNames[allyId]
+      : (ally.empresa_multialiado_id || "");
+
+    if (nextHasCompany && !nextEmpresaId.trim()) {
+      alert("Seleccionar una empresa es obligatorio si pertenece a una empresa.");
       return;
     }
 
     setUpdatingRow(allyId);
     setSuccessRow(null);
     try {
-      await changeAllyType(allyId, nextTipo, nextTipo === "lider" ? nextEmpresaId : undefined);
+      const targetTipo = nextHasCompany ? nextTipo : "aliado";
+      const targetEmpresaId = nextHasCompany ? nextEmpresaId : null;
+
+      await changeAllyType(allyId, targetTipo, targetEmpresaId);
       
       setSuccessRow(allyId);
       setTimeout(() => setSuccessRow(null), 3000);
@@ -137,6 +153,10 @@ export default function AsignacionAliados() {
       const newGroups = { ...groupNames };
       delete newGroups[allyId];
       setGroupNames(newGroups);
+
+      const newHasCompany = { ...rowHasCompany };
+      delete newHasCompany[allyId];
+      setRowHasCompany(newHasCompany);
     } catch (e) {
       console.error(e);
       // Keep state on failure so they don't lose typed text
@@ -154,6 +174,10 @@ export default function AsignacionAliados() {
     const newGroups = { ...groupNames };
     delete newGroups[allyId];
     setGroupNames(newGroups);
+
+    const newHasCompany = { ...rowHasCompany };
+    delete newHasCompany[allyId];
+    setRowHasCompany(newHasCompany);
   };
 
   // Helper to count active prospects of an ally
@@ -416,7 +440,9 @@ export default function AsignacionAliados() {
                       <th className="px-5 py-4">Contacto</th>
                       <th className="px-5 py-4 text-center">Prospectos</th>
                       <th className="px-5 py-4">Supervisor AM</th>
-                      <th className="px-5 py-4">Tipo de Aliado</th>
+                      <th className="px-5 py-4 text-center">¿Pertenece a Empresa?</th>
+                      <th className="px-5 py-4">Empresa</th>
+                      <th className="px-5 py-4">Rol en Empresa</th>
                       <th className="px-5 py-4">Asignar a Líder</th>
                       <th className="px-5 py-4 text-center">Estado</th>
                     </tr>
@@ -429,10 +455,24 @@ export default function AsignacionAliados() {
                       const isUpdating = updatingRow === a.id;
                       const isSuccess = successRow === a.id;
 
-                      // Edit state for type
+                      // Edit state for type & company belonging
+                      const currentHasCompany = rowHasCompany[a.id] !== undefined ? rowHasCompany[a.id] : !!a.empresa_multialiado_id;
                       const currentTipo = rowTypes[a.id] !== undefined ? rowTypes[a.id] : (a.aliado_tipo || "aliado");
                       const currentEmpresaId = groupNames[a.id] !== undefined ? groupNames[a.id] : (a.empresa_multialiado_id || "");
-                      const hasTypeChanged = currentTipo !== (a.aliado_tipo || "aliado") || (currentTipo === "lider" && currentEmpresaId !== (a.empresa_multialiado_id || ""));
+
+                      const dbHasCompany = !!a.empresa_multialiado_id;
+                      const dbEmpresaId = a.empresa_multialiado_id || "";
+                      const dbTipo = a.aliado_tipo || "aliado";
+
+                      const hasTypeChanged = 
+                        currentHasCompany !== dbHasCompany ||
+                        currentEmpresaId !== dbEmpresaId ||
+                        currentTipo !== dbTipo;
+
+                      // Filter leaders of the SAME company
+                      const leadersOfSameCompany = activeLeaders.filter(
+                        (l) => l.empresa_multialiado_id === currentEmpresaId
+                      );
 
                       return (
                         <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors text-xs">
@@ -464,7 +504,7 @@ export default function AsignacionAliados() {
 
                           {/* 2. Contact details */}
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <span className="font-semibold text-slate-650 dark:text-slate-300 block">{a.email}</span>
+                            <span className="font-semibold text-slate-655 dark:text-slate-300 block">{a.email}</span>
                             <span className="text-[10px] text-slate-450 block mt-0.5">{a.phone || "Sin Celular"}</span>
                           </td>
 
@@ -486,7 +526,7 @@ export default function AsignacionAliados() {
                                 value={currentSelectedVal}
                                 onChange={(e) => handleSelectAM(a.id, e.target.value)}
                                 disabled={isUpdating}
-                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
+                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-355 focus:border-emerald-500 transition-all cursor-pointer ${
                                   isAssignedNow
                                     ? "border-emerald-200/50 bg-emerald-50/10 text-slate-705 dark:text-slate-200" 
                                     : "border-amber-250/50 bg-amber-50/10 text-amber-705 dark:text-amber-400"
@@ -502,9 +542,61 @@ export default function AsignacionAliados() {
                             )}
                           </td>
 
-                          {/* 5. Tipo de Aliado */}
+                          {/* 5. ¿Pertenece a Empresa? */}
+                          <td className="px-5 py-4 whitespace-nowrap text-center">
+                            <select
+                              value={currentHasCompany ? "si" : "no"}
+                              onChange={(e) => {
+                                const val = e.target.value === "si";
+                                setRowHasCompany({ ...rowHasCompany, [a.id]: val });
+                                if (!val) {
+                                  setGroupNames({ ...groupNames, [a.id]: "" });
+                                  setRowTypes({ ...rowTypes, [a.id]: "aliado" });
+                                }
+                              }}
+                              disabled={isUpdating}
+                              className="font-bold rounded-xl px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:border-blue-500 cursor-pointer"
+                            >
+                              <option value="no">No</option>
+                              <option value="si">Sí</option>
+                            </select>
+                          </td>
+
+                          {/* 6. Empresa */}
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="flex flex-col gap-1">
+                            {!currentHasCompany ? (
+                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
+                            ) : (
+                              <select
+                                value={currentEmpresaId}
+                                onChange={(e) => {
+                                  setGroupNames({ ...groupNames, [a.id]: e.target.value });
+                                }}
+                                disabled={isUpdating}
+                                className={`font-semibold rounded-xl px-2 py-1 border outline-none bg-slate-50 dark:bg-slate-900 text-slate-705 dark:text-slate-350 focus:border-blue-500 cursor-pointer ${
+                                  !currentEmpresaId
+                                    ? "border-red-500"
+                                    : "border-slate-200 dark:border-slate-800"
+                                }`}
+                              >
+                                <option value="">Selecciona Empresa</option>
+                                {empresasMultialiado.map((emp) => (
+                                  <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                                ))}
+                              </select>
+                            )}
+                            {!hasTypeChanged && a.empresa_multialiado_id && (
+                              <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight px-1 mt-0.5">
+                                Actualmente: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 7. Rol en Empresa */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {!currentHasCompany ? (
+                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
+                            ) : (
                               <select
                                 value={currentTipo}
                                 onChange={(e) => {
@@ -516,41 +608,13 @@ export default function AsignacionAliados() {
                                 <option value="aliado">Aliado</option>
                                 <option value="lider">Líder</option>
                               </select>
-                              
-                              {currentTipo === "lider" && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <select
-                                    value={currentEmpresaId}
-                                    onChange={(e) => {
-                                      setGroupNames({ ...groupNames, [a.id]: e.target.value });
-                                    }}
-                                    className={`w-28 px-1.5 py-0.5 text-[10px] rounded-lg border outline-none bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 ${
-                                      !currentEmpresaId
-                                        ? "border-red-500 focus:border-red-650"
-                                        : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
-                                    }`}
-                                  >
-                                    <option value="" className="text-slate-500">Selecciona Empresa</option>
-                                    {empresasMultialiado.map((emp) => (
-                                      <option key={emp.id} value={emp.id} className="text-slate-805 dark:text-slate-100">
-                                        {emp.nombre}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              )}
-                              {a.aliado_tipo === "lider" && currentTipo === "lider" && !hasTypeChanged && (
-                                <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight px-1 mt-0.5">
-                                  Empresa: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </td>
 
-                          {/* 6. Asignar a Líder */}
+                          {/* 8. Asignar a Líder */}
                           <td className="px-5 py-4 whitespace-nowrap relative">
-                            {currentTipo === "lider" ? (
-                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica para Líderes</span>
+                            {(!currentHasCompany || currentTipo === "lider") ? (
+                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
                             ) : (
                               <div className="relative">
                                 <button
@@ -582,14 +646,14 @@ export default function AsignacionAliados() {
                                     />
                                     <div className="absolute z-20 mt-2 w-64 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl shadow-xl overflow-hidden left-0 max-h-64 overflow-y-auto">
                                       <div className="p-2 space-y-1">
-                                        {activeLeaders
+                                        {leadersOfSameCompany
                                           .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
                                           .length === 0 ? (
                                             <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 text-center">
-                                              No hay líderes disponibles
+                                              No hay líderes disponibles en esta empresa
                                             </div>
                                           ) : (
-                                          activeLeaders
+                                          leadersOfSameCompany
                                             .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
                                             .map((l) => {
                                               const isSelected = a.lider_ids?.includes(l.id) || false;
@@ -620,7 +684,7 @@ export default function AsignacionAliados() {
                             )}
                           </td>
 
-                          {/* 7. Action Status / Save trigger */}
+                          {/* 9. Action Status / Save trigger */}
                           <td className="px-5 py-4 whitespace-nowrap text-center text-xs font-bold">
                             {isUpdating ? (
                               <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1">

@@ -739,10 +739,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               lider_grupo: p.lider_grupo || null,
               empresa_multialiado_id: p.empresa_multialiado_id || null,
             };
-            const rel = localLiderAliados.find((r: any) => r.aliado_asignado_id === mapped.id);
-            if (rel) {
-              mapped.lider_id = rel.lider_id;
-              mapped.lider_aliado_rel_id = rel.id;
+            const rels = localLiderAliados.filter((r: any) => r.aliado_asignado_id === mapped.id) || [];
+            mapped.lider_ids = rels.map((r: any) => r.lider_id);
+            mapped.lider_aliado_rels = rels.map((r: any) => ({ id: r.id, lider_id: r.lider_id }));
+            if (rels.length > 0) {
+              mapped.lider_id = rels[0].lider_id;
+              mapped.lider_aliado_rel_id = rels[0].id;
             } else {
               mapped.lider_id = null;
               mapped.lider_aliado_rel_id = null;
@@ -757,7 +759,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             lider_grupo: p.lider_grupo || null,
             empresa_multialiado_id: p.empresa_multialiado_id || null,
             lider_id: null,
+            lider_ids: [],
             lider_aliado_rel_id: null,
+            lider_aliado_rels: [],
           }));
           setProfiles(parsedProfilesList);
         }
@@ -768,7 +772,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           lider_grupo: p.lider_grupo || null,
           empresa_multialiado_id: p.empresa_multialiado_id || null,
           lider_id: null,
+          lider_ids: [],
           lider_aliado_rel_id: null,
+          lider_aliado_rels: [],
         }));
         setProfiles(parsedProfilesList);
         localStorage.setItem("pensionflow_profiles", JSON.stringify(parsedProfilesList));
@@ -1004,10 +1010,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
             const mappedProfiles = dbProfiles ? dbProfiles.map(dbP => {
               const mapped = mapProfileFromDB(dbP);
-              const rel = dbLiderAliados?.find((r: any) => r.aliado_asignado_id === mapped.id);
-              if (rel) {
-                mapped.lider_id = rel.lider_id;
-                mapped.lider_aliado_rel_id = rel.id;
+              const rels = dbLiderAliados?.filter((r: any) => r.aliado_asignado_id === mapped.id) || [];
+              mapped.lider_ids = rels.map((r: any) => r.lider_id);
+              mapped.lider_aliado_rels = rels.map((r: any) => ({ id: r.id, lider_id: r.lider_id }));
+              if (rels.length > 0) {
+                mapped.lider_id = rels[0].lider_id;
+                mapped.lider_aliado_rel_id = rels[0].id;
               } else {
                 mapped.lider_id = null;
                 mapped.lider_aliado_rel_id = null;
@@ -3179,16 +3187,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     if (isDemoMode || isProvisionalSession || !supabase) {
       // Local updates in demo mode
       const company = empresasMultialiado.find(e => e.id === empresaMultialiadoId);
-      const companyName = tipo === "lider" ? (company?.nombre || "Sin Empresa") : null;
+      const companyName = empresaMultialiadoId ? (company?.nombre || "Sin Empresa") : null;
 
       const updatedProfiles = profiles.map((p) => {
         if (p.id === allyId) {
-          return {
+          const companyChanged = p.empresa_multialiado_id !== (empresaMultialiadoId || null);
+          const roleChangedToLider = p.aliado_tipo !== "lider" && tipo === "lider";
+          const updated = {
             ...p,
             aliado_tipo: tipo,
-            empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+            empresa_multialiado_id: empresaMultialiadoId || null,
             lider_grupo: companyName,
           };
+          if (companyChanged || roleChangedToLider) {
+            updated.lider_id = null;
+            updated.lider_ids = [];
+            updated.lider_aliado_rel_id = null;
+            updated.lider_aliado_rels = [];
+          }
+          return updated;
         }
         return p;
       });
@@ -3197,12 +3214,20 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
       // If updating self (for preview)
       if (user?.id === allyId) {
+        const companyChanged = user.empresa_multialiado_id !== (empresaMultialiadoId || null);
+        const roleChangedToLider = user.aliado_tipo !== "lider" && tipo === "lider";
         const updatedUser = {
           ...user,
           aliado_tipo: tipo,
-          empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+          empresa_multialiado_id: empresaMultialiadoId || null,
           lider_grupo: companyName,
         };
+        if (companyChanged || roleChangedToLider) {
+          updatedUser.lider_id = null;
+          updatedUser.lider_ids = [];
+          updatedUser.lider_aliado_rel_id = null;
+          updatedUser.lider_aliado_rels = [];
+        }
         setUser(updatedUser);
         saveToStorage("pensionflow_user", updatedUser);
       }
@@ -3228,7 +3253,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             aliado_tipo: tipo,
-            empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
+            empresa_multialiado_id: empresaMultialiadoId || null,
           }),
         });
 
@@ -3240,29 +3265,47 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const companyName = data.empresa_nombre || null;
 
         // Update local profiles list
-        const updatedProfiles = profiles.map((p) =>
-          p.id === allyId
-            ? {
-                ...p,
-                aliado_tipo: tipo,
-                empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
-                lider_grupo: companyName,
-              }
-            : p
-        );
+        const updatedProfiles = profiles.map((p) => {
+          if (p.id === allyId) {
+            const companyChanged = p.empresa_multialiado_id !== (empresaMultialiadoId || null);
+            const roleChangedToLider = p.aliado_tipo !== "lider" && tipo === "lider";
+            const updated = {
+              ...p,
+              aliado_tipo: tipo,
+              empresa_multialiado_id: empresaMultialiadoId || null,
+              lider_grupo: companyName,
+            };
+            if (companyChanged || roleChangedToLider) {
+              updated.lider_id = null;
+              updated.lider_ids = [];
+              updated.lider_aliado_rel_id = null;
+              updated.lider_aliado_rels = [];
+            }
+            return updated;
+          }
+          return p;
+        });
         setProfiles(updatedProfiles);
 
         if (user?.id === allyId) {
-          setUser((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  aliado_tipo: tipo,
-                  empresa_multialiado_id: tipo === "lider" ? (empresaMultialiadoId || null) : null,
-                  lider_grupo: companyName,
-                }
-              : null
-          );
+          setUser((prev) => {
+            if (!prev) return null;
+            const companyChanged = prev.empresa_multialiado_id !== (empresaMultialiadoId || null);
+            const roleChangedToLider = prev.aliado_tipo !== "lider" && tipo === "lider";
+            const updatedUser = {
+              ...prev,
+              aliado_tipo: tipo,
+              empresa_multialiado_id: empresaMultialiadoId || null,
+              lider_grupo: companyName,
+            };
+            if (companyChanged || roleChangedToLider) {
+              updatedUser.lider_id = null;
+              updatedUser.lider_ids = [];
+              updatedUser.lider_aliado_rel_id = null;
+              updatedUser.lider_aliado_rels = [];
+            }
+            return updatedUser;
+          });
         }
 
         // Re-calculate leader counts
