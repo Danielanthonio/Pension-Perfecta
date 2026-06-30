@@ -168,14 +168,12 @@ function DashboardContent() {
   // Expanded rows state for indicators table
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
-  // Auto-expand AM, Category, and Company rows by default to match screenshot layout
+  // Auto-expand Company row by default to match new layout
   useEffect(() => {
     if (user?.aliado_tipo === "lider") {
-      const amId = user.account_manager_id || "direct";
+      const companyRowId = `company-${user.empresa_multialiado_id || "unknown"}`;
       setExpandedRows({
-        [`am-${amId}`]: true,
-        [`am-${amId}-empresas`]: true,
-        [`am-${amId}-empresas-${user.empresa_multialiado_id || "unknown"}`]: true,
+        [companyRowId]: true,
       });
     }
   }, [user]);
@@ -256,152 +254,115 @@ function DashboardContent() {
       };
     };
 
-    const assignedAllies = profiles.filter((p) => p.role === "aliado" && p.lider_ids?.includes(user.id));
-    const assignedAllyIds = assignedAllies.map((a) => a.id);
+    // Use backend-loaded allies to bypass RLS limitations on client-side profiles list
+    const assignedAllies = liderAliadosData?.aliados_asignados || [];
+    const assignedAllyIds = assignedAllies.map((a: any) => a.id);
 
     const leaderProspects = filteredProspects.filter((p) => p.aliado_id === user.id);
-    const teamProspects = filteredProspects.filter((p) => assignedAllyIds.includes(p.aliado_id || ""));
     const allProspects = filteredProspects.filter((p) => p.aliado_id === user.id || assignedAllyIds.includes(p.aliado_id || ""));
 
-    const amName = assignedAM?.full_name || "Mesa de Operaciones";
-    const amId = assignedAM?.id || "direct";
-    const amRowId = `am-${amId}`;
+    const companyName = user.lider_grupo || "Sin Empresa";
+    const companyRowId = `company-${user.empresa_multialiado_id || "unknown"}`;
+    const companyExpanded = !!expandedRows[companyRowId];
 
-    const totalAllies = assignedAllies.length + 1; // Team + Leader
-    const amStats = getStats(allProspects);
-    const amExpanded = !!expandedRows[amRowId];
+    const totalAlliesCount = assignedAllies.length + 1; // Team + Leader
+    const companyStats = getStats(allProspects);
 
-    // Root AM row
+    // Root Company row (Level 1)
     rows.push({
-      id: amRowId,
+      id: companyRowId,
       level: 1,
-      name: amName,
-      type: "am",
-      alliesCount: totalAllies,
-      ...amStats,
+      name: companyName,
+      type: "company",
+      alliesCount: totalAlliesCount,
+      ...companyStats,
       hasChildren: true,
-      isExpanded: amExpanded,
+      isExpanded: companyExpanded,
     });
 
-    if (amExpanded) {
-      // Level 2 Category row
-      const empCategoryRowId = `${amRowId}-empresas`;
-      const empCategoryExpanded = !!expandedRows[empCategoryRowId];
-
+    if (companyExpanded) {
+      // Level 2 Role Group: Leaders
+      const leadersHeaderId = `${companyRowId}-lideres-header`;
       rows.push({
-        id: empCategoryRowId,
+        id: leadersHeaderId,
         level: 2,
-        name: "Empresas",
-        type: "category",
-        alliesCount: totalAllies,
-        ...amStats,
-        hasChildren: true,
-        isExpanded: empCategoryExpanded,
-        parentId: amRowId,
+        name: "Líderes",
+        type: "role-group",
+        clientes: 0,
+        evaluados: 0,
+        aprobados: 0,
+        condicionados: 0,
+        rechazados: 0,
+        finAprobados: 0,
+        finOtorgados: 0,
+        tasaEvaluacion: 0,
+        tasaAprobacion: 0,
+        tasaCierre: 0,
+        hasChildren: false,
+        isExpanded: false,
+        parentId: companyRowId,
       });
 
-      if (empCategoryExpanded) {
-        // Level 3 Company row
-        const companyRowId = `${empCategoryRowId}-${user.empresa_multialiado_id || "unknown"}`;
-        const companyExpanded = !!expandedRows[companyRowId];
+      // Level 3 Ally: Leader himself
+      const leaderStats = getStats(leaderProspects);
+      const leaderRowId = `${leadersHeaderId}-${user.id}`;
+      rows.push({
+        id: leaderRowId,
+        level: 3,
+        name: user.full_name,
+        type: "ally",
+        ...leaderStats,
+        hasChildren: false,
+        isExpanded: false,
+        parentId: leadersHeaderId,
+      });
 
+      // Level 2 Role Group: Allies
+      if (assignedAllies.length > 0) {
+        const alliesHeaderId = `${companyRowId}-aliados-header`;
         rows.push({
-          id: companyRowId,
-          level: 3,
-          name: user.lider_grupo || "Sin Empresa",
-          type: "company",
-          alliesCount: totalAllies,
-          ...amStats,
-          hasChildren: true,
-          isExpanded: companyExpanded,
-          parentId: empCategoryRowId,
+          id: alliesHeaderId,
+          level: 2,
+          name: "Aliados",
+          type: "role-group",
+          clientes: 0,
+          evaluados: 0,
+          aprobados: 0,
+          condicionados: 0,
+          rechazados: 0,
+          finAprobados: 0,
+          finOtorgados: 0,
+          tasaEvaluacion: 0,
+          tasaAprobacion: 0,
+          tasaCierre: 0,
+          hasChildren: false,
+          isExpanded: false,
+          parentId: companyRowId,
         });
 
-        if (companyExpanded) {
-          // Level 4 Role Group: Leaders
-          const leadersHeaderId = `${companyRowId}-lideres-header`;
-          rows.push({
-            id: leadersHeaderId,
-            level: 4,
-            name: "Líderes",
-            type: "role-group",
-            clientes: 0,
-            evaluados: 0,
-            aprobados: 0,
-            condicionados: 0,
-            rechazados: 0,
-            finAprobados: 0,
-            finOtorgados: 0,
-            tasaEvaluacion: 0,
-            tasaAprobacion: 0,
-            tasaCierre: 0,
-            hasChildren: false,
-            isExpanded: false,
-            parentId: companyRowId,
-          });
+        // Level 3 Ally: Advisors
+        assignedAllies.forEach((ally: any) => {
+          const allyRowId = `${alliesHeaderId}-${ally.id}`;
+          const allyProspects = filteredProspects.filter((p) => p.aliado_id === ally.id);
+          const allyStats = getStats(allyProspects);
 
-          // Level 5 Ally: Leader himself
-          const leaderStats = getStats(leaderProspects);
-          const leaderRowId = `${leadersHeaderId}-${user.id}`;
           rows.push({
-            id: leaderRowId,
-            level: 5,
-            name: user.full_name,
+            id: allyRowId,
+            level: 3,
+            name: ally.name,
+            subLabel: `Líder: ${user.full_name}`,
             type: "ally",
-            ...leaderStats,
+            ...allyStats,
             hasChildren: false,
             isExpanded: false,
-            parentId: leadersHeaderId,
+            parentId: alliesHeaderId,
           });
-
-          // Level 4 Role Group: Allies
-          if (assignedAllies.length > 0) {
-            const alliesHeaderId = `${companyRowId}-aliados-header`;
-            rows.push({
-              id: alliesHeaderId,
-              level: 4,
-              name: "Aliados",
-              type: "role-group",
-              clientes: 0,
-              evaluados: 0,
-              aprobados: 0,
-              condicionados: 0,
-              rechazados: 0,
-              finAprobados: 0,
-              finOtorgados: 0,
-              tasaEvaluacion: 0,
-              tasaAprobacion: 0,
-              tasaCierre: 0,
-              hasChildren: false,
-              isExpanded: false,
-              parentId: companyRowId,
-            });
-
-            // Level 5 Ally: Advisors
-            assignedAllies.forEach((ally) => {
-              const allyRowId = `${alliesHeaderId}-${ally.id}`;
-              const allyProspects = filteredProspects.filter((p) => p.aliado_id === ally.id);
-              const allyStats = getStats(allyProspects);
-
-              rows.push({
-                id: allyRowId,
-                level: 5,
-                name: ally.full_name,
-                subLabel: `Líder: ${user.full_name}`,
-                type: "ally",
-                ...allyStats,
-                hasChildren: false,
-                isExpanded: false,
-                parentId: alliesHeaderId,
-              });
-            });
-          }
-        }
+        });
       }
     }
 
     return rows;
-  }, [profiles, filteredProspects, expandedRows, user, assignedAM]);
+  }, [filteredProspects, expandedRows, user, liderAliadosData]);
 
   const toggleRow = (rowId: string) => {
     setExpandedRows((prev) => ({
@@ -411,8 +372,6 @@ function DashboardContent() {
   };
 
   const getActionButtonText = (row: EfficiencyTableRow) => {
-    if (row.type === "am") return row.isExpanded ? "Ocultar" : "Ver aliados";
-    if (row.type === "category" && row.name === "Empresas") return row.isExpanded ? "Ocultar" : "Ver empresas";
     if (row.type === "company") return row.isExpanded ? "Ocultar" : "Ver detalle";
     return null;
   };
