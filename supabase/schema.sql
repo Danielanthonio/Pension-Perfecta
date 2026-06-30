@@ -43,6 +43,7 @@ CREATE TABLE prospects (
   id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
   aliado_id uuid REFERENCES profiles(id),
   aliado_name text,
+  empresa_multialiado_id uuid REFERENCES public.empresas_multialiado(id) ON DELETE SET NULL,
   full_name text NOT NULL,
   nss text,
   curp text,
@@ -213,6 +214,22 @@ CREATE POLICY "Aliados ven sus propios prospectos"
       public.get_user_role(auth.uid()) = 'account_manager'
       AND public.get_user_account_manager(aliado_id) = auth.uid()
     )
+    OR (
+      aliado_id IN (
+        SELECT aliado_asignado_id 
+        FROM public.lider_aliados 
+        WHERE lider_id = auth.uid()
+      )
+    )
+    OR (
+      empresa_multialiado_id IS NOT NULL 
+      AND empresa_multialiado_id IN (
+        SELECT empresa_multialiado_id 
+        FROM public.profiles 
+        WHERE id = auth.uid() 
+          AND (aliado_tipo = 'lider' OR role IN ('admin', 'director', 'account_manager'))
+      )
+    )
   );
 
 CREATE POLICY "Aliados crean sus prospectos"
@@ -226,6 +243,13 @@ CREATE POLICY "Admins y dueños pueden actualizar"
     OR (
       public.get_user_role(auth.uid()) = 'account_manager'
       AND public.get_user_account_manager(aliado_id) = auth.uid()
+    )
+    OR (
+      aliado_id IN (
+        SELECT aliado_asignado_id 
+        FROM public.lider_aliados 
+        WHERE lider_id = auth.uid()
+      )
     )
   );
 
@@ -368,3 +392,18 @@ CREATE POLICY "Admins_y_AMs_gestionan_relaciones"
   ON public.lider_aliados FOR ALL USING (
     public.get_user_role(auth.uid()) IN ('admin', 'director', 'account_manager')
   );
+
+-- =============================================================================
+-- MIGRACIÓN: Validación de Unicidad de CURP (RPC)
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.check_curp_exists(target_curp text)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 
+    FROM public.prospects 
+    WHERE UPPER(curp) = UPPER(target_curp)
+      AND (notes_director IS NULL OR (notes_director NOT LIKE '[DELETED:%' AND notes_director NOT LIKE '[PURGED:%'))
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

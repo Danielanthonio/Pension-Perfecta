@@ -359,6 +359,7 @@ function ClientesAdminContent() {
                       <th className="px-6 py-4">Prospecto</th>
                       <th className="px-6 py-4">NSS / CURP</th>
                       <th className="px-6 py-4">Aliado Comercial</th>
+                      <th className="px-6 py-4">Líder Asignado</th>
                       <th className="px-6 py-4">Fecha Eliminación</th>
                       <th className="px-6 py-4">Días Restantes</th>
                       <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
@@ -393,6 +394,18 @@ function ClientesAdminContent() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-slate-655 dark:text-slate-400">
+                              {(() => {
+                                const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
+                                if (!allyProfile) return "Sin Líder";
+                                const leaders = profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id));
+                                return leaders.length > 0
+                                  ? leaders.map((prof) => prof.full_name).join(", ")
+                                  : "Sin Líder";
+                              })()}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-505 dark:text-slate-400">
                             {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
@@ -452,6 +465,7 @@ function ClientesAdminContent() {
                       <th className="px-6 py-4">Prospecto</th>
                       <th className="px-6 py-4">NSS / CURP</th>
                       <th className="px-6 py-4">Aliado Comercial</th>
+                      <th className="px-6 py-4">Líder Asignado</th>
                       <th className="px-6 py-4">Expediente</th>
                       <th className="px-6 py-4">Estado Interno (8 Etapas)</th>
                       <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
@@ -495,6 +509,18 @@ function ClientesAdminContent() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-slate-655 dark:text-slate-400">
+                              {(() => {
+                                const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
+                                if (!allyProfile) return "Sin Líder";
+                                const leaders = profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id));
+                                return leaders.length > 0
+                                  ? leaders.map((prof) => prof.full_name).join(", ")
+                                  : "Sin Líder";
+                              })()}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">

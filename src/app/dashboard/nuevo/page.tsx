@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/utils/context/AppContext";
 import {
@@ -21,7 +21,7 @@ import {
 
 export default function SubirProspecto() {
   const router = useRouter();
-  const { addProspect, user } = useApp();
+  const { addProspect, user, checkCurpExists } = useApp();
   const isDirector = user?.role === "director";
 
   // Form Fields
@@ -31,6 +31,10 @@ export default function SubirProspecto() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [notesAliado, setNotesAliado] = useState("");
+
+  // Duplicate Check States
+  const [isCurpDuplicate, setIsCurpDuplicate] = useState(false);
+  const [checkingCurp, setCheckingCurp] = useState(false);
 
   // Ley 73 Calculation Fields
   const [semanas, setSemanas] = useState<string>("");
@@ -162,6 +166,36 @@ export default function SubirProspecto() {
     setTimeout(() => setOcrSuccessMsg(""), 7000);
   };
 
+  // Validate CURP uniqueness in real-time
+  useEffect(() => {
+    let active = true;
+    if (curp.length === 18 && /^[A-Z0-9]{18}$/i.test(curp)) {
+      setCheckingCurp(true);
+      checkCurpExists(curp).then((exists) => {
+        if (active) {
+          setIsCurpDuplicate(exists);
+          setCheckingCurp(false);
+          if (exists) {
+            setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
+          } else {
+            setErrorMsg((prev) => 
+              prev.includes("Este cliente ya se encuentra registrado con la misma CURP") ? "" : prev
+            );
+          }
+        }
+      });
+    } else {
+      setIsCurpDuplicate(false);
+      setCheckingCurp(false);
+      setErrorMsg((prev) => 
+        prev.includes("Este cliente ya se encuentra registrado con la misma CURP") ? "" : prev
+      );
+    }
+    return () => {
+      active = false;
+    };
+  }, [curp, checkCurpExists]);
+
   // Real-time Validations
   const nssValid = nss.length === 11 && /^\d+$/.test(nss);
   const curpValid = curp.length === 18 && /^[A-Z0-9]+$/i.test(curp);
@@ -172,7 +206,7 @@ export default function SubirProspecto() {
   const hasDocuments = aforeFileName !== "" && imssFileName !== "";
   const uploadsInProgress = aforeUploading || imssUploading;
   const filesReady = aforeFileDataUrl !== "" && imssFileDataUrl !== "";
-  const formIsValid = nameValid && nssValid && curpValid && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
+  const formIsValid = nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
 
   const simulateFileUpload = (type: "afore" | "imss", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,8 +282,23 @@ export default function SubirProspecto() {
 
   const handleSave = async () => {
     setFormSubmitted(true);
+
+    if (curpValid) {
+      setSaving(true);
+      const exists = await checkCurpExists(curp);
+      if (exists) {
+        setIsCurpDuplicate(true);
+        setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+
     if (!formIsValid) {
-      if (!hasDocuments) {
+      if (isCurpDuplicate) {
+        setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
+      } else if (!hasDocuments) {
         setErrorMsg("Es obligatorio subir tanto el Reporte de Semanas IMSS como el Estado de Cuenta de AFORE para enviar a evaluación.");
       } else {
         setErrorMsg("Por favor corrige los datos del prospecto antes de continuar.");
@@ -309,9 +358,9 @@ export default function SubirProspecto() {
       </div>
 
       {errorMsg && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-2xl text-xs font-semibold flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <span className="whitespace-pre-line leading-normal">{errorMsg}</span>
         </div>
       )}
 
@@ -415,12 +464,14 @@ export default function SubirProspecto() {
                       onChange={(e) => setCurp(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase())}
                       placeholder="18 caracteres alfanuméricos"
                       className={`w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/80 dark:hover:bg-slate-800 border rounded-xl text-xs font-semibold outline-none focus:bg-white dark:focus:bg-slate-850 transition-all dark:text-white ${
-                        formSubmitted && !curpValid ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
+                        (formSubmitted && !curpValid) || isCurpDuplicate ? "border-red-400 dark:border-red-500/50 focus:ring-1 focus:ring-red-400" : "border-slate-200 dark:border-slate-750 focus:border-emerald-500 dark:focus:border-emerald-500"
                       } ${highlightFields ? "ring-2 ring-emerald-400 dark:ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20 transition-all duration-500" : ""}`}
                     />
                     {curp.length > 0 && (
                       <span className="absolute inset-y-0 right-0 pr-3.5 flex items-center">
-                        {curpValid ? (
+                        {checkingCurp ? (
+                          <div className="h-4 w-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                        ) : curpValid && !isCurpDuplicate ? (
                           <CheckCircle className="h-4.5 w-4.5 text-emerald-500 animate-scale-in" />
                         ) : (
                           <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">{curp.length}/18</span>
@@ -430,6 +481,13 @@ export default function SubirProspecto() {
                   </div>
                   {formSubmitted && !curpValid && (
                     <span className="text-[10px] text-red-500 dark:text-red-400 font-semibold mt-1 block">El CURP debe tener exactamente 18 caracteres alfanuméricos.</span>
+                  )}
+                  {isCurpDuplicate && (
+                    <span className="text-[10px] text-red-500 dark:text-red-400 font-semibold mt-1 block whitespace-pre-line leading-normal">
+                      Este cliente ya se encuentra registrado con la misma CURP.{"\n"}
+                      No es posible continuar con un registro duplicado.{"\n"}
+                      Por favor revisa la información antes de avanzar.
+                    </span>
                   )}
                 </div>
               </div>

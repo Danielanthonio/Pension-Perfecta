@@ -93,6 +93,7 @@ export interface Prospect {
     | "posible_simulacion";
   notes_aliado?: string;
   notes_director?: string;
+  empresa_multialiado_id?: string | null;
   simulation?: Simulation;
   documents: DocumentItem[];
   google_drive_folder?: string;
@@ -159,6 +160,7 @@ interface AppContextType {
     imssFile?: string | { name: string; dataUrl: string }
   ) => Promise<Prospect>;
   deleteProspect: (id: string) => Promise<void>;
+  checkCurpExists: (curp: string) => Promise<boolean>;
   restoreProspect: (id: string) => Promise<void>;
   permanentlyDeleteProspect: (id: string) => Promise<void>;
   editProspectPersonalData: (
@@ -609,6 +611,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       status: dbProspect.status,
       notes_aliado: dbProspect.notes_aliado || "",
       notes_director: dbProspect.notes_director || "",
+      empresa_multialiado_id: dbProspect.empresa_multialiado_id || null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,
@@ -1024,6 +1027,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             }) : [];
             setProfiles(mappedProfiles);
 
+            const activeUser = currentUser;
+            if (activeUser) {
+              const matched = mappedProfiles.find((p: any) => p.id === activeUser.id);
+              if (matched) {
+                currentUser = matched;
+                setUser(matched);
+              }
+            }
+
             // Fetch empresas_multialiado
             const { data: dbEmpresas, error: empresasError } = await client
               .from("empresas_multialiado")
@@ -1034,14 +1046,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             }
 
             const countMap: Record<string, number> = {};
-            mappedProfiles.forEach((p) => {
+            mappedProfiles.forEach((p: any) => {
               if (p.aliado_tipo === "lider" && p.empresa_multialiado_id) {
                 countMap[p.empresa_multialiado_id] = (countMap[p.empresa_multialiado_id] || 0) + 1;
               }
             });
 
             const mappedEmpresas = (dbEmpresas || []).map((c: any) => {
-              const creatorProfile = mappedProfiles.find(p => p.id === c.created_by);
+              const creatorProfile = mappedProfiles.find((p: any) => p.id === c.created_by);
               return {
                 id: c.id,
                 nombre: c.nombre,
@@ -1053,20 +1065,33 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             });
             setEmpresasMultialiado(mappedEmpresas);
 
-            // Fetch prospects (filtered by role if user is aliado or account_manager)
-            let prospectsQuery = client.from("prospects").select("*, documents(*)");
-            if (currentUser && currentUser.role === "aliado") {
-              prospectsQuery = prospectsQuery.eq("aliado_id", currentUser.id);
-            } else if (currentUser && currentUser.role === "account_manager") {
-              const assignedAllyIds = mappedProfiles
-                .filter(p => p.role === "aliado" && p.account_manager_id === currentUser.id)
-                .map(p => p.id);
-              if (assignedAllyIds.length > 0) {
-                prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
-              } else {
-                prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
-              }
-            }
+             // Fetch prospects (filtered by role if user is aliado or account_manager)
+             let prospectsQuery = client.from("prospects").select("*, documents(*)");
+             if (activeUser && activeUser.role === "aliado") {
+               if (activeUser.aliado_tipo === "lider") {
+                 const assignedAllyIds = mappedProfiles
+                   .filter((p: any) => p.role === "aliado" && p.lider_ids?.includes(activeUser.id))
+                   .map((p: any) => p.id);
+                 if (activeUser.empresa_multialiado_id) {
+                   prospectsQuery = prospectsQuery.or(`aliado_id.eq.${activeUser.id},empresa_multialiado_id.eq.${activeUser.empresa_multialiado_id}`);
+                 } else if (assignedAllyIds.length > 0) {
+                   prospectsQuery = prospectsQuery.in("aliado_id", [activeUser.id, ...assignedAllyIds]);
+                 } else {
+                   prospectsQuery = prospectsQuery.eq("aliado_id", activeUser.id);
+                 }
+               } else {
+                 prospectsQuery = prospectsQuery.eq("aliado_id", activeUser.id);
+               }
+             } else if (activeUser && activeUser.role === "account_manager") {
+               const assignedAllyIds = mappedProfiles
+                 .filter((p: any) => p.role === "aliado" && p.account_manager_id === activeUser.id)
+                 .map((p: any) => p.id);
+               if (assignedAllyIds.length > 0) {
+                 prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+               } else {
+                 prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+               }
+             }
             const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
             if (prospectsError) {
               console.error("Error fetching prospects:", prospectsError);
@@ -1077,7 +1102,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               setProspects(mappedProspects);
 
               // Clean up old soft-deleted or purged prospects in background if director/admin
-              if (currentUser && currentUser.role === "director") {
+              if (activeUser && activeUser.role === "director") {
                 const now = new Date();
                 const toPurge = mappedProspects.filter((p: Prospect) => {
                   const deletedAt = getProspectDeletedAt(p);
@@ -1501,13 +1526,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         }
 
         if (profile) {
+          const activeProfile = profile;
           // Strict role matching check
-          if (profile.role !== role) {
+          if (activeProfile.role !== role) {
             await supabase.auth.signOut();
             throw new Error("Acceso Inválido: Tu cuenta no tiene permisos para acceder con este rol.");
           }
 
-          setUser(profile);
+          setUser(activeProfile);
           setActiveRole(profile.role);
           saveToStorage("pensionflow_user", profile);
           saveToStorage("pensionflow_active_role", profile.role);
@@ -1556,69 +1582,106 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             if (profilesError) {
               console.error("Error fetching profiles on login:", profilesError);
             }
-            const mappedProfiles = dbProfiles ? dbProfiles.map(mapProfileFromDB) : [];
+            const { data: dbLiderAliados } = await supabase.from("lider_aliados").select("*");
+            const mappedProfiles = dbProfiles ? dbProfiles.map((dbP: any) => {
+              const mapped = mapProfileFromDB(dbP);
+              const rels = dbLiderAliados?.filter((r: any) => r.aliado_asignado_id === mapped.id) || [];
+              mapped.lider_ids = rels.map((r: any) => r.lider_id);
+              mapped.lider_aliado_rels = rels.map((r: any) => ({ id: r.id, lider_id: r.lider_id }));
+              if (rels.length > 0) {
+                mapped.lider_id = rels[0].lider_id;
+                mapped.lider_aliado_rel_id = rels[0].id;
+              } else {
+                mapped.lider_id = null;
+                mapped.lider_aliado_rel_id = null;
+              }
+              return mapped;
+            }) : [];
             setProfiles(mappedProfiles);
 
-            // Fetch prospects (filtered by role if user is aliado or account_manager)
-            let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
-            if (profile.role === "aliado") {
-              prospectsQuery = prospectsQuery.eq("aliado_id", profile.id);
-            } else if (profile.role === "account_manager") {
-              const assignedAllyIds = mappedProfiles
-                .filter((p: any) => p.role === "aliado" && p.account_manager_id === profile.id)
-                .map((p: any) => p.id);
-              if (assignedAllyIds.length > 0) {
-                prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
-              } else {
-                prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+            if (profile) {
+              const matched = mappedProfiles.find((p: any) => p.id === activeProfile.id);
+              if (matched) {
+                profile = matched;
+                setUser(matched);
               }
             }
-            const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
-            if (prospectsError) {
-              console.error("Error fetching prospects on login:", prospectsError);
-            }
-            if (dbProspects) {
-              setProspects(dbProspects.map(transformProspectFromDB));
-            }
 
-            // Fetch invitation codes
-            const { data: dbCodes, error: codesError } = await supabase.from("invitation_codes").select("*");
-            if (codesError) {
-              console.error("Error fetching codes on login:", codesError);
-            }
-            if (dbCodes) {
-              setInvitationCodes(dbCodes.map((c: any) => {
-                const userWhoUsedIt = mappedProfiles.find((p: any) => p.invitation_code_used === c.code);
-                return {
-                  id: c.id,
-                  code: c.code,
-                  created_by: c.created_by,
-                  is_used: c.is_used || !!userWhoUsedIt,
-                  used_by: c.used_by || userWhoUsedIt?.id,
-                  created_at: c.created_at
-                };
-              }));
-            }
+            if (activeProfile) {
+              // Fetch prospects (filtered by role if user is aliado or account_manager)
+              let prospectsQuery = supabase.from("prospects").select("*, documents(*)");
+              if (activeProfile.role === "aliado") {
+                if (activeProfile.aliado_tipo === "lider") {
+                  const assignedAllyIds = mappedProfiles
+                    .filter((p: any) => p.role === "aliado" && p.lider_ids?.includes(activeProfile.id))
+                    .map((p: any) => p.id);
+                  if (activeProfile.empresa_multialiado_id) {
+                    prospectsQuery = prospectsQuery.or(`aliado_id.eq.${activeProfile.id},empresa_multialiado_id.eq.${activeProfile.empresa_multialiado_id}`);
+                  } else if (assignedAllyIds.length > 0) {
+                    prospectsQuery = prospectsQuery.in("aliado_id", [activeProfile.id, ...assignedAllyIds]);
+                  } else {
+                    prospectsQuery = prospectsQuery.eq("aliado_id", activeProfile.id);
+                  }
+                } else {
+                  prospectsQuery = prospectsQuery.eq("aliado_id", activeProfile.id);
+                }
+              } else if (activeProfile.role === "account_manager") {
+                const assignedAllyIds = mappedProfiles
+                  .filter((p: any) => p.role === "aliado" && p.account_manager_id === activeProfile.id)
+                  .map((p: any) => p.id);
+                if (assignedAllyIds.length > 0) {
+                  prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
+                } else {
+                  prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
+                }
+              }
+              const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
+              if (prospectsError) {
+                console.error("Error fetching prospects on login:", prospectsError);
+              }
+              if (dbProspects) {
+                setProspects(dbProspects.map(transformProspectFromDB));
+              }
 
-            // Fetch notifications
-            const { data: dbNotifs } = await supabase
-              .from("notifications")
-              .select("*")
-              .eq("user_id", profile.id)
-              .order("created_at", { ascending: false });
-            if (dbNotifs) {
-              setNotifications(dbNotifs.map((n: any) => ({
-                id: n.id,
-                title: n.title,
-                message: n.message,
-                type: n.type as any,
-                read: n.read,
-                created_at: n.created_at
-              })));
+              // Fetch invitation codes
+              const { data: dbCodes, error: codesError } = await supabase.from("invitation_codes").select("*");
+              if (codesError) {
+                console.error("Error fetching codes on login:", codesError);
+              }
+              if (dbCodes) {
+                setInvitationCodes(dbCodes.map((c: any) => {
+                  const userWhoUsedIt = mappedProfiles.find((p: any) => p.invitation_code_used === c.code);
+                  return {
+                    id: c.id,
+                    code: c.code,
+                    created_by: c.created_by,
+                    is_used: c.is_used || !!userWhoUsedIt,
+                    used_by: c.used_by || userWhoUsedIt?.id,
+                    created_at: c.created_at
+                  };
+                }));
+              }
+
+              // Fetch notifications
+              const { data: dbNotifs } = await supabase
+                .from("notifications")
+                .select("*")
+                .eq("user_id", activeProfile.id)
+                .order("created_at", { ascending: false });
+              if (dbNotifs) {
+                setNotifications(dbNotifs.map((n: any) => ({
+                  id: n.id,
+                  title: n.title,
+                  message: n.message,
+                  type: n.type as any,
+                  read: n.read,
+                  created_at: n.created_at
+                })));
+              }
             }
           }
           setIsLoading(false);
-          return profile.role;
+          return activeProfile ? activeProfile.role : null;
         }
 
         setIsLoading(false);
@@ -1755,6 +1818,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         id: newId,
         aliado_id: user?.id || "aliado-123",
         aliado_name: user?.full_name || "Roberto Asesor",
+        empresa_multialiado_id: user?.empresa_multialiado_id || null,
         status: "evaluacion_pendiente",
         documents: docs,
         google_drive_folder: driveFolderId,
@@ -1791,6 +1855,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       try {
         let finalAliadoId = user?.id;
         let finalAliadoName = user?.full_name;
+        let finalEmpresaId = user?.empresa_multialiado_id || null;
 
         if (!finalAliadoId && supabase) {
           const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -1798,11 +1863,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             finalAliadoId = authUser.id;
             const { data: profile } = await supabase
               .from("profiles")
-              .select("full_name")
+              .select("full_name, empresa_multialiado_id")
               .eq("id", authUser.id)
               .maybeSingle();
             if (profile) {
               finalAliadoName = profile.full_name;
+              finalEmpresaId = profile.empresa_multialiado_id;
             }
           }
         }
@@ -1816,6 +1882,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           .insert({
             aliado_id: finalAliadoId,
             aliado_name: finalAliadoName || "Roberto Asesor",
+            empresa_multialiado_id: finalEmpresaId,
             full_name: prospectData.full_name,
             nss: prospectData.nss,
             curp: prospectData.curp,
@@ -1922,6 +1989,57 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       } catch (error) {
         console.error("Error adding prospect to Supabase:", error);
         throw error;
+      }
+    }
+  };
+
+  const checkCurpExists = async (curpToCheck: string): Promise<boolean> => {
+    const cleanCurp = curpToCheck.trim().toUpperCase();
+    if (!cleanCurp) return false;
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const storedProspects = localStorage.getItem("pensionflow_prospects");
+      let allProspects: Prospect[] = [];
+      if (storedProspects) {
+        try {
+          allProspects = JSON.parse(storedProspects);
+        } catch (e) {
+          allProspects = prospects;
+        }
+      } else {
+        allProspects = prospects;
+      }
+      return allProspects.some(
+        (p) =>
+          p.curp.toUpperCase() === cleanCurp &&
+          !p.notes_director?.startsWith("[DELETED:") &&
+          !p.notes_director?.startsWith("[PURGED:")
+      );
+    } else {
+      try {
+        const { data, error } = await supabase.rpc("check_curp_exists", {
+          target_curp: cleanCurp
+        });
+        if (error) {
+          console.warn("Error calling RPC check_curp_exists, falling back to query:", error);
+          const { data: tableData } = await supabase
+            .from("prospects")
+            .select("id, notes_director")
+            .eq("curp", cleanCurp);
+
+          if (tableData && tableData.length > 0) {
+            return tableData.some(
+              (p: any) =>
+                !p.notes_director?.startsWith("[DELETED:") &&
+                !p.notes_director?.startsWith("[PURGED:")
+            );
+          }
+          return false;
+        }
+        return !!data;
+      } catch (err) {
+        console.error("Error checking CURP uniqueness:", err);
+        return false;
       }
     }
   };
@@ -3686,6 +3804,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return prospects.filter(p => assignedAllyIds.includes(p.aliado_id));
     }
     if (user.role === "aliado") {
+      if (user.aliado_tipo === "lider") {
+        const assignedAllyIds = profiles
+          .filter(p => p.role === "aliado" && p.lider_ids?.includes(user.id))
+          .map(p => p.id);
+        return prospects.filter(p => 
+          p.aliado_id === user.id || 
+          assignedAllyIds.includes(p.aliado_id) ||
+          (user.empresa_multialiado_id && p.empresa_multialiado_id === user.empresa_multialiado_id)
+        );
+      }
       return prospects.filter(p => p.aliado_id === user.id);
     }
     return [];
@@ -3715,6 +3843,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         switchRole,
         addProspect,
         deleteProspect,
+        checkCurpExists,
         restoreProspect,
         permanentlyDeleteProspect,
         editProspectPersonalData,
