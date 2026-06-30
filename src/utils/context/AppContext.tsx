@@ -1072,10 +1072,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                  const assignedAllyIds = mappedProfiles
                    .filter((p: any) => p.role === "aliado" && p.lider_ids?.includes(activeUser.id))
                    .map((p: any) => p.id);
+                 const allAllyIds = [activeUser.id, ...assignedAllyIds];
+
                  if (activeUser.empresa_multialiado_id) {
-                   prospectsQuery = prospectsQuery.or(`aliado_id.eq.${activeUser.id},empresa_multialiado_id.eq.${activeUser.empresa_multialiado_id}`);
+                   const allyIdsString = allAllyIds.map(id => `aliado_id.eq.${id}`).join(",");
+                   prospectsQuery = prospectsQuery.or(`empresa_multialiado_id.eq.${activeUser.empresa_multialiado_id},${allyIdsString}`);
                  } else if (assignedAllyIds.length > 0) {
-                   prospectsQuery = prospectsQuery.in("aliado_id", [activeUser.id, ...assignedAllyIds]);
+                   prospectsQuery = prospectsQuery.in("aliado_id", allAllyIds);
                  } else {
                    prospectsQuery = prospectsQuery.eq("aliado_id", activeUser.id);
                  }
@@ -1615,10 +1618,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                   const assignedAllyIds = mappedProfiles
                     .filter((p: any) => p.role === "aliado" && p.lider_ids?.includes(activeProfile.id))
                     .map((p: any) => p.id);
+                  const allAllyIds = [activeProfile.id, ...assignedAllyIds];
+
                   if (activeProfile.empresa_multialiado_id) {
-                    prospectsQuery = prospectsQuery.or(`aliado_id.eq.${activeProfile.id},empresa_multialiado_id.eq.${activeProfile.empresa_multialiado_id}`);
+                    const allyIdsString = allAllyIds.map(id => `aliado_id.eq.${id}`).join(",");
+                    prospectsQuery = prospectsQuery.or(`empresa_multialiado_id.eq.${activeProfile.empresa_multialiado_id},${allyIdsString}`);
                   } else if (assignedAllyIds.length > 0) {
-                    prospectsQuery = prospectsQuery.in("aliado_id", [activeProfile.id, ...assignedAllyIds]);
+                    prospectsQuery = prospectsQuery.in("aliado_id", allAllyIds);
                   } else {
                     prospectsQuery = prospectsQuery.eq("aliado_id", activeProfile.id);
                   }
