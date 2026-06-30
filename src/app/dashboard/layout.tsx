@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  Users,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -32,14 +33,19 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useApp();
   const currentParamsString = searchParams.toString();
 
   const cleanPath = pathname.replace(/\/$/, "");
   const isDashboard = cleanPath === "/dashboard";
   const isClientes = cleanPath === "/dashboard/clientes";
+  const isAliados = cleanPath === "/dashboard/aliados";
 
   const dashboardHref = currentParamsString ? `/dashboard?${currentParamsString}` : "/dashboard";
   const clientesHref = currentParamsString ? `/dashboard/clientes?${currentParamsString}` : "/dashboard/clientes";
+  const aliadosHref = currentParamsString ? `/dashboard/aliados?${currentParamsString}` : "/dashboard/aliados";
+
+  const isLeader = user?.aliado_tipo === "lider";
 
   return (
     <>
@@ -68,6 +74,21 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
         <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
         Mis Clientes (Listado)
       </Link>
+
+      {isLeader && (
+        <Link
+          href={aliadosHref}
+          onClick={onLinkClick}
+          className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
+            isAliados
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
+              : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+          }`}
+        >
+          <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
+          Mis Aliados Asignados
+        </Link>
+      )}
     </>
   );
 }
@@ -324,6 +345,12 @@ export default function DashboardLayout({
       return {
         title: "Mis Clientes",
         subtitle: "Gestiona tus prospectos, sus etapas finales y subetapas.",
+      };
+    }
+    if (cleanPath === "/dashboard/aliados") {
+      return {
+        title: "Mis Aliados Asignados",
+        subtitle: "Visualiza los asesores comerciales asignados bajo tu liderazgo.",
       };
     }
     if (cleanPath === "/dashboard/nuevo") {
