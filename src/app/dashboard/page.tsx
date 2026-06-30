@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
-import { useApp, getStageAndSubStage } from "@/utils/context/AppContext";
+import React, { useState, useEffect, Suspense, useMemo } from "react";
+import { useApp, getStageAndSubStage, Prospect } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
-import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX } from "lucide-react";
+import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX, Sparkles, ChevronRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -164,6 +164,267 @@ function DashboardContent() {
   }, [user, profiles, prospects, isDemoMode]);
 
   const assignedAM = profiles.find(p => p.id === user?.account_manager_id);
+
+  // Expanded rows state for indicators table
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  // Auto-expand AM, Category, and Company rows by default to match screenshot layout
+  useEffect(() => {
+    if (user?.aliado_tipo === "lider") {
+      const amId = user.account_manager_id || "direct";
+      setExpandedRows({
+        [`am-${amId}`]: true,
+        [`am-${amId}-empresas`]: true,
+        [`am-${amId}-empresas-${user.empresa_multialiado_id || "unknown"}`]: true,
+      });
+    }
+  }, [user]);
+
+  interface EfficiencyTableRow {
+    id: string;
+    level: number;
+    name: string;
+    subLabel?: string;
+    type: "am" | "category" | "company" | "role-group" | "ally";
+    alliesCount?: number;
+    clientes: number;
+    evaluados: number;
+    aprobados: number;
+    condicionados: number;
+    rechazados: number;
+    finAprobados: number;
+    finOtorgados: number;
+    tasaEvaluacion: number;
+    tasaAprobacion: number;
+    tasaCierre: number;
+    hasChildren: boolean;
+    isExpanded: boolean;
+    parentId?: string;
+  }
+
+  // Calculate hierarchical Visible Rows for "Mis Indicadores de Eficiencia"
+  const visibleRows = useMemo(() => {
+    if (user?.aliado_tipo !== "lider") return [];
+
+    const rows: EfficiencyTableRow[] = [];
+
+    const getStats = (prospectsList: Prospect[]) => {
+      const totalClientes = prospectsList.length;
+      const evaluados = totalClientes;
+      const aprobados = prospectsList.filter((p) =>
+        ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
+      ).length;
+      const condicionados = prospectsList.filter((p) =>
+        ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
+      ).length;
+      const rechazados = prospectsList.filter((p) =>
+        ["rechazado", "cerrado_perdido"].includes(p.status)
+      ).length;
+
+      const approvedStatuses = [
+        "aprobado_listo",
+        "aportacion",
+        "asesoria_agendada",
+        "doc_proceso",
+        "analisis_riesgo",
+        "firma_programada",
+        "pagado_comision",
+      ];
+      const finAprobados = prospectsList
+        .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
+        .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+
+      const finOtorgados = prospectsList
+        .filter((p) => p.status === "pagado_comision" && p.simulation)
+        .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+
+      const tasaEvaluacion = totalClientes > 0 ? (evaluados / totalClientes) * 100 : 0;
+      const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
+      const tasaCierre = aprobados > 0 ? (prospectsList.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
+
+      return {
+        clientes: totalClientes,
+        evaluados,
+        aprobados,
+        condicionados,
+        rechazados,
+        finAprobados,
+        finOtorgados,
+        tasaEvaluacion,
+        tasaAprobacion,
+        tasaCierre,
+      };
+    };
+
+    const assignedAllies = profiles.filter((p) => p.role === "aliado" && p.lider_ids?.includes(user.id));
+    const assignedAllyIds = assignedAllies.map((a) => a.id);
+
+    const leaderProspects = filteredProspects.filter((p) => p.aliado_id === user.id);
+    const teamProspects = filteredProspects.filter((p) => assignedAllyIds.includes(p.aliado_id || ""));
+    const allProspects = filteredProspects.filter((p) => p.aliado_id === user.id || assignedAllyIds.includes(p.aliado_id || ""));
+
+    const amName = assignedAM?.full_name || "Mesa de Operaciones";
+    const amId = assignedAM?.id || "direct";
+    const amRowId = `am-${amId}`;
+
+    const totalAllies = assignedAllies.length + 1; // Team + Leader
+    const amStats = getStats(allProspects);
+    const amExpanded = !!expandedRows[amRowId];
+
+    // Root AM row
+    rows.push({
+      id: amRowId,
+      level: 1,
+      name: amName,
+      type: "am",
+      alliesCount: totalAllies,
+      ...amStats,
+      hasChildren: true,
+      isExpanded: amExpanded,
+    });
+
+    if (amExpanded) {
+      // Level 2 Category row
+      const empCategoryRowId = `${amRowId}-empresas`;
+      const empCategoryExpanded = !!expandedRows[empCategoryRowId];
+
+      rows.push({
+        id: empCategoryRowId,
+        level: 2,
+        name: "Empresas",
+        type: "category",
+        alliesCount: totalAllies,
+        ...amStats,
+        hasChildren: true,
+        isExpanded: empCategoryExpanded,
+        parentId: amRowId,
+      });
+
+      if (empCategoryExpanded) {
+        // Level 3 Company row
+        const companyRowId = `${empCategoryRowId}-${user.empresa_multialiado_id || "unknown"}`;
+        const companyExpanded = !!expandedRows[companyRowId];
+
+        rows.push({
+          id: companyRowId,
+          level: 3,
+          name: user.lider_grupo || "Sin Empresa",
+          type: "company",
+          alliesCount: totalAllies,
+          ...amStats,
+          hasChildren: true,
+          isExpanded: companyExpanded,
+          parentId: empCategoryRowId,
+        });
+
+        if (companyExpanded) {
+          // Level 4 Role Group: Leaders
+          const leadersHeaderId = `${companyRowId}-lideres-header`;
+          rows.push({
+            id: leadersHeaderId,
+            level: 4,
+            name: "Líderes",
+            type: "role-group",
+            clientes: 0,
+            evaluados: 0,
+            aprobados: 0,
+            condicionados: 0,
+            rechazados: 0,
+            finAprobados: 0,
+            finOtorgados: 0,
+            tasaEvaluacion: 0,
+            tasaAprobacion: 0,
+            tasaCierre: 0,
+            hasChildren: false,
+            isExpanded: false,
+            parentId: companyRowId,
+          });
+
+          // Level 5 Ally: Leader himself
+          const leaderStats = getStats(leaderProspects);
+          const leaderRowId = `${leadersHeaderId}-${user.id}`;
+          rows.push({
+            id: leaderRowId,
+            level: 5,
+            name: user.full_name,
+            type: "ally",
+            ...leaderStats,
+            hasChildren: false,
+            isExpanded: false,
+            parentId: leadersHeaderId,
+          });
+
+          // Level 4 Role Group: Allies
+          if (assignedAllies.length > 0) {
+            const alliesHeaderId = `${companyRowId}-aliados-header`;
+            rows.push({
+              id: alliesHeaderId,
+              level: 4,
+              name: "Aliados",
+              type: "role-group",
+              clientes: 0,
+              evaluados: 0,
+              aprobados: 0,
+              condicionados: 0,
+              rechazados: 0,
+              finAprobados: 0,
+              finOtorgados: 0,
+              tasaEvaluacion: 0,
+              tasaAprobacion: 0,
+              tasaCierre: 0,
+              hasChildren: false,
+              isExpanded: false,
+              parentId: companyRowId,
+            });
+
+            // Level 5 Ally: Advisors
+            assignedAllies.forEach((ally) => {
+              const allyRowId = `${alliesHeaderId}-${ally.id}`;
+              const allyProspects = filteredProspects.filter((p) => p.aliado_id === ally.id);
+              const allyStats = getStats(allyProspects);
+
+              rows.push({
+                id: allyRowId,
+                level: 5,
+                name: ally.full_name,
+                subLabel: `Líder: ${user.full_name}`,
+                type: "ally",
+                ...allyStats,
+                hasChildren: false,
+                isExpanded: false,
+                parentId: alliesHeaderId,
+              });
+            });
+          }
+        }
+      }
+    }
+
+    return rows;
+  }, [profiles, filteredProspects, expandedRows, user, assignedAM]);
+
+  const toggleRow = (rowId: string) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [rowId]: !prev[rowId],
+    }));
+  };
+
+  const getActionButtonText = (row: EfficiencyTableRow) => {
+    if (row.type === "am") return row.isExpanded ? "Ocultar" : "Ver aliados";
+    if (row.type === "category" && row.name === "Empresas") return row.isExpanded ? "Ocultar" : "Ver empresas";
+    if (row.type === "company") return row.isExpanded ? "Ocultar" : "Ver detalle";
+    return null;
+  };
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12">
@@ -394,6 +655,167 @@ function DashboardContent() {
 
       {/* Sales Funnel and Rates */}
       <SalesFunnel prospects={filteredProspects} />
+
+      {/* Hierarchical Efficiency Indicators Table (Solo para Líderes) */}
+      {user?.aliado_tipo === "lider" && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden mt-8">
+          <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-widest">
+              Mis Indicadores de Eficiencia
+            </span>
+            <span className="text-[10px] font-bold flex items-center gap-1 text-blue-500">
+              <Sparkles className="h-3.5 w-3.5" />
+              Comparativa de eficiencia en tiempo real
+            </span>
+          </div>
+
+          {visibleRows.length === 0 ? (
+            <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
+              <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-705 dark:text-slate-300">Sin datos de rendimiento</h4>
+                <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  No hay aliados asignados ni prospectos registrados bajo tu liderazgo.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <th className="px-6 py-4">Account Manager / Entidad</th>
+                    <th className="px-4 py-4 text-center">Aliados</th>
+                    <th className="px-4 py-4 text-center">Clientes</th>
+                    <th className="px-4 py-4 text-center">Evaluados</th>
+                    <th className="px-4 py-4 text-center">Aprobados</th>
+                    <th className="px-4 py-4 text-center">Condicionados</th>
+                    <th className="px-4 py-4 text-center">Rechazados</th>
+                    <th className="px-5 py-4 text-right">Fin. Aprobados</th>
+                    <th className="px-5 py-4 text-right">Fin. Otorgados</th>
+                    <th className="px-4 py-4 text-center">Tasa Eval.</th>
+                    <th className="px-4 py-4 text-center">Tasa Aprob.</th>
+                    <th className="px-4 py-4 text-center">Tasa Cierre</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150 dark:divide-slate-808">
+                  {visibleRows.map((row) => {
+                    if (row.type === "role-group") {
+                      return (
+                        <tr key={row.id} className="bg-slate-100/50 dark:bg-slate-950/20">
+                          <td
+                            colSpan={12}
+                            className="px-6 py-2.5 text-[9px] font-black text-slate-450 dark:text-slate-550 uppercase tracking-widest"
+                            style={{ paddingLeft: `${row.level * 1.5}rem` }}
+                          >
+                            {row.name}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const actionText = getActionButtonText(row);
+                    const isLevel1 = row.level === 1;
+
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group ${
+                          isLevel1 ? "bg-slate-50/20 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800" : ""
+                        }`}
+                      >
+                        <td
+                          className="py-4 pr-4 select-none cursor-pointer"
+                          onClick={() => row.hasChildren && toggleRow(row.id)}
+                          style={{ paddingLeft: `${row.level * 1.5}rem` }}
+                        >
+                          <div className="flex items-center gap-2">
+                            {row.hasChildren ? (
+                              <span className="flex-shrink-0">
+                                {row.isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" />
+                                )}
+                              </span>
+                            ) : (
+                              <span className="w-4 h-4 flex-shrink-0" />
+                            )}
+
+                            <div className="flex flex-col">
+                              <span className={`text-xs ${isLevel1 ? "text-slate-900 dark:text-white font-extrabold" : "text-slate-700 dark:text-slate-300 font-semibold"}`}>
+                                {row.name}
+                              </span>
+                              {row.subLabel && (
+                                <span className="text-[10px] text-slate-450 dark:text-slate-500 font-medium mt-0.5">
+                                  {row.subLabel}
+                                </span>
+                              )}
+                            </div>
+
+                            {row.hasChildren && actionText && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRow(row.id);
+                                }}
+                                className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[9px] text-slate-500 dark:text-slate-400 font-bold transition-all cursor-pointer border border-slate-200 dark:border-slate-700/80"
+                              >
+                                {actionText}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                          {row.alliesCount !== undefined ? row.alliesCount : "-"}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                          {row.clientes}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                          {row.evaluados}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-605 dark:text-slate-350">
+                          {row.aprobados}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                          {row.condicionados}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                          {row.rechazados}
+                        </td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                          {formatCurrency(row.finAprobados)}
+                        </td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(row.finOtorgados)}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400 border border-blue-105">
+                            {row.tasaEvaluacion.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/20 text-purple-650 dark:text-purple-405 border border-purple-105">
+                            {row.tasaAprobacion.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 border border-emerald-105">
+                            {row.tasaCierre.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
