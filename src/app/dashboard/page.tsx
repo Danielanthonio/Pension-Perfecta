@@ -6,11 +6,40 @@ import SalesFunnel from "@/components/SalesFunnel";
 import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 function DashboardContent() {
   const { prospects, isProspectDeleted, isProspectPurged, user: contextUser, profiles, isDemoMode } = useApp();
   const user = profiles.find((p) => p.id === contextUser?.id) || contextUser;
   const searchParams = useSearchParams();
+
+  const [assignedLeaderIds, setAssignedLeaderIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user?.id && !isDemoMode) {
+      const supabaseClient = createClient();
+      supabaseClient
+        .from("lider_aliados")
+        .select("lider_id")
+        .eq("aliado_asignado_id", user.id)
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Error fetching leaders directly:", error);
+          }
+          if (data) {
+            setAssignedLeaderIds(data.map((r: any) => r.lider_id));
+          }
+        });
+    }
+  }, [user?.id, isDemoMode]);
+
+  const activeLeaderIds = Array.from(new Set([
+    ...(user?.lider_ids || []),
+    ...(user?.lider_id ? [user.lider_id] : []),
+    ...assignedLeaderIds
+  ]));
+
+  const assignedLeaders = profiles.filter((p) => activeLeaderIds.includes(p.id));
 
   // Read URL parameters
   const startDate = searchParams.get("desde") || "";
@@ -194,14 +223,12 @@ function DashboardContent() {
                       <div className="flex flex-col gap-1.5 pt-1">
                         <span className="text-slate-400 font-bold uppercase text-[9px]">Mis Líderes Asignados:</span>
                         <div className="flex flex-wrap gap-1 mt-0.5">
-                          {profiles.filter((p) => user?.lider_ids?.includes(p.id)).length > 0 ? (
-                            profiles
-                              .filter((p) => user?.lider_ids?.includes(p.id))
-                              .map((l) => (
-                                <span key={l.id} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-extrabold border border-indigo-100 dark:border-indigo-900/40">
-                                  👤 {l.full_name}
-                                </span>
-                              ))
+                          {assignedLeaders.length > 0 ? (
+                            assignedLeaders.map((l) => (
+                              <span key={l.id} className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg font-extrabold border border-indigo-100 dark:border-indigo-900/40">
+                                👤 {l.full_name}
+                              </span>
+                            ))
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">Ningún líder asignado</span>
                           )}
