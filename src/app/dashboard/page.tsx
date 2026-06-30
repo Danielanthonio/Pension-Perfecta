@@ -14,6 +14,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   const [assignedLeaderIds, setAssignedLeaderIds] = useState<string[]>([]);
+  const [dbLeaders, setDbLeaders] = useState<any[]>([]);
 
   useEffect(() => {
     if (user?.id && !isDemoMode) {
@@ -22,12 +23,22 @@ function DashboardContent() {
         .from("lider_aliados")
         .select("lider_id")
         .eq("aliado_asignado_id", user.id)
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           if (error) {
             console.error("Error fetching leaders directly:", error);
           }
-          if (data) {
-            setAssignedLeaderIds(data.map((r: any) => r.lider_id));
+          if (data && data.length > 0) {
+            const ids = data.map((r: any) => r.lider_id);
+            setAssignedLeaderIds(ids);
+            
+            // Failsafe: Fetch leader profile directly by ID to bypass missing entries in profiles state
+            const { data: profs } = await supabaseClient
+              .from("profiles")
+              .select("id, full_name, email, role")
+              .in("id", ids);
+            if (profs) {
+              setDbLeaders(profs);
+            }
           }
         });
     }
@@ -39,7 +50,14 @@ function DashboardContent() {
     ...assignedLeaderIds
   ]));
 
-  const assignedLeaders = profiles.filter((p) => activeLeaderIds.includes(p.id));
+  const allProfiles = [
+    ...profiles,
+    ...dbLeaders
+  ];
+
+  const assignedLeaders = allProfiles.filter(
+    (p, index, self) => activeLeaderIds.includes(p.id) && self.findIndex(o => o.id === p.id) === index
+  );
 
   // Read URL parameters
   const startDate = searchParams.get("desde") || "";
