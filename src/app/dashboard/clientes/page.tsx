@@ -23,6 +23,7 @@ import {
   X,
   AlertCircle,
   Layers,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -50,7 +51,7 @@ function ClientesContent() {
 
   // Page local states
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "papelera">("evaluacion");
+  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "rechazados" | "papelera">("evaluacion");
 
   // States for Scheduling Modal
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -179,6 +180,10 @@ function ClientesContent() {
     (p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada"))
   );
 
+  const rechazados = filteredActive.filter((p) =>
+    ["rechazado", "cerrado_perdido"].includes(p.status)
+  );
+
   const getActiveStageIndex = (status: Prospect["status"]) => {
     switch (status) {
       case "asesoria_agendada":
@@ -224,7 +229,7 @@ function ClientesContent() {
       {/* Tab select and action button row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Segmented Controller Tab Selector */}
-        <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl flex-1 max-w-xl flex border border-slate-200 dark:border-slate-800">
+        <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl flex-1 max-w-3xl flex border border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setActiveTab("evaluacion")}
             className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
@@ -255,6 +260,16 @@ function ClientesContent() {
             }`}
           >
             Proyectos Activos ({proyectosActivos.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("rechazados")}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              activeTab === "rechazados"
+                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+            }`}
+          >
+            Rechazados ({rechazados.length})
           </button>
           <button
             onClick={() => setActiveTab("papelera")}
@@ -747,6 +762,103 @@ function ClientesContent() {
                                 className="px-3 py-1.5 bg-red-50 dark:bg-red-955/10 hover:bg-red-105 dark:hover:bg-red-900/30 text-red-755 dark:text-red-400 text-[10px] font-bold rounded-xl border border-red-202 dark:border-red-850 transition-colors"
                               >
                                 Eliminar Permanente
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: RECHAZADOS */}
+        {activeTab === "rechazados" && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">
+                Prospectos Rechazados o Cerrados Perdidos
+              </h3>
+            </div>
+
+            {rechazados.length === 0 ? (
+              <div className="py-16 text-center">
+                <XCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-655" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos rechazados</h4>
+                <p className="text-xs text-slate-405 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Aquí aparecerán los clientes cuyos expedientes no hayan sido aprobados o se hayan cerrado como perdidos.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                      <th className="px-6 py-4.5">Nombre Completo</th>
+                      <th className="px-6 py-4.5">NSS</th>
+                      <th className="px-6 py-4.5">CURP</th>
+                      <th className="px-6 py-4.5">Teléfono</th>
+                      <th className="px-6 py-4.5">Email</th>
+                      <th className="px-6 py-4.5">Motivo del Rechazo</th>
+                      <th className="px-6 py-4.5">Etapa</th>
+                      <th className="px-6 py-4.5">Subetapa</th>
+                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {rechazados.map((p) => {
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                            {p.full_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.nss}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                            {p.curp}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.phone}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
+                            {p.email}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
+                            {p.notes_director || <span className="text-slate-400 italic">Sin motivo especificado</span>}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+                              {getStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+                              {getSubStageLabel(p.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-slate-205 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                                title="Ver Expediente"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Link>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                    await deleteProspect(p.id);
+                                  }
+                                }}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                title="Mover a Papelera"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
                           </td>
