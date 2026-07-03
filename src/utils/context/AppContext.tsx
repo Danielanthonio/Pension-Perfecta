@@ -1343,6 +1343,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     await saveFile(docId, fileDataUrl);
 
     if (!isDemoMode && !isProvisionalSession && supabase) {
+      let finalUploadedBy = user?.id;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        finalUploadedBy = authUser.id;
+      }
+
       const { error: dbErr } = await supabase.from("documents").insert({
         id: docId,
         prospect_id: prospectId,
@@ -1352,7 +1358,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         drive_file_id: driveFileId,
         drive_file_url: driveFileUrl,
         drive_folder_id: folderId,
-        uploaded_by: user?.id,
+        uploaded_by: finalUploadedBy,
       });
 
       if (dbErr) {
@@ -1859,11 +1865,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return newProspect;
     } else {
       try {
-        let finalAliadoId = user?.id;
-        let finalAliadoName = user?.full_name;
-        let finalEmpresaId = user?.empresa_multialiado_id || null;
+        let finalAliadoId = undefined;
+        let finalAliadoName = undefined;
+        let finalEmpresaId = null;
 
-        if (!finalAliadoId && supabase) {
+        if (supabase) {
           const { data: { user: authUser } } = await supabase.auth.getUser();
           if (authUser) {
             finalAliadoId = authUser.id;
@@ -1875,12 +1881,21 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             if (profile) {
               finalAliadoName = profile.full_name;
               finalEmpresaId = profile.empresa_multialiado_id;
+            } else {
+              finalAliadoName = user?.full_name;
+              finalEmpresaId = user?.empresa_multialiado_id || null;
             }
           }
         }
 
         if (!finalAliadoId) {
-          throw new Error("No hay una sesión activa de Supabase. Por favor, inicia sesión de nuevo.");
+          finalAliadoId = user?.id;
+          finalAliadoName = user?.full_name;
+          finalEmpresaId = user?.empresa_multialiado_id || null;
+        }
+
+        if (!finalAliadoId) {
+          throw new Error("No hay una sesión activa de Supabase o su sesión ha expirado. Por favor, inicia sesión de nuevo.");
         }
 
         const { data: dbProspect, error: prospectError } = await supabase
