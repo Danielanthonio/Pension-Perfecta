@@ -862,6 +862,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         try {
           // Check if there is an active session
           const { data: { session } } = await client.auth.getSession();
+          let hasActiveSession = !!session?.user;
           let currentUser: UserProfile | null = null;
 
           if (session?.user) {
@@ -931,11 +932,35 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                     }
                   } else if (storedUser.password_provisional) {
                     // Provisional session bypass: RLS blocks profiles query when anonymous.
-                    // Keep the local storage session intact.
-                    console.warn("Restoring user with provisional session from localStorage fallback:", storedUser.email);
-                    currentUser = storedUser;
-                    setUser(storedUser);
-                    setActiveRole(storedUser.role);
+                    // Try to automatically upgrade/sign in to Supabase Auth using the provisional password in the background
+                    try {
+                      console.log("Attempting background session upgrade using provisional password for:", storedUser.email);
+                      const { data: authData, error: authErr } = await client.auth.signInWithPassword({
+                        email: storedUser.email,
+                        password: storedUser.password_provisional
+                      });
+                      if (!authErr && authData.user) {
+                        console.log("Background session upgrade successful!");
+                        const profile = await ensureProfileExists(client, authData.user);
+                        if (profile) {
+                          currentUser = profile;
+                          setUser(profile);
+                          setActiveRole(profile.role);
+                          saveToStorage("pensionflow_user", profile);
+                          hasActiveSession = true;
+                        }
+                      } else {
+                        console.warn("Background session upgrade failed, keeping provisional session:", authErr?.message);
+                        currentUser = storedUser;
+                        setUser(storedUser);
+                        setActiveRole(storedUser.role);
+                      }
+                    } catch (upgradeErr) {
+                      console.error("Error in background session upgrade:", upgradeErr);
+                      currentUser = storedUser;
+                      setUser(storedUser);
+                      setActiveRole(storedUser.role);
+                    }
                   } else if (fetchError) {
                     // DB/network error: restore from localStorage anyway to prevent drop!
                     console.warn("DB error when restoring session, keeping localStorage user");
@@ -958,7 +983,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
 
           // Fetch profiles, prospects, notifications, invitation codes
-          const isProvisional = !session?.user && !!currentUser?.password_provisional;
+          const isProvisional = !hasActiveSession && !!currentUser?.password_provisional;
           setIsProvisionalSession(isProvisional);
 
           if (isProvisional) {
