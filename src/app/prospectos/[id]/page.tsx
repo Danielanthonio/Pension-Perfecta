@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
+import { createClient } from "@/utils/supabase/client";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -70,7 +71,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, profiles, empresasMultialiado, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment } = useApp();
+  const { user, prospects, profiles, empresasMultialiado, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment, isDemoMode } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -536,31 +537,115 @@ export default function ProspectoDetalle() {
   const cumpleSemanas = semanas >= 500;
   const fmtMXN = (n: number) => `$${Math.round(n || 0).toLocaleString("es-MX")}`;
 
-  // Internal evaluation chat / bitácora — persisted per prospect (queda como antecedente del cliente)
-  useEffect(() => {
-    if (!prospect) return;
+  // Internal evaluation chat / bitácora — persisted server-side in `prospect_messages`
+  // so it is shared across aliado / account manager / director and survives browser wipes.
+  // Degrades gracefully to localStorage in demo mode or if the table isn't migrated yet.
+  const prospectId = prospect?.id;
+
+  const loadChatFromLocal = useCallback((pid: string) => {
     try {
-      const raw = localStorage.getItem(`pp_chat_${prospect.id}`);
+      const raw = localStorage.getItem(`pp_chat_${pid}`);
       setChatMessages(raw ? JSON.parse(raw) : []);
     } catch {
       setChatMessages([]);
     }
-  }, [prospect?.id]);
+  }, []);
 
-  const sendChat = () => {
+  const loadChat = useCallback(async () => {
+    if (!prospectId) return;
+    if (isDemoMode) {
+      loadChatFromLocal(prospectId);
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("prospect_messages")
+        .select("id, author_name, author_role, text, created_at")
+        .eq("prospect_id", prospectId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      setChatMessages(
+        (data || []).map((m: any) => ({
+          id: m.id,
+          author: m.author_name,
+          role: m.author_role,
+          text: m.text,
+          ts: new Date(m.created_at).getTime(),
+        }))
+      );
+    } catch {
+      // Table not migrated yet or a transient error — keep working with the local log.
+      loadChatFromLocal(prospectId);
+    }
+  }, [prospectId, isDemoMode, loadChatFromLocal]);
+
+  useEffect(() => {
+    loadChat();
+  }, [loadChat]);
+
+  // Live updates: reflect messages other participants post, in real time.
+  // Safe no-op if realtime is not enabled for the table.
+  useEffect(() => {
+    if (isDemoMode || !prospectId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`prospect_messages_${prospectId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "prospect_messages", filter: `prospect_id=eq.${prospectId}` },
+        () => loadChat()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [prospectId, isDemoMode, loadChat]);
+
+  const persistChatLocal = (pid: string, msg: { id: string; author: string; role: string; text: string; ts: number }) => {
+    try {
+      const raw = localStorage.getItem(`pp_chat_${pid}`);
+      const arr = raw ? JSON.parse(raw) : [];
+      localStorage.setItem(`pp_chat_${pid}`, JSON.stringify([...arr, msg]));
+    } catch {}
+  };
+
+  const sendChat = async () => {
     const text = chatInput.trim();
     if (!text || !prospect) return;
-    const msg = {
+    const localMsg = {
       id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
       author: user?.full_name || "Usuario",
       role: user?.role || "aliado",
       text,
       ts: Date.now(),
     };
-    const next = [...chatMessages, msg];
-    setChatMessages(next);
-    try { localStorage.setItem(`pp_chat_${prospect.id}`, JSON.stringify(next)); } catch {}
+
+    // Optimistic append + clear input for a responsive feel.
+    setChatMessages((prev) => [...prev, localMsg]);
     setChatInput("");
+
+    if (isDemoMode) {
+      persistChatLocal(prospect.id, localMsg);
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("prospect_messages").insert({
+        prospect_id: prospect.id,
+        author_id: user?.id ?? null,
+        author_name: user?.full_name || "Usuario",
+        author_role: user?.role || "aliado",
+        text,
+      });
+      if (error) throw error;
+      // Re-sync with canonical server ordering (and any concurrent messages).
+      loadChat();
+    } catch {
+      // Table not migrated / transient error — keep the note locally so it isn't lost.
+      persistChatLocal(prospect.id, localMsg);
+    }
   };
 
   const roleLabelShort = (r: string) => r === "director" ? "Director" : r === "account_manager" ? "Account Mgr" : "Aliado";
