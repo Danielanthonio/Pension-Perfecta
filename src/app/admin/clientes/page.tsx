@@ -106,13 +106,13 @@ function ClientesAdminContent() {
     const { stage } = getStageAndSubStage(status);
     switch (stage) {
       case "evaluacion_pendiente":
-        return "bg-blue-50 dark:bg-blue-955/15 text-blue-600 dark:text-blue-400 border-blue-105 dark:border-blue-800/40";
+        return "bg-blue-50 dark:bg-blue-950/15 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/40";
       case "rechazado":
-        return "bg-red-50 dark:bg-red-955/20 text-red-655 dark:text-red-400 border-red-105 dark:border-red-800/40";
+        return "bg-red-50 dark:bg-red-950/20 text-red-650 dark:text-red-400 border-red-100 dark:border-red-800/40";
       case "condicionado":
-        return "bg-amber-50 text-amber-700 dark:bg-amber-955/20 dark:text-amber-400 border-amber-100 dark:border-amber-800/40";
+        return "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border-amber-100 dark:border-amber-800/40";
       case "aprobado":
-        return "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-105 dark:border-emerald-800/40";
+        return "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/40";
       case "cerrado_perdido":
         return "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700";
       default:
@@ -216,7 +216,7 @@ function ClientesAdminContent() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-              <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-202 dark:border-slate-850 text-xs font-bold">
+              <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-200 dark:border-slate-850 text-xs font-bold">
                 <button
                   onClick={() => setDirectorFilterType("todos")}
                   className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
@@ -228,7 +228,7 @@ function ClientesAdminContent() {
                 <button
                   onClick={() => setDirectorFilterType("am")}
                   className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-505 hover:text-slate-850"
+                    directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
                   }`}
                 >
                   Por AM
@@ -236,7 +236,7 @@ function ClientesAdminContent() {
                 <button
                   onClick={() => setDirectorFilterType("aliado")}
                   className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-505 hover:text-slate-850"
+                    directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
                   }`}
                 >
                   Por Aliado
@@ -272,7 +272,7 @@ function ClientesAdminContent() {
                 <select
                   value={selectedAllyId}
                   onChange={(e) => setSelectedAllyId(e.target.value)}
-                  className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-355 focus:border-emerald-500"
+                  className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-350 focus:border-emerald-500"
                 >
                   <option value="all">Todos los aliados...</option>
                   {profiles
@@ -299,7 +299,7 @@ function ClientesAdminContent() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar prospecto por Nombre, NSS o CURP..."
-              className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-205 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
+              className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
                 isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
               }`}
             />
@@ -331,7 +331,7 @@ function ClientesAdminContent() {
         </div>
 
         {/* Kanban List Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Listado Pipeline Operativo</span>
             <span className={`text-[10px] font-bold flex items-center gap-1 ${isAM ? "text-blue-500" : "text-emerald-500"}`}>
@@ -373,7 +373,7 @@ function ClientesAdminContent() {
                         <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors group">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-605 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750">
+                              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750">
                                 {p.full_name.charAt(0)}
                               </div>
                               <div>
@@ -396,7 +396,7 @@ function ClientesAdminContent() {
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-655 dark:text-slate-400">
+                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">
                               {(() => {
                                 const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                                 if (!allyProfile) return "Sin Líder";
@@ -407,11 +407,11 @@ function ClientesAdminContent() {
                               })()}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-505 dark:text-slate-400">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50" : "bg-amber-50 dark:bg-amber-955/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50"}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50" : "bg-amber-50 dark:bg-amber-950/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50"}`}>
                               {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
@@ -423,7 +423,7 @@ function ClientesAdminContent() {
                                     await restoreProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-emerald-55 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-202 dark:border-emerald-850 transition-colors"
+                                className="px-2.5 py-1.5 bg-emerald-55 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-200 dark:border-emerald-850 transition-colors"
                               >
                                 Restaurar
                               </button>
@@ -433,7 +433,7 @@ function ClientesAdminContent() {
                                     await permanentlyDeleteProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-955/15 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[10px] font-bold rounded-xl border border-rose-250 dark:border-rose-850 transition-colors"
+                                className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/15 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[10px] font-bold rounded-xl border border-rose-250 dark:border-rose-850 transition-colors"
                               >
                                 Eliminar Permanente
                               </button>
@@ -461,7 +461,7 @@ function ClientesAdminContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4">Prospecto</th>
                       <th className="px-6 py-4">NSS / CURP</th>
                       <th className="px-6 py-4">Aliado Comercial</th>
@@ -481,7 +481,7 @@ function ClientesAdminContent() {
                             <div className="flex items-center gap-3">
                               <div className={`h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 transition-all ${
                                 isAM 
-                                  ? "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-955/20 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+                                  ? "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500 dark:group-hover:text-blue-400"
                                   : "group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-950/20 group-hover:text-emerald-500 dark:group-hover:text-emerald-400"
                               }`}>
                                 {p.full_name.charAt(0)}
@@ -501,7 +501,7 @@ function ClientesAdminContent() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-405">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-400">
                             <div>
                               <span>NSS: {p.nss}</span>
                               <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
@@ -511,7 +511,7 @@ function ClientesAdminContent() {
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-655 dark:text-slate-400">
+                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">
                               {(() => {
                                 const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                                 if (!allyProfile) return "Sin Líder";
@@ -529,7 +529,7 @@ function ClientesAdminContent() {
                                   AFORE
                                 </span>
                               ) : (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-955/20 text-red-505 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
+                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/20 text-red-500 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
                                   No AFORE
                                 </span>
                               )}
@@ -538,7 +538,7 @@ function ClientesAdminContent() {
                                   IMSS
                                 </span>
                               ) : (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-955/20 text-red-505 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
+                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/20 text-red-500 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
                                   No IMSS
                                 </span>
                               )}
@@ -591,7 +591,7 @@ function ClientesAdminContent() {
                             </Link>
                             <button
                               onClick={() => openDeleteModal(p)}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-405 dark:text-red-400 hover:text-red-650 dark:hover:text-red-300 transition-colors ml-3 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-955/20"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-400 dark:text-red-400 hover:text-red-650 dark:hover:text-red-300 transition-colors ml-3 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
                               title="Eliminar prospecto"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -611,9 +611,9 @@ function ClientesAdminContent() {
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-202 dark:border-slate-800 mx-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4">
             <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
-              <div className="h-11 w-11 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-505 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40 shadow-sm">
+              <div className="h-11 w-11 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40 shadow-sm">
                 <Trash2 className="h-5 w-5" />
               </div>
               <div>
@@ -628,13 +628,13 @@ function ClientesAdminContent() {
               </div>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-202 dark:border-slate-800 rounded-2xl p-4 space-y-1.5">
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-1.5">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-red-100 dark:bg-red-955/20 text-red-600 dark:text-red-400 flex items-center justify-center text-sm font-black">
+                <div className="h-9 w-9 rounded-xl bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 flex items-center justify-center text-sm font-black">
                   {deleteTarget.full_name.charAt(0)}
                 </div>
                 <div>
-                  <span className="text-sm font-black text-slate-808 dark:text-slate-200 block">{deleteTarget.full_name}</span>
+                  <span className="text-sm font-black text-slate-800 dark:text-slate-200 block">{deleteTarget.full_name}</span>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">NSS: {deleteTarget.nss} • CURP: {deleteTarget.curp}</span>
                 </div>
               </div>
@@ -659,7 +659,7 @@ function ClientesAdminContent() {
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-705 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
               >
                 Cancelar
               </button>

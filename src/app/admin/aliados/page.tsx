@@ -549,7 +549,7 @@ export default function GestorAliados() {
                             <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
                               Empresa: {company.nombre}
                             </span>
-                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-450 text-[9px] font-black rounded-full uppercase tracking-wider">
+                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-450 text-[9px] font-black rounded-full uppercase tracking-wider">
                               {companyProfiles.length} Integrantes
                             </span>
                           </div>
@@ -589,7 +589,7 @@ export default function GestorAliados() {
                                   return (
                                     <React.Fragment key={leader.id}>
                                       {/* Leader Header Row */}
-                                      <tr className="bg-blue-50/20 dark:bg-blue-955/5 font-semibold text-slate-800 dark:text-slate-200">
+                                      <tr className="bg-blue-50/20 dark:bg-blue-950/5 font-semibold text-slate-800 dark:text-slate-200">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                           <div className="flex items-center gap-3">
                                             <div className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-200 shrink-0">
@@ -598,11 +598,11 @@ export default function GestorAliados() {
                                             <div>
                                               <div className="flex items-center gap-1.5">
                                                 <span className="font-extrabold block leading-tight">{leader.full_name}</span>
-                                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
+                                                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
                                                   LÍDER
                                                 </span>
                                               </div>
-                                              <span className="text-[9px] text-slate-455 dark:text-slate-500 block mt-0.5 leading-none">{leader.email}</span>
+                                              <span className="text-[9px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">{leader.email}</span>
                                             </div>
                                           </div>
                                         </td>
@@ -654,11 +654,11 @@ export default function GestorAliados() {
                                                 </div>
                                                 <div>
                                                   <span className="font-bold text-slate-700 dark:text-slate-300 block leading-tight">{ally.full_name}</span>
-                                                  <span className="text-[8px] text-slate-455 block mt-0.5 leading-none">{ally.email}</span>
+                                                  <span className="text-[8px] text-slate-450 block mt-0.5 leading-none">{ally.email}</span>
                                                 </div>
                                               </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-655 dark:text-slate-400">
+                                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
                                               👤 {getAMName(ally.account_manager_id)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -674,7 +674,7 @@ export default function GestorAliados() {
                                             <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-655">{allyStats.conversionRate}%</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-center">
                                               <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                                 allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
@@ -718,11 +718,11 @@ export default function GestorAliados() {
                                               </div>
                                               <div>
                                                 <span className="font-bold text-slate-700 dark:text-slate-300 block leading-tight">{ally.full_name}</span>
-                                                <span className="text-[8px] text-slate-455 block mt-0.5 leading-none">{ally.email}</span>
+                                                <span className="text-[8px] text-slate-450 block mt-0.5 leading-none">{ally.email}</span>
                                               </div>
                                             </div>
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-655 dark:text-slate-405">
+                                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
                                             👤 {getAMName(ally.account_manager_id)}
                                           </td>
                                           <td className="px-6 py-4 whitespace-nowrap text-center">

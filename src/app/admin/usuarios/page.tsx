@@ -382,7 +382,7 @@ export default function GestionUsuarios() {
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Asignados</span>
             <div className="mt-2 flex items-baseline justify-between">
               <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-              <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
                 {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-400">Inactivos</span>
               </span>
             </div>
@@ -413,8 +413,8 @@ export default function GestionUsuarios() {
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Usuarios Totales</span>
             <div className="mt-2 flex items-baseline justify-between">
               <span className="text-3xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
-              <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
-                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-455">Inactivos</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-450">Inactivos</span>
               </span>
             </div>
           </div>
@@ -469,7 +469,7 @@ export default function GestionUsuarios() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Directorio de Accesos</span>
-                  <span className="text-xs font-bold text-slate-655 dark:text-slate-400 mt-1 block">Monitorea y configura las cuentas del personal registrado en la aplicación.</span>
+                  <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">Monitorea y configura las cuentas del personal registrado en la aplicación.</span>
                 </div>
                 
                 <div className="relative w-full sm:w-64">
@@ -493,7 +493,7 @@ export default function GestionUsuarios() {
                     <button
                       onClick={() => setRoleFilter("all")}
                       className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                        roleFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        roleFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
                       Todos ({totalUsers})
@@ -501,7 +501,7 @@ export default function GestionUsuarios() {
                     <button
                       onClick={() => setRoleFilter("aliado")}
                       className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                        roleFilter === "aliado" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        roleFilter === "aliado" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
                       Aliados ({totalAllies})
@@ -509,7 +509,7 @@ export default function GestionUsuarios() {
                     <button
                       onClick={() => setRoleFilter("account_manager")}
                       className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                        roleFilter === "account_manager" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        roleFilter === "account_manager" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
                       AM ({totalAMs})
@@ -517,7 +517,7 @@ export default function GestionUsuarios() {
                     <button
                       onClick={() => setRoleFilter("director")}
                       className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                        roleFilter === "director" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        roleFilter === "director" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
                       Directores ({totalDirectors})
@@ -531,7 +531,7 @@ export default function GestionUsuarios() {
                   <select
                     value={statusFilter}
                     onChange={(e: any) => setStatusFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-755 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
+                    className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
                   >
                     <option value="all">Todos los estados</option>
                     <option value="active">Activos</option>
@@ -544,7 +544,7 @@ export default function GestionUsuarios() {
             {/* Profiles Directory Table */}
             {filteredProfiles.length === 0 ? (
               <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
-                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-505 mx-auto">
+                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
                   <UserX className="h-6 w-6" />
                 </div>
                 <div>
@@ -556,7 +556,7 @@ export default function GestionUsuarios() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-555 dark:text-slate-450 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4">Usuario</th>
                       <th className="px-6 py-4">Teléfono</th>
                       <th className="px-6 py-4 text-center">Rol del Sistema</th>
@@ -774,7 +774,7 @@ export default function GestionUsuarios() {
                 Historial de Códigos
               </span>
               {myInvitationCodes.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-slate-205 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-505 text-xs bg-slate-50/50 dark:bg-slate-950/20">
+                <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 dark:text-slate-500 text-xs bg-slate-50/50 dark:bg-slate-950/20">
                   No hay códigos generados.
                 </div>
               ) : (
@@ -784,7 +784,7 @@ export default function GestionUsuarios() {
                     className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/60 hover:bg-slate-100/50 dark:hover:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 transition-colors"
                   >
                     <div className="space-y-0.5">
-                      <code className="text-xs font-bold text-slate-705 dark:text-slate-200 select-all">{code.code}</code>
+                      <code className="text-xs font-bold text-slate-700 dark:text-slate-200 select-all">{code.code}</code>
                       <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-medium">
                         {new Date(code.created_at).toLocaleDateString()}
                       </span>
@@ -841,7 +841,7 @@ export default function GestionUsuarios() {
                 {modalMode === "create" ? <UserPlus className="h-5 w-5" /> : <Edit3 className="h-5 w-5" />}
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-805 dark:text-white">
+                <h3 className="text-sm font-black text-slate-800 dark:text-white">
                   {modalMode === "create" ? "Registrar Nuevo Colaborador" : "Editar Colaborador"}
                 </h3>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
@@ -862,7 +862,7 @@ export default function GestionUsuarios() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="ej: Laura Martínez"
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-205 ${
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
                     formSubmitted && !isNameValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
                   }`}
                   required
@@ -888,7 +888,7 @@ export default function GestionUsuarios() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ej: laura@prevision.com"
-                    className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-205 ${
+                    className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
                       formSubmitted && !isEmailValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
                     }`}
                     required
@@ -933,7 +933,7 @@ export default function GestionUsuarios() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                       placeholder="10 dígitos"
-                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-205 ${
+                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
                         formSubmitted && !isPhoneValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
                       }`}
                       required
@@ -960,7 +960,7 @@ export default function GestionUsuarios() {
                       className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                         role === "aliado"
                           ? "bg-teal-50 dark:bg-teal-950/30 border-teal-500 text-teal-600 dark:text-teal-400"
-                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
                       }`}
                     >
                       <UserCheck className="h-4 w-4" /> Aliado Comercial
@@ -971,7 +971,7 @@ export default function GestionUsuarios() {
                       className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                         role === "account_manager"
                           ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500 text-blue-600 dark:text-blue-400"
-                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
                       }`}
                     >
                       <ShieldCheck className="h-4 w-4" /> Account Manager
@@ -982,7 +982,7 @@ export default function GestionUsuarios() {
                       className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                         role === "director"
                           ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                          : "bg-slate-50 dark:bg-slate-855 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
                       }`}
                     >
                       <ShieldCheck className="h-4 w-4" /> Director Operativo
@@ -1005,7 +1005,7 @@ export default function GestionUsuarios() {
                     value={passwordProvisional}
                     onChange={(e) => setPasswordProvisional(e.target.value)}
                     placeholder="ej: MiPass2026"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-205"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200"
                   />
                 </div>
                 {passwordProvisional && (
@@ -1062,11 +1062,11 @@ export default function GestionUsuarios() {
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 dark:border-slate-800 mx-4">
             <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-3">
-              <div className="h-10 w-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-505 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40">
+              <div className="h-10 w-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40">
                 <AlertCircle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-805 dark:text-white">Eliminar Colaborador</h3>
+                <h3 className="text-sm font-black text-slate-800 dark:text-white">Eliminar Colaborador</h3>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">Esta acción revocará accesos y eliminará su código de invitación.</p>
               </div>
             </div>
@@ -1080,7 +1080,7 @@ export default function GestionUsuarios() {
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 bg-slate-105 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
                 disabled={deleting}
               >
                 Cancelar
@@ -1092,7 +1092,7 @@ export default function GestionUsuarios() {
                   setDeleting(false);
                   setDeleteTarget(null);
                 }}
-                className="flex-1 py-2.5 bg-red-655 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform active:scale-95"
+                className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform active:scale-95"
                 disabled={deleting}
               >
                 {deleting ? "Eliminando..." : "Eliminar Colaborador"}

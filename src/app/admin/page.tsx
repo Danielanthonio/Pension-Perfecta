@@ -482,17 +482,17 @@ function PipelineManagerContent() {
       
       {/* Director Pipeline Assignment Filters */}
       {!isAM && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-808/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 flex-shrink-0 text-emerald-500" />
             <div>
-              <h4 className="text-xs font-bold text-slate-808 dark:text-white">Filtro de Asignación / Origen</h4>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra todo el embudo y el comparativo por supervisor, aliado comercial o gestión directa.</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-202 dark:border-slate-850 text-xs font-bold">
+            <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-200 dark:border-slate-850 text-xs font-bold">
               <button
                 onClick={() => setDirectorFilterType("todos")}
                 className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
@@ -504,7 +504,7 @@ function PipelineManagerContent() {
               <button
                 onClick={() => setDirectorFilterType("am")}
                 className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                  directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-505 hover:text-slate-850"
+                  directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
                 }`}
               >
                 Por Account Manager
@@ -512,7 +512,7 @@ function PipelineManagerContent() {
               <button
                 onClick={() => setDirectorFilterType("aliado")}
                 className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                  directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-505 hover:text-slate-850"
+                  directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
                 }`}
               >
                 Por Aliado
@@ -548,7 +548,7 @@ function PipelineManagerContent() {
               <select
                 value={selectedAllyId}
                 onChange={(e) => setSelectedAllyId(e.target.value)}
-                className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-355 focus:border-emerald-500"
+                className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-350 focus:border-emerald-500"
               >
                 <option value="all">Todos los aliados...</option>
                 {profiles
@@ -568,9 +568,9 @@ function PipelineManagerContent() {
       <SalesFunnel prospects={filteredByDate} />
 
       {/* Account Manager Performance Comparative Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-widest">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
             {isAM ? "Mis Indicadores de Eficiencia" : "Indicadores de Gestión de los Account Managers"}
           </span>
           <span className={`text-[10px] font-bold flex items-center gap-1 ${themeColorText}`}>
@@ -585,7 +585,7 @@ function PipelineManagerContent() {
               <Users className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-705 dark:text-slate-300">Sin datos de rendimiento</h4>
+              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Sin datos de rendimiento</h4>
               <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                 No hay asesores asignados ni prospectos registrados bajo el filtro actual.
               </p>
@@ -595,7 +595,7 @@ function PipelineManagerContent() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-455 uppercase tracking-widest text-left">
+                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                   <th className="px-6 py-4">Account Manager / Entidad</th>
                   <th className="px-4 py-4 text-center">Aliados</th>
                   <th className="px-4 py-4 text-center">Clientes</th>
@@ -610,7 +610,7 @@ function PipelineManagerContent() {
                   <th className="px-4 py-4 text-center">Tasa Cierre</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-150 dark:divide-slate-808">
+              <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
                 {visibleRows.map((row) => {
                   if (row.type === "role-group") {
                     return (
@@ -687,7 +687,7 @@ function PipelineManagerContent() {
                       <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                         {row.evaluados}
                       </td>
-                      <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-605 dark:text-slate-350">
+                      <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                         {row.aprobados}
                       </td>
                       <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
@@ -703,17 +703,17 @@ function PipelineManagerContent() {
                         {formatCurrency(row.finOtorgados)}
                       </td>
                       <td className="px-4 py-4 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400 border border-blue-105">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/20 text-blue-650 dark:text-blue-400 border border-blue-100">
                           {row.tasaEvaluacion.toFixed(1)}%
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/20 text-purple-650 dark:text-purple-405 border border-purple-105">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/20 text-purple-650 dark:text-purple-400 border border-purple-100">
                           {row.tasaAprobacion.toFixed(1)}%
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 border border-emerald-105">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 border border-emerald-100">
                           {row.tasaCierre.toFixed(1)}%
                         </span>
                       </td>
@@ -731,7 +731,7 @@ function PipelineManagerContent() {
 
 export default function PipelineManager() {
   return (
-    <Suspense fallback={<div className="text-sm text-slate-455">Cargando consola...</div>}>
+    <Suspense fallback={<div className="text-sm text-slate-450">Cargando consola...</div>}>
       <PipelineManagerContent />
     </Suspense>
   );

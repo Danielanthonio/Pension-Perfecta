@@ -146,7 +146,7 @@ function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
         className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
           isUsuarios
             ? `${themeColor} text-white shadow-md`
-            : "text-slate-405 hover:text-white hover:bg-slate-800/50"
+            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
         }`}
       >
         <UserPlus className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
@@ -288,12 +288,12 @@ function SidebarFilters() {
               </select>
             </div>
             <div>
-              <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Subetapa</label>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subetapa</label>
               <select
                 value={localSubStageFilter}
                 onChange={(e) => setLocalSubStageFilter(e.target.value)}
                 disabled={localStageFilter === "all"}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-505 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <option value="all">Todas las Subetapas</option>
                 {subStagesList.map((sub) => (
@@ -306,11 +306,11 @@ function SidebarFilters() {
 
             {/* Allied Dropdown filter */}
             <div>
-              <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Aliado Comercial</label>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Aliado Comercial</label>
               <select
                 value={localAllyFilter}
                 onChange={(e) => setLocalAllyFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-355 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
               >
                 <option value="all">Todos los Aliados</option>
                 {uniqueAllies.map((ally) => (
@@ -548,7 +548,7 @@ export default function AdminLayout({
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="p-2 -ml-2 text-slate-505 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 md:hidden"
+              className="p-2 -ml-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 md:hidden"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -601,10 +601,10 @@ export default function AdminLayout({
                     {isAM ? "Account Manager" : "Director"}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5 justify-end">
-                    <span className="block text-xs font-black text-slate-855 dark:text-white leading-none">
+                    <span className="block text-xs font-black text-slate-850 dark:text-white leading-none">
                       {user.full_name}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-505" />
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   </div>
                 </div>
                 <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-55 border-emerald-400/20">
@@ -662,7 +662,7 @@ export default function AdminLayout({
                 <Bell className="h-5 w-5 text-emerald-500" />
                 <h3 className="text-base font-bold text-slate-800 dark:text-white font-black">Notificaciones</h3>
                 {unreadNotifsCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-505/10 text-emerald-500">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500">
                     {unreadNotifsCount} nuevas
                   </span>
                 )}
@@ -676,7 +676,7 @@ export default function AdminLayout({
             </div>
 
             {unreadNotifsCount > 0 && (
-              <div className="px-6 py-3 border-b border-slate-180 dark:border-slate-850 flex justify-end">
+              <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-850 flex justify-end">
                 <button
                   onClick={markAllNotificationsRead}
                   className="text-xs font-bold flex items-center gap-1.5 text-emerald-500 hover:text-emerald-600"
@@ -708,7 +708,7 @@ export default function AdminLayout({
                       onClick={() => markNotificationRead(notif.id)}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-3 relative ${
                         notif.read
-                          ? "bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-805"
+                          ? "bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
                           : "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50/40"
                       }`}
                     >
@@ -722,11 +722,11 @@ export default function AdminLayout({
                             notif.type === "success"
                               ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 border border-emerald-100 dark:border-emerald-900/50"
                               : notif.type === "alert"
-                                ? "bg-red-50 dark:bg-red-955/20 text-red-500 border border-red-105 dark:border-red-900/50"
+                                ? "bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100 dark:border-red-900/50"
                                 : notif.type === "warning"
-                                  ? "bg-amber-50 dark:bg-amber-955/20 text-amber-555 border border-amber-100 dark:border-amber-900/50"
+                                  ? "bg-amber-50 dark:bg-amber-950/20 text-amber-550 border border-amber-100 dark:border-amber-900/50"
                                   : isAM
-                                    ? "bg-blue-50 dark:bg-blue-955/20 text-blue-500 border border-blue-100 dark:border-blue-900/50"
+                                    ? "bg-blue-50 dark:bg-blue-950/20 text-blue-500 border border-blue-100 dark:border-blue-900/50"
                                     : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 border border-emerald-100 dark:border-emerald-900/50"
                           }`}
                         >
@@ -744,7 +744,7 @@ export default function AdminLayout({
                         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
                           {notif.title}
                         </h4>
-                        <p className="text-[11px] text-slate-505 dark:text-slate-400 mt-1 leading-normal">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
                           {notif.message}
                         </p>
                         <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-2 block flex items-center gap-1.5">

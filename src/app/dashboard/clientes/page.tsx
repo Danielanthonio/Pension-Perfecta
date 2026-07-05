@@ -77,15 +77,15 @@ function ClientesContent() {
       case "evaluacion_pendiente":
         return "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/40";
       case "rechazado":
-        return "bg-red-50 text-red-605 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
+        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/40";
       case "condicionado":
-        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-800/40";
+        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/40";
       case "aprobado":
-        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-955/20 dark:text-emerald-400 dark:border-emerald-800/40";
+        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40";
       case "otorgado":
-        return "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-955/20 dark:text-teal-400 dark:border-teal-800/40";
+        return "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-800/40";
       case "cerrado_perdido":
-        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-770";
+        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-750";
       default:
         return "bg-slate-50 text-slate-500 border-slate-100";
     }
@@ -100,7 +100,7 @@ function ClientesContent() {
         return "bg-slate-900 text-white border-slate-700 dark:bg-black dark:text-slate-300 dark:border-slate-800";
       case "rechazado":
       case "condicionado":
-        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
+        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/40";
       case "aprobado":
       case "otorgado":
         return "bg-emerald-50/70 text-emerald-600 border-emerald-100 dark:bg-emerald-950/15 dark:text-emerald-400 dark:border-emerald-900/30";
@@ -235,7 +235,7 @@ function ClientesContent() {
             className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
               activeTab === "evaluacion"
                 ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-555 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
             }`}
           >
             <Layers className="h-4 w-4" />
@@ -275,8 +275,8 @@ function ClientesContent() {
             onClick={() => setActiveTab("papelera")}
             className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
               activeTab === "papelera"
-                ? "bg-white dark:bg-slate-800 text-slate-805 dark:text-white shadow-sm"
-                : "text-slate-505 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
             }`}
           >
             Papelera ({filteredDeleted.length})
@@ -311,7 +311,7 @@ function ClientesContent() {
         
         {/* TAB 1: EVALUADOS */}
         {activeTab === "evaluacion" && (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 mb-6">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Evaluados Técnicamente</h3>
             </div>
@@ -329,7 +329,7 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-505 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -351,7 +351,7 @@ function ClientesContent() {
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
@@ -370,14 +370,14 @@ function ClientesContent() {
                               {getSubStageLabel(p.status)}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-505 dark:text-slate-400">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-805 group-hover:bg-blue-50 dark:group-hover:bg-blue-955/20 text-slate-550 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/20 text-slate-550 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </Link>
@@ -387,7 +387,7 @@ function ClientesContent() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="inline-flex p-1.5 bg-slate-105 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-505 dark:text-slate-400 hover:text-red-655 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-650 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -408,14 +408,14 @@ function ClientesContent() {
         {activeTab === "listo" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
             </div>
 
             {listoPresentar.length === 0 ? (
               <div className="py-16 text-center">
-                <CheckSquare className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
+                <CheckSquare className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Ninguna simulación aprobada aún</h4>
-                <p className="text-xs text-slate-405 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.
                 </p>
               </div>
@@ -423,7 +423,7 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-955/20 border-b border-slate-150 dark:border-slate-805 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -439,13 +439,13 @@ function ClientesContent() {
                     {listoPresentar.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
                             {p.full_name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
@@ -460,7 +460,7 @@ function ClientesContent() {
                                 <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                                   ${p.simulation.totalCredito.toLocaleString()}
                                 </span>
-                                <span className="block text-[9px] text-slate-400 dark:text-slate-505">M40 + Gestión</span>
+                                <span className="block text-[9px] text-slate-400 dark:text-slate-500">M40 + Gestión</span>
                               </div>
                             ) : (
                               <span className="text-slate-400 italic text-[11px]">N/A</span>
@@ -480,7 +480,7 @@ function ClientesContent() {
                             <div className="flex items-center gap-2 justify-end">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-slate-205 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
                                 title="Ver Expediente"
                               >
                                 <FileText className="h-4 w-4" />
@@ -496,7 +496,7 @@ function ClientesContent() {
                               </a>
                               <button
                                 onClick={() => handleOpenSchedule(p)}
-                                className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-606 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
+                                className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
                                 title="Confirmar Agendado (Avanzar a Activos)"
                               >
                                 <CheckSquare className="h-4 w-4" />
@@ -507,7 +507,7 @@ function ClientesContent() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -528,8 +528,8 @@ function ClientesContent() {
         {activeTab === "activos" && (
           <div className="space-y-6">
             {proyectosActivos.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-808/80 shadow-sm py-16 text-center">
-                <Folder className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-655" />
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm py-16 text-center">
+                <Folder className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Sin proyectos activos en curso</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Una vez que agendes la reunión de presentación de simulación, el caso se moverá automáticamente aquí para seguimiento.
@@ -540,24 +540,24 @@ function ClientesContent() {
                 const activeIndex = getActiveStageIndex(p.status);
                 const isPaid = p.status === "pagado_comision";
                 return (
-                  <div key={p.id} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-202/80 dark:border-slate-800/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                  <div key={p.id} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-6 space-y-6 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                     
                     {/* Header Details in Horizontal Grid */}
                     <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 flex-1">
                         <div>
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
-                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-205 leading-tight block mt-0.5 flex items-center gap-1.5">
+                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight block mt-0.5 flex items-center gap-1.5">
                             {p.full_name}
                             {isPaid && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30">
                                 ★
                               </span>
                             )}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">NSS</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">NSS</span>
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.nss}</span>
                         </div>
                         <div>
@@ -573,7 +573,7 @@ function ClientesContent() {
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.email}</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Etapa</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Etapa</span>
                           <div className="mt-1">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
                               {getStageLabel(p.status)}
@@ -581,7 +581,7 @@ function ClientesContent() {
                           </div>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Subetapa</span>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Subetapa</span>
                           <div className="mt-1">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
                               {getSubStageLabel(p.status)}
@@ -600,7 +600,7 @@ function ClientesContent() {
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/prospectos/${p.id}`}
-                            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-202 dark:border-slate-700 transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1.5"
                           >
                             Expediente <ArrowUpRight className="h-3 w-3" />
                           </Link>
@@ -610,7 +610,7 @@ function ClientesContent() {
                                 await deleteProspect(p.id);
                               }
                             }}
-                            className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-505 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                            className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
                             title="Mover a Papelera"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -627,7 +627,7 @@ function ClientesContent() {
                         </div>
                         <div className="absolute inset-0 flex items-center" aria-hidden="true">
                           <div
-                            className="border-t-2 border-emerald-505 transition-all duration-500"
+                            className="border-t-2 border-emerald-500 transition-all duration-500"
                             style={{ width: `${(activeIndex / 4) * 100}%` }}
                           />
                         </div>
@@ -641,10 +641,10 @@ function ClientesContent() {
                                 <div
                                   className={`h-7 w-7 rounded-full flex items-center justify-center transition-all border-2 text-[10px] font-bold ${
                                     isCompleted
-                                      ? "bg-emerald-500 border-emerald-605 text-white shadow-sm shadow-emerald-500/20"
+                                      ? "bg-emerald-500 border-emerald-600 text-white shadow-sm shadow-emerald-500/20"
                                       : isActive
                                       ? "bg-blue-600 border-blue-700 text-white shadow-md ring-4 ring-blue-500/10 dark:ring-blue-500/5 scale-110"
-                                      : "bg-slate-100 dark:bg-slate-808 border-slate-202 dark:border-slate-700 text-slate-405 dark:text-slate-500"
+                                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
                                   }`}
                                 >
                                   {isCompleted ? <CheckCircle2 className="h-4 w-4 text-white" /> : idx + 1}
@@ -690,14 +690,14 @@ function ClientesContent() {
         {activeTab === "papelera" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
                 Papelera de Reciclaje (Se eliminan permanentemente en 7 días)
               </h3>
             </div>
 
             {filteredDeleted.length === 0 ? (
               <div className="py-16 text-center">
-                <Trash2 className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-655" />
+                <Trash2 className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">La papelera está vacía</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Los clientes que elimines aparecerán aquí por 7 días antes de borrarse definitivamente.
@@ -707,7 +707,7 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -724,20 +724,20 @@ function ClientesContent() {
                         : 7;
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
                             {p.full_name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
                             {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/15 dark:text-red-400 dark:border-red-800/50" : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/15 dark:text-amber-400 dark:border-amber-800/50"}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/15 dark:text-red-400 dark:border-red-800/50" : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/15 dark:text-amber-400 dark:border-amber-800/50"}`}>
                               {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
@@ -749,7 +749,7 @@ function ClientesContent() {
                                     await restoreProspect(p.id);
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-202 dark:border-emerald-850 transition-colors"
+                                className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-200 dark:border-emerald-850 transition-colors"
                               >
                                 Restaurar
                               </button>
@@ -759,7 +759,7 @@ function ClientesContent() {
                                     await permanentlyDeleteProspect(p.id);
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-red-50 dark:bg-red-955/10 hover:bg-red-105 dark:hover:bg-red-900/30 text-red-755 dark:text-red-400 text-[10px] font-bold rounded-xl border border-red-202 dark:border-red-850 transition-colors"
+                                className="px-3 py-1.5 bg-red-50 dark:bg-red-950/10 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-750 dark:text-red-400 text-[10px] font-bold rounded-xl border border-red-200 dark:border-red-850 transition-colors"
                               >
                                 Eliminar Permanente
                               </button>
@@ -779,16 +779,16 @@ function ClientesContent() {
         {activeTab === "rechazados" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-              <h3 className="text-xs font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
                 Prospectos Rechazados o Cerrados Perdidos
               </h3>
             </div>
 
             {rechazados.length === 0 ? (
               <div className="py-16 text-center">
-                <XCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-655" />
+                <XCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos rechazados</h4>
-                <p className="text-xs text-slate-405 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Aquí aparecerán los clientes cuyos expedientes no hayan sido aprobados o se hayan cerrado como perdidos.
                 </p>
               </div>
@@ -796,7 +796,7 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-455 uppercase tracking-widest text-left">
+                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
                       <th className="px-6 py-4.5">Nombre Completo</th>
                       <th className="px-6 py-4.5">NSS</th>
                       <th className="px-6 py-4.5">CURP</th>
@@ -812,13 +812,13 @@ function ClientesContent() {
                     {rechazados.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-205">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
                             {p.full_name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                             {p.nss}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-355 uppercase">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
                             {p.curp}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
@@ -844,7 +844,7 @@ function ClientesContent() {
                             <div className="flex items-center gap-2 justify-end">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-slate-205 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-202/60 dark:border-slate-700"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
                                 title="Ver Expediente"
                               >
                                 <FileText className="h-4 w-4" />
@@ -855,7 +855,7 @@ function ClientesContent() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-805 hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-202/60 dark:border-slate-700"
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -876,7 +876,7 @@ function ClientesContent() {
       {/* Scheduling Assessment Modal */}
       {selectedProspect && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-202 dark:border-slate-800 mx-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
@@ -893,7 +893,7 @@ function ClientesContent() {
               </div>
               <button
                 onClick={() => setSelectedProspect(null)}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-202 transition-colors"
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -902,10 +902,10 @@ function ClientesContent() {
             {/* Steps navigation */}
             {schedulingStep === "datetime" ? (
               <div className="space-y-4">
-                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-202 dark:border-slate-800 rounded-2xl p-4">
+                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
                   <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Prospecto</span>
-                  <span className="text-xs font-extrabold text-slate-805 dark:text-slate-200 block mt-0.5">{selectedProspect.full_name}</span>
-                  <span className="text-[10px] text-slate-405 mt-0.5 block">NSS: {selectedProspect.nss}</span>
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block mt-0.5">{selectedProspect.full_name}</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">NSS: {selectedProspect.nss}</span>
                 </div>
 
                 <div className="space-y-3">
@@ -929,7 +929,7 @@ function ClientesContent() {
                       type="time"
                       value={selectedTime}
                       onChange={(e) => setSelectedTime(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-202 dark:border-slate-755 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-202"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-200"
                     />
                   </div>
                 </div>
@@ -948,25 +948,25 @@ function ClientesContent() {
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                   <div>
                     <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 font-black">¿Confirmar Fecha y Hora?</h4>
-                    <p className="text-[10px] text-emerald-705 dark:text-emerald-405 mt-0.5">
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">
                       El caso avanzará a la etapa de &quot;Proyectos Activos&quot; tras guardar la cita.
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-202 dark:border-slate-800 rounded-2xl p-4 space-y-2">
+                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2">
                   <div>
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Cliente</span>
+                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
                     <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{selectedProspect.full_name}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-850 pt-2">
                     <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Fecha</span>
-                      <span className="text-xs font-semibold text-slate-705 dark:text-slate-300 block">{selectedDate}</span>
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Fecha</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">{selectedDate}</span>
                     </div>
                     <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-wider">Hora</span>
-                      <span className="text-xs font-semibold text-slate-705 dark:text-slate-300 block">{selectedTime} hs</span>
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Hora</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">{selectedTime} hs</span>
                     </div>
                   </div>
                 </div>
@@ -974,7 +974,7 @@ function ClientesContent() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setSchedulingStep("datetime")}
-                    className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-202 rounded-xl text-xs font-bold border border-slate-202 dark:border-slate-700 transition-all"
+                    className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 transition-all"
                   >
                     Atrás
                   </button>

@@ -256,7 +256,7 @@ export default function GestionAccountManagers() {
                   </div>
 
                   {/* Condicionados */}
-                  <div className="p-2.5 bg-amber-50/20 dark:bg-amber-955/10 border border-amber-100/50 dark:border-amber-900/20 rounded-xl">
+                  <div className="p-2.5 bg-amber-50/20 dark:bg-amber-950/10 border border-amber-100/50 dark:border-amber-900/20 rounded-xl">
                     <div className="flex items-center justify-between text-[10px] font-bold text-amber-600 dark:text-amber-400">
                       <span className="flex items-center gap-1">
                         <Layers className="h-3.5 w-3.5" /> Condicionados
@@ -269,7 +269,7 @@ export default function GestionAccountManagers() {
                   </div>
 
                   {/* Rechazados */}
-                  <div className="p-2.5 bg-rose-50/20 dark:bg-rose-955/10 border border-rose-100/50 dark:border-rose-900/20 rounded-xl">
+                  <div className="p-2.5 bg-rose-50/20 dark:bg-rose-950/10 border border-rose-100/50 dark:border-rose-900/20 rounded-xl">
                     <div className="flex items-center justify-between text-[10px] font-bold text-rose-600 dark:text-rose-450">
                       <span className="flex items-center gap-1">
                         <UserX className="h-3.5 w-3.5" /> Rechazados
@@ -282,7 +282,7 @@ export default function GestionAccountManagers() {
                   </div>
 
                   {/* Otorgados */}
-                  <div className="p-2.5 bg-teal-50/20 dark:bg-teal-955/10 border border-teal-100/50 dark:border-teal-900/20 rounded-xl">
+                  <div className="p-2.5 bg-teal-50/20 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/20 rounded-xl">
                     <div className="flex items-center justify-between text-[10px] font-bold text-teal-650 dark:text-teal-400">
                       <span className="flex items-center gap-1">
                         <UserCheck className="h-3.5 w-3.5" /> Otorgados
@@ -306,7 +306,7 @@ export default function GestionAccountManagers() {
                     </span>
                     <span className="text-xs font-black text-indigo-700 dark:text-indigo-400">{formatCurrency(m.finAprobados)}</span>
                   </div>
-                  <div className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-955/10 p-2 rounded-xl border border-emerald-100/30">
+                  <div className="flex justify-between items-center bg-emerald-50/30 dark:bg-emerald-950/10 p-2 rounded-xl border border-emerald-100/30">
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
                       <DollarSign className="h-3 w-3 text-emerald-500" /> Fin. Otorgado
                     </span>

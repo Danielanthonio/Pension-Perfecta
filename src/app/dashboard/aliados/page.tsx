@@ -143,10 +143,10 @@ function AliadosContent() {
                       <td className="px-6 py-4 whitespace-nowrap text-slate-450 dark:text-slate-500 font-semibold">
                         {new Date(a.assigned_at + "T00:00:00").toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-655 dark:text-slate-300 font-semibold">
+                      <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
                         {a.empresa_nombre}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-655 dark:text-slate-300 font-semibold">
+                      <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
                         {a.account_manager_name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-indigo-600 dark:text-indigo-400 font-extrabold">

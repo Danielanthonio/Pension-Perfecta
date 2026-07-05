@@ -417,7 +417,7 @@ function DashboardContent() {
                 {user?.full_name.charAt(0)}
               </div>
               <div className="min-w-0">
-                <span className="block text-sm font-extrabold text-slate-855 dark:text-white truncate leading-tight">{user?.full_name}</span>
+                <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{user?.full_name}</span>
                 <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-bold">
                   {user?.empresa_multialiado_id ? `Empresa: ${user.lider_grupo || "Sin Empresa"}` : "Asesor Independiente"}
                 </span>
@@ -479,7 +479,7 @@ function DashboardContent() {
               </div>
             )}
 
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] leading-relaxed text-slate-505 dark:text-slate-450 font-medium">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] leading-relaxed text-slate-500 dark:text-slate-450 font-medium">
               {assignedAM 
                 ? `Supervisor: ${assignedAM.full_name}. Contáctale para dudas de clientes o liberación de dictámenes Ley 73.`
                 : "Aún no se te ha asignado un AM. Tus expedientes serán evaluados por el Director de Operaciones."}
@@ -515,7 +515,7 @@ function DashboardContent() {
               )}
             </div>
 
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] text-slate-505 dark:text-slate-450 font-medium leading-relaxed">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] text-slate-500 dark:text-slate-450 font-medium leading-relaxed">
               {user?.aliado_tipo === "lider" 
                 ? `Lideras un grupo de ${liderAliadosData?.totales?.total_aliados || 0} asesores comerciales, con un total de ${liderAliadosData?.totales?.total_prospectos || 0} prospectos acumulados.`
                 : `Tienes ${activeProspects.filter(p => p.status === "evaluacion_pendiente").length} expedientes pendientes de evaluar.`}
@@ -531,7 +531,7 @@ function DashboardContent() {
             <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 animate-pulse" />
             <div>
               <h4 className="text-xs font-bold text-amber-900 dark:text-amber-300">Prospectos Incompletos ({faltaDocumentos.length})</h4>
-              <p className="text-[11px] text-amber-700 dark:text-amber-405 mt-0.5">Se han detectado expedientes evaluados con documentación faltante. Completa los requisitos para emitir dictamen.</p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">Se han detectado expedientes evaluados con documentación faltante. Completa los requisitos para emitir dictamen.</p>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -553,9 +553,9 @@ function DashboardContent() {
 
       {/* Hierarchical Efficiency Indicators Table (Solo para Líderes) */}
       {user?.aliado_tipo === "lider" && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-805 shadow-sm overflow-hidden mt-8">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden mt-8">
           <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[10px] text-slate-400 dark:text-slate-505 font-bold uppercase tracking-widest">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
               Mis Indicadores de Eficiencia
             </span>
             <span className="text-[10px] font-bold flex items-center gap-1 text-blue-500">
@@ -570,7 +570,7 @@ function DashboardContent() {
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-705 dark:text-slate-300">Sin datos de rendimiento</h4>
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Sin datos de rendimiento</h4>
                 <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   No hay aliados asignados ni prospectos registrados bajo tu liderazgo.
                 </p>
@@ -580,7 +580,7 @@ function DashboardContent() {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-455 uppercase tracking-widest text-left">
+                  <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                     <th className="px-6 py-4">Account Manager / Entidad</th>
                     <th className="px-4 py-4 text-center">Aliados</th>
                     <th className="px-4 py-4 text-center">Clientes</th>
@@ -595,7 +595,7 @@ function DashboardContent() {
                     <th className="px-4 py-4 text-center">Tasa Cierre</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-150 dark:divide-slate-808">
+                <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
                   {visibleRows.map((row) => {
                     if (row.type === "role-group") {
                       return (
@@ -672,7 +672,7 @@ function DashboardContent() {
                         <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                           {row.evaluados}
                         </td>
-                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-605 dark:text-slate-350">
+                        <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
                           {row.aprobados}
                         </td>
                         <td className="px-4 py-4 text-center whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
@@ -688,17 +688,17 @@ function DashboardContent() {
                           {formatCurrency(row.finOtorgados)}
                         </td>
                         <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-955/20 text-blue-650 dark:text-blue-400 border border-blue-105">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/20 text-blue-650 dark:text-blue-400 border border-blue-100">
                             {row.tasaEvaluacion.toFixed(1)}%
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/20 text-purple-650 dark:text-purple-405 border border-purple-105">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/20 text-purple-650 dark:text-purple-400 border border-purple-100">
                             {row.tasaAprobacion.toFixed(1)}%
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 border border-emerald-105">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 border border-emerald-100">
                             {row.tasaCierre.toFixed(1)}%
                           </span>
                         </td>

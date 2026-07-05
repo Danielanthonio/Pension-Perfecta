@@ -239,7 +239,7 @@ export default function AsignacionAliados() {
           <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Mis Aliados</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-            <span className="text-[10px] text-slate-505 dark:text-slate-400 font-bold">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
               Total asignado
             </span>
           </div>
@@ -250,7 +250,7 @@ export default function AsignacionAliados() {
           <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Sin Supervisor</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-amber-600 dark:text-amber-500">{unassignedCount}</span>
-            <span className="text-[9px] bg-amber-50 dark:bg-amber-955/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-[9px] bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">
               En mesa Director
             </span>
           </div>
@@ -261,7 +261,7 @@ export default function AsignacionAliados() {
           <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Bajo mi supervisión</span>
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-3xl font-black text-emerald-600 dark:text-emerald-500">{assignedCount}</span>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-955/30 text-emerald-650 dark:text-emerald-450 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-650 dark:text-emerald-450 px-2 py-0.5 rounded-full font-bold">
               Bajo Gestión AM
             </span>
           </div>
@@ -284,7 +284,7 @@ export default function AsignacionAliados() {
         <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
         <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
         <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
-        <p className="text-[11px] text-slate-555 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
+        <p className="text-[11px] text-slate-550 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
           Al seleccionar un Account Manager o un Líder de Grupo, la asignación se actualizará y guardará inmediatamente. Se enviará automáticamente una notificación al aliado comercial correspondiente.
         </p>
       </div>
@@ -355,7 +355,7 @@ export default function AsignacionAliados() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Matriz de Asignaciones</span>
-                  <span className="text-xs font-bold text-slate-655 dark:text-slate-400 mt-1 block">Asigna supervisores a cada aliado comercial. Los cambios requieren confirmación manual.</span>
+                  <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">Asigna supervisores a cada aliado comercial. Los cambios requieren confirmación manual.</span>
                 </div>
                 
                 <div className="relative w-full sm:w-64">
@@ -408,7 +408,7 @@ export default function AsignacionAliados() {
                     <select
                       value={selectedAMFilter}
                       onChange={(e) => setSelectedAMFilter(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-705 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
                     >
                       <option value="all">Todos los AM</option>
                       {accountManagers.map((am) => (
@@ -489,7 +489,7 @@ export default function AsignacionAliados() {
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{a.full_name}</span>
                                   {a.aliado_tipo === "lider" && (
-                                    <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-955 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
+                                    <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-[8px] font-black rounded-full uppercase tracking-wider">
                                       LÍDER
                                     </span>
                                   )}
@@ -505,7 +505,7 @@ export default function AsignacionAliados() {
 
                           {/* 3. Prospects count */}
                           <td className="px-5 py-4 whitespace-nowrap text-center">
-                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-655 dark:text-slate-300 text-[10px] font-bold rounded-full">
+                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 text-[10px] font-bold rounded-full">
                               {currentProspects}
                             </span>
                           </td>
@@ -513,7 +513,7 @@ export default function AsignacionAliados() {
                           {/* 4. Assign Account Manager */}
                           <td className="px-5 py-4 whitespace-nowrap">
                             {isAM ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-505 dark:text-slate-400 rounded-xl font-bold">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-bold">
                                 👤 {accountManagers.find(m => m.id === currentSelectedVal)?.full_name || "Sin Supervisor"}
                               </span>
                             ) : (
@@ -521,10 +521,10 @@ export default function AsignacionAliados() {
                                 value={currentSelectedVal}
                                 onChange={(e) => handleSelectAM(a.id, e.target.value)}
                                 disabled={isUpdating}
-                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-355 focus:border-emerald-500 transition-all cursor-pointer ${
+                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
                                   isAssignedNow
-                                    ? "border-emerald-200/50 bg-emerald-50/10 text-slate-705 dark:text-slate-200" 
-                                    : "border-amber-250/50 bg-amber-50/10 text-amber-705 dark:text-amber-400"
+                                    ? "border-emerald-200/50 bg-emerald-50/10 text-slate-700 dark:text-slate-200" 
+                                    : "border-amber-250/50 bg-amber-50/10 text-amber-700 dark:text-amber-400"
                                 }`}
                               >
                                 <option value="" className="text-slate-500 dark:bg-slate-900">⚠️ Sin AM (Director)</option>
@@ -568,7 +568,7 @@ export default function AsignacionAliados() {
                                   setGroupNames({ ...groupNames, [a.id]: e.target.value });
                                 }}
                                 disabled={isUpdating}
-                                className={`font-semibold rounded-xl px-2 py-1 border outline-none bg-slate-50 dark:bg-slate-900 text-slate-705 dark:text-slate-350 focus:border-blue-500 cursor-pointer ${
+                                className={`font-semibold rounded-xl px-2 py-1 border outline-none bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-350 focus:border-blue-500 cursor-pointer ${
                                   !currentEmpresaId
                                     ? "border-red-500"
                                     : "border-slate-200 dark:border-slate-800"
@@ -620,7 +620,7 @@ export default function AsignacionAliados() {
                                     !a.account_manager_id 
                                       ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
                                       : (a.lider_ids && a.lider_ids.length > 0)
-                                        ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-705 dark:text-indigo-400"
+                                        ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-700 dark:text-indigo-400"
                                         : "border-slate-200/50 bg-slate-50/10 text-slate-500"
                                   }`}
                                   title={!a.account_manager_id ? "Asigna primero un Account Manager a este aliado" : ""}

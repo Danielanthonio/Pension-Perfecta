@@ -702,7 +702,7 @@ export default function SubirProspecto() {
                     {/* Aportación (Formula) */}
                     <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm">
                       <span className="text-[9px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">Aportación (Fórmula)</span>
-                      <span className={`text-lg font-black mt-2 block ${aportacion >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-455"}`}>
+                      <span className={`text-lg font-black mt-2 block ${aportacion >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-450"}`}>
                         {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }).format(aportacion)}
                       </span>
                       <span className="text-[8px] text-slate-400 dark:text-slate-500 font-medium mt-1 leading-normal">

@@ -48,7 +48,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className={`p-1 rounded bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-405 hover:text-white transition-all cursor-pointer inline-flex items-center justify-center h-6 w-6 ml-2 no-print`}
+      className={`p-1 rounded bg-slate-900/60 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer inline-flex items-center justify-center h-6 w-6 ml-2 no-print`}
       title="Copiar"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" strokeWidth={3} /> : <Copy className="h-3.5 w-3.5" />}
@@ -70,15 +70,15 @@ export default function ProspectoDetalle() {
       case "evaluacion_pendiente":
         return "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800/40";
       case "rechazado":
-        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-955/20 dark:text-red-400 dark:border-red-800/40";
+        return "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800/40";
       case "condicionado":
-        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-800/40";
+        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800/40";
       case "aprobado":
-        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-955/20 dark:text-emerald-400 dark:border-emerald-800/40";
+        return "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40";
       case "otorgado":
-        return "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-955/20 dark:text-teal-400 dark:border-teal-800/40";
+        return "bg-teal-50 text-teal-600 border-teal-100 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-800/40";
       case "cerrado_perdido":
-        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-770";
+        return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-750";
       default:
         return "bg-slate-50 text-slate-500 border-slate-100 dark:bg-slate-800 dark:text-slate-400";
     }

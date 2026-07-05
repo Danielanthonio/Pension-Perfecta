@@ -195,7 +195,7 @@ export default function EmpresasMultialiadoPage() {
         <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Listado de Empresas</span>
-            <span className="text-xs font-bold text-slate-655 dark:text-slate-400 mt-1 block">Monitorea las empresas multialiado registradas en el sistema.</span>
+            <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">Monitorea las empresas multialiado registradas en el sistema.</span>
           </div>
           
           <div className="relative w-full sm:w-64">
@@ -215,7 +215,7 @@ export default function EmpresasMultialiadoPage() {
         {/* Table representation */}
         {filteredEmpresas.length === 0 ? (
           <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
-            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-505 mx-auto">
+            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
               <Building2 className="h-6 w-6" />
             </div>
             <div>
@@ -227,7 +227,7 @@ export default function EmpresasMultialiadoPage() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-555 dark:text-slate-450 uppercase tracking-widest text-left">
+                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                   <th className="px-6 py-4">Nombre</th>
                   <th className="px-6 py-4 text-center">Líderes Asignados</th>
                   <th className="px-6 py-4">Creada Por</th>
@@ -248,7 +248,7 @@ export default function EmpresasMultialiadoPage() {
                       <span className={`inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full text-xs font-bold ${
                         (empresa.lideres_count || 0) > 0
                           ? "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40"
-                          : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-505"
+                          : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
                       }`}>
                         {empresa.lideres_count || 0}
                       </span>

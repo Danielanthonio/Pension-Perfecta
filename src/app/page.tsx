@@ -40,7 +40,7 @@ export default function Home() {
       {/* Welcome Hero Content */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto px-6 text-center relative z-10 py-12">
         <div className="space-y-6 animate-fade-in-up">
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-tight bg-gradient-to-r from-white via-slate-155 to-slate-300 bg-clip-text text-transparent">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-tight bg-gradient-to-r from-white via-slate-150 to-slate-300 bg-clip-text text-transparent">
             Bienvenidos al Portal
           </h1>
           <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-350 to-emerald-400 bg-clip-text text-transparent pb-2">

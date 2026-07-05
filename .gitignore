@@ -43,3 +43,4 @@ architecture-output.md
 *.tsbuildinfo
 next-env.d.ts
 next-build.zip
+extract-architecture.sh

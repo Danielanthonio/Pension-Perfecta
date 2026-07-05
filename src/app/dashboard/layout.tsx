@@ -170,7 +170,7 @@ function SidebarFilters() {
         
         <div className="space-y-2.5">
           <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Desde</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Desde</label>
             <input
               type="date"
               value={localStartDate}
@@ -179,7 +179,7 @@ function SidebarFilters() {
             />
           </div>
           <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Hasta</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
             <input
               type="date"
               value={localEndDate}
@@ -192,7 +192,7 @@ function SidebarFilters() {
         {/* Etapas Dropdowns */}
         <div className="space-y-2.5 pt-2">
           <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Etapa</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
             <select
               value={localStageFilter}
               onChange={(e) => {
@@ -210,7 +210,7 @@ function SidebarFilters() {
             </select>
           </div>
           <div>
-            <label className="block text-[9px] font-bold text-slate-505 uppercase mb-1">Subetapa</label>
+            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subetapa</label>
             <select
               value={localSubStageFilter}
               onChange={(e) => setLocalSubStageFilter(e.target.value)}
@@ -306,7 +306,7 @@ export default function DashboardLayout({
 
   if (!mounted || isLoading || !user || user.role === "director" || user.role === "account_manager") {
     return (
-      <div className="min-h-screen bg-slate-955 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
@@ -409,7 +409,7 @@ export default function DashboardLayout({
             <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
               Pensión Perfecta
             </span>
-            <span className="block text-[9px] text-slate-505 font-bold uppercase tracking-wider leading-none mt-0.5">
+            <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider leading-none mt-0.5">
               Portal Aliados
             </span>
           </div>
@@ -454,7 +454,7 @@ export default function DashboardLayout({
             {/* Notification Bell */}
             <button
               onClick={() => setNotifDrawerOpen(true)}
-              className="relative p-2.5 bg-slate-105 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl transition-colors active:scale-95 transform"
+              className="relative p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl transition-colors active:scale-95 transform"
             >
               <Bell className="h-4.5 w-4.5" />
               {unreadNotifsCount > 0 && (
@@ -503,7 +503,7 @@ export default function DashboardLayout({
             {/* Logout button */}
             <button
               onClick={handleLogout}
-              className="p-2.5 bg-slate-100 hover:bg-red-50/10 hover:text-red-400 text-slate-505 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-400 rounded-xl transition-all border border-slate-200/40 dark:border-slate-700/40 active:scale-95"
+              className="p-2.5 bg-slate-100 hover:bg-red-50/10 hover:text-red-400 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-400 rounded-xl transition-all border border-slate-200/40 dark:border-slate-700/40 active:scale-95"
               title="Cerrar Sesión"
             >
               <LogOut className="h-4.5 w-4.5" />
@@ -556,7 +556,7 @@ export default function DashboardLayout({
               </div>
               <button
                 onClick={() => setNotifDrawerOpen(false)}
-                className="p-1.5 bg-slate-205/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
+                className="p-1.5 bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
               >
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -577,7 +577,7 @@ export default function DashboardLayout({
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {notifications.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-405 dark:text-slate-500">
+                  <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500">
                     <CheckCircle className="h-6 w-6" />
                   </div>
                   <div>
@@ -595,7 +595,7 @@ export default function DashboardLayout({
                       onClick={() => markNotificationRead(notif.id)}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer flex gap-3 relative ${
                         notif.read
-                          ? "bg-slate-50/50 dark:bg-slate-950/20 border-slate-105 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-955/40"
+                          ? "bg-slate-50/50 dark:bg-slate-950/20 border-slate-100 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-950/40"
                           : "bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20"
                       }`}
                     >
@@ -609,10 +609,10 @@ export default function DashboardLayout({
                             notif.type === "success"
                               ? "bg-emerald-55 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30"
                               : notif.type === "alert"
-                                ? "bg-red-50 dark:bg-red-955/30 text-red-500 dark:text-red-400 border border-red-100 dark:border-red-900/30"
+                                ? "bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 border border-red-100 dark:border-red-900/30"
                                 : notif.type === "warning"
-                                  ? "bg-amber-50 dark:bg-amber-955/30 text-amber-500 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30"
-                                  : "bg-teal-50 dark:bg-teal-955/30 text-teal-500 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30"
+                                  ? "bg-amber-50 dark:bg-amber-950/30 text-amber-500 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30"
+                                  : "bg-teal-50 dark:bg-teal-950/30 text-teal-500 dark:text-teal-400 border border-teal-100 dark:border-teal-900/30"
                           }`}
                         >
                           {notif.type === "success" ? (
@@ -629,7 +629,7 @@ export default function DashboardLayout({
                         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">
                           {notif.title}
                         </h4>
-                        <p className="text-[11px] text-slate-505 dark:text-slate-400 mt-1 leading-normal">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-normal">
                           {notif.message}
                         </p>
                         <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-2 block flex items-center gap-1.5">
