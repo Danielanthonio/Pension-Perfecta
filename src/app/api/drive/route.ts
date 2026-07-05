@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Readable } from "stream";
+import { createClient } from "@/utils/supabase/server";
 
 // Check if credentials are set
 const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -57,6 +58,15 @@ if (isConfigured) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require an authenticated session. This endpoint operates on the company's
+    // Google Drive through a service account (createFolder / uploadFile /
+    // downloadFile / deleteFile / scanOcr), so it must never be publicly callable.
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { action } = body;
 
