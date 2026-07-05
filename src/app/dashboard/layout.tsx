@@ -30,70 +30,49 @@ import {
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 
-function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
+function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; collapsed?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useApp();
   const currentParamsString = searchParams.toString();
+  const qs = currentParamsString ? `?${currentParamsString}` : "";
 
   const cleanPath = pathname.replace(/\/$/, "");
-  const isDashboard = cleanPath === "/dashboard";
-  const isClientes = cleanPath === "/dashboard/clientes";
-  const isAliados = cleanPath === "/dashboard/aliados";
-
-  const dashboardHref = currentParamsString ? `/dashboard?${currentParamsString}` : "/dashboard";
-  const clientesHref = currentParamsString ? `/dashboard/clientes?${currentParamsString}` : "/dashboard/clientes";
-  const aliadosHref = currentParamsString ? `/dashboard/aliados?${currentParamsString}` : "/dashboard/aliados";
-
   const isLeader = user?.aliado_tipo === "lider";
+
+  const items = [
+    { href: `/dashboard${qs}`, active: cleanPath === "/dashboard", Icon: LayoutDashboard, label: "Dashboard" },
+    { href: `/dashboard/clientes${qs}`, active: cleanPath === "/dashboard/clientes", Icon: Contact, label: "Mis Clientes" },
+    ...(isLeader
+      ? [{ href: `/dashboard/aliados${qs}`, active: cleanPath === "/dashboard/aliados", Icon: Users, label: "Mis Aliados" }]
+      : []),
+  ];
 
   return (
     <>
-      <Link
-        href={dashboardHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isDashboard
-            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Dashboard
-      </Link>
-
-      <Link
-        href={clientesHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isClientes
-            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Mis Clientes (Listado)
-      </Link>
-
-      {isLeader && (
+      {items.map(({ href, active, Icon, label }) => (
         <Link
-          href={aliadosHref}
+          key={href}
+          href={href}
           onClick={onLinkClick}
-          className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-            isAliados
+          title={label}
+          className={`flex items-center py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase ${
+            collapsed ? "px-4 md:justify-center md:px-0" : "px-4"
+          } ${
+            active
               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
               : "text-slate-400 hover:text-white hover:bg-slate-800/50"
           }`}
         >
-          <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-          Mis Aliados Asignados
+          <Icon className={`h-5 w-5 stroke-[2.5] shrink-0 ${collapsed ? "mr-3 md:mr-0" : "mr-3"}`} />
+          <span className={collapsed ? "md:hidden" : ""}>{label}</span>
         </Link>
-      )}
+      ))}
     </>
   );
 }
 
-function SidebarFilters() {
+function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -153,7 +132,7 @@ function SidebarFilters() {
   const subStagesList = localStageFilter !== "all" ? (SUB_STAGES_BY_STAGE[localStageFilter] || []) : [];
 
   return (
-    <div className="pt-8 border-t border-slate-800/55 mt-6 space-y-4">
+    <div className={`pt-8 border-t border-slate-800/55 mt-6 space-y-4 ${collapsed ? "md:hidden" : ""}`}>
       <div className="flex items-center gap-2 px-4">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">
           FILTRAR
@@ -272,6 +251,7 @@ export default function DashboardLayout({
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
@@ -279,8 +259,19 @@ export default function DashboardLayout({
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("pensionflow_theme") || "light";
       setCurrentTheme(savedTheme as any);
+      setIsCollapsed(localStorage.getItem("pensionflow_sidebar_collapsed") === "1");
     }
   }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pensionflow_sidebar_collapsed", next ? "1" : "0");
+      }
+      return next;
+    });
+  };
 
   const toggleTheme = () => {
     const nextTheme = currentTheme === "light" ? "dark" : "light";
@@ -398,14 +389,16 @@ export default function DashboardLayout({
 
       {/* Left Sidebar Layout */}
       <aside
-         className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
+         className={`fixed inset-y-0 left-0 z-40 w-64 ${
+          isCollapsed ? "md:w-[76px]" : "md:w-64"
+        } bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-all duration-300 md:translate-x-0 md:static ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Sidebar Header / Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-2.5">
-          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20" strokeWidth={2.5} />
-          <div>
+        <div className={`h-20 flex items-center border-b border-slate-800/80 gap-2.5 px-6 ${isCollapsed ? "md:justify-center md:px-0" : ""}`}>
+          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20 shrink-0" strokeWidth={2.5} />
+          <div className={isCollapsed ? "md:hidden" : ""}>
             <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
               Pensión Perfecta
             </span>
@@ -418,12 +411,12 @@ export default function DashboardLayout({
         {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
           <Suspense fallback={<div className="h-24 px-4 py-3 text-[10px] text-slate-500">Cargando enlaces...</div>}>
-            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} />
+            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} collapsed={isCollapsed} />
           </Suspense>
 
           {/* Collapsible sidebar filter widgets wrapped in Suspense */}
-          <Suspense fallback={<div className="px-4 py-3 text-[10px] text-slate-550">Cargando filtros...</div>}>
-            <SidebarFilters />
+          <Suspense fallback={<div className="px-4 py-3 text-[10px] text-slate-500">Cargando filtros...</div>}>
+            <SidebarFilters collapsed={isCollapsed} />
           </Suspense>
         </nav>
       </aside>
@@ -439,7 +432,16 @@ export default function DashboardLayout({
             >
               <Menu className="h-5 w-5" />
             </button>
-            
+
+            <button
+              onClick={toggleCollapse}
+              className="hidden md:inline-flex p-2.5 -ml-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors active:scale-95"
+              title={isCollapsed ? "Mostrar menú" : "Ocultar menú"}
+              aria-label={isCollapsed ? "Mostrar menú" : "Ocultar menú"}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
             <div className="hidden sm:block">
               <h2 className="text-lg font-black text-slate-800 dark:text-white leading-tight">
                 {headerInfo.title}

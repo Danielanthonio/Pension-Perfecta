@@ -32,131 +32,52 @@ import {
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 
-function SidebarLinks({ onLinkClick }: { onLinkClick: () => void }) {
+function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; collapsed?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useApp();
   const currentParamsString = searchParams.toString();
-
+  const qs = currentParamsString ? `?${currentParamsString}` : "";
   const cleanPath = pathname.replace(/\/$/, "");
-  const isAdminRoot = cleanPath === "/admin";
-  const isClientes = cleanPath === "/admin/clientes";
-  const isAliados = cleanPath === "/admin/aliados";
-  const isUsuarios = cleanPath === "/admin/usuarios";
-  const isAMs = cleanPath === "/admin/account-managers";
-  const isAsignacion = cleanPath === "/admin/asignacion";
-  const isEmpresas = cleanPath === "/admin/empresas-multialiado";
-
   const isAM = user?.role === "account_manager";
-  const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
 
-  const adminHref = currentParamsString ? `/admin?${currentParamsString}` : "/admin";
-  const clientesHref = currentParamsString ? `/admin/clientes?${currentParamsString}` : "/admin/clientes";
-  const aliadosHref = currentParamsString ? `/admin/aliados?${currentParamsString}` : "/admin/aliados";
-  const asignacionHref = currentParamsString ? `/admin/asignacion?${currentParamsString}` : "/admin/asignacion";
-  const empresasHref = currentParamsString ? `/admin/empresas-multialiado?${currentParamsString}` : "/admin/empresas-multialiado";
-  const accountManagersHref = currentParamsString ? `/admin/account-managers?${currentParamsString}` : "/admin/account-managers";
-  const usuariosHref = currentParamsString ? `/admin/usuarios?${currentParamsString}` : "/admin/usuarios";
+  const items = [
+    { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
+    { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
+    { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
+    { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Aliados" },
+    { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
+    ...(!isAM
+      ? [{ href: `/admin/account-managers${qs}`, active: cleanPath === "/admin/account-managers", Icon: Users, label: "Gestión AMs" }]
+      : []),
+    { href: `/admin/usuarios${qs}`, active: cleanPath === "/admin/usuarios", Icon: UserPlus, label: "Gestión Usuarios" },
+  ];
 
   return (
     <>
-      <Link
-        href={adminHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isAdminRoot
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <LayoutDashboard className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Dashboard
-      </Link>
-
-      <Link
-        href={clientesHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isClientes
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <Contact className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Gestión Clientes
-      </Link>
-
-      <Link
-        href={aliadosHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isAliados
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Gestión Aliados
-      </Link>
-
-      <Link
-        href={asignacionHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isAsignacion
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <ArrowRightLeft className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Asignación Aliados
-      </Link>
-
-      <Link
-        href={empresasHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isEmpresas
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <Building2 className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Empresas Multialiado
-      </Link>
-
-      {!isAM && (
+      {items.map(({ href, active, Icon, label }) => (
         <Link
-          href={accountManagersHref}
+          key={href}
+          href={href}
           onClick={onLinkClick}
-          className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-            isAMs
-              ? `${themeColor} text-white shadow-md`
+          title={label}
+          className={`flex items-center py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase ${
+            collapsed ? "px-4 md:justify-center md:px-0" : "px-4"
+          } ${
+            active
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
               : "text-slate-400 hover:text-white hover:bg-slate-800/50"
           }`}
         >
-          <Users className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-          Gestión AMs
+          <Icon className={`h-5 w-5 stroke-[2.5] shrink-0 ${collapsed ? "mr-3 md:mr-0" : "mr-3"}`} />
+          <span className={collapsed ? "md:hidden" : ""}>{label}</span>
         </Link>
-      )}
-
-      <Link
-        href={usuariosHref}
-        onClick={onLinkClick}
-        className={`flex items-center px-4 py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase group ${
-          isUsuarios
-            ? `${themeColor} text-white shadow-md`
-            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-        }`}
-      >
-        <UserPlus className="mr-3 h-4.5 w-4.5 stroke-[2.5]" />
-        Gestión Usuarios
-      </Link>
+      ))}
     </>
   );
 }
 
-function SidebarFilters() {
+function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -232,7 +153,7 @@ function SidebarFilters() {
   });
 
   return (
-    <div className="pt-8 border-t border-slate-800/55 mt-6 space-y-4">
+    <div className={`pt-8 border-t border-slate-800/55 mt-6 space-y-4 ${collapsed ? "md:hidden" : ""}`}>
       <div className="flex items-center gap-2 px-4">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">
           FILTRAR
@@ -366,6 +287,7 @@ export default function AdminLayout({
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
@@ -373,8 +295,19 @@ export default function AdminLayout({
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("pensionflow_theme") || "light";
       setCurrentTheme(savedTheme as any);
+      setIsCollapsed(localStorage.getItem("pensionflow_sidebar_collapsed") === "1");
     }
   }, []);
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("pensionflow_sidebar_collapsed", next ? "1" : "0");
+      }
+      return next;
+    });
+  };
 
   const toggleTheme = () => {
     const nextTheme = currentTheme === "light" ? "dark" : "light";
@@ -511,14 +444,16 @@ export default function AdminLayout({
 
       {/* Left Sidebar Layout */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 md:translate-x-0 md:static ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 ${
+          isCollapsed ? "md:w-[76px]" : "md:w-64"
+        } bg-[#070b12] text-slate-300 flex flex-col border-r border-slate-800 transition-all duration-300 md:translate-x-0 md:static ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Sidebar Header / Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-800/80 gap-2.5">
-          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-450/20" strokeWidth={2.5} />
-          <div>
+        <div className={`h-20 flex items-center border-b border-slate-800/80 gap-2.5 px-6 ${isCollapsed ? "md:justify-center md:px-0" : ""}`}>
+          <Heart className="h-6 w-6 text-emerald-400 fill-emerald-400/20 shrink-0" strokeWidth={2.5} />
+          <div className={isCollapsed ? "md:hidden" : ""}>
             <span className="text-lg font-black tracking-tight text-white bg-gradient-to-r bg-clip-text text-transparent from-emerald-400 to-teal-300">
               Pensión Perfecta
             </span>
@@ -531,12 +466,12 @@ export default function AdminLayout({
         {/* Sidebar Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
           <Suspense fallback={<div className="h-48 px-4 py-3 text-[10px] text-slate-500">Cargando enlaces...</div>}>
-            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} />
+            <SidebarLinks onLinkClick={() => setIsSidebarOpen(false)} collapsed={isCollapsed} />
           </Suspense>
 
           {/* Sidebar Filters wrapped in Suspense */}
           <Suspense fallback={<div className="px-4 py-3 text-[10px] text-slate-500">Cargando filtros...</div>}>
-            <SidebarFilters />
+            <SidebarFilters collapsed={isCollapsed} />
           </Suspense>
         </nav>
       </aside>
@@ -552,7 +487,16 @@ export default function AdminLayout({
             >
               <Menu className="h-5 w-5" />
             </button>
-            
+
+            <button
+              onClick={toggleCollapse}
+              className="hidden md:inline-flex p-2.5 -ml-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors active:scale-95"
+              title={isCollapsed ? "Mostrar menú" : "Ocultar menú"}
+              aria-label={isCollapsed ? "Mostrar menú" : "Ocultar menú"}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
             <div className="hidden sm:block">
               <h2 className="text-lg font-black text-slate-800 dark:text-white leading-tight font-black">
                 {headerInfo.title}
@@ -607,7 +551,7 @@ export default function AdminLayout({
                     <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   </div>
                 </div>
-                <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-55 border-emerald-400/20">
+                <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-500 border-emerald-400/20">
                   {user.full_name.charAt(0)}
                 </div>
               </div>
