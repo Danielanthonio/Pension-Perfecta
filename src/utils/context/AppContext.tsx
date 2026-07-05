@@ -931,8 +931,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                       setActiveRole(profile.role);
                     }
                   } else if (storedUser.password_provisional) {
-                    // Provisional session bypass: RLS blocks profiles query when anonymous.
-                    // Try to automatically upgrade/sign in to Supabase Auth using the provisional password in the background
+                    // Provisional session bypass: RLS blocks the profiles query when anonymous.
+                    // Try to upgrade to a REAL Supabase Auth session in the background using the
+                    // provisional password. If the upgrade does not fully complete for ANY reason
+                    // (auth error, exception, or profile not resolved), we always fall back to the
+                    // intact localStorage session so the user is never logged out.
+                    let upgraded = false;
                     try {
                       console.log("Attempting background session upgrade using provisional password for:", storedUser.email);
                       const { data: authData, error: authErr } = await client.auth.signInWithPassword({
@@ -940,23 +944,26 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                         password: storedUser.password_provisional
                       });
                       if (!authErr && authData.user) {
-                        console.log("Background session upgrade successful!");
                         const profile = await ensureProfileExists(client, authData.user);
                         if (profile) {
+                          console.log("Background session upgrade successful!");
                           currentUser = profile;
                           setUser(profile);
                           setActiveRole(profile.role);
                           saveToStorage("pensionflow_user", profile);
                           hasActiveSession = true;
+                          upgraded = true;
+                        } else {
+                          console.warn("Background session upgrade signed in but profile could not be resolved; keeping provisional session");
                         }
-                      } else {
+                      } else if (authErr) {
                         console.warn("Background session upgrade failed, keeping provisional session:", authErr?.message);
-                        currentUser = storedUser;
-                        setUser(storedUser);
-                        setActiveRole(storedUser.role);
                       }
                     } catch (upgradeErr) {
                       console.error("Error in background session upgrade:", upgradeErr);
+                    }
+                    if (!upgraded) {
+                      // Keep the localStorage provisional session intact (identical to prior behavior).
                       currentUser = storedUser;
                       setUser(storedUser);
                       setActiveRole(storedUser.role);
