@@ -7,3 +7,14 @@
     @apply bg-background text-primary antialiased;
   }
 }
+
+@layer utilities {
+  /* Hide the horizontal scrollbar on the funnel row while keeping it scrollable */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
