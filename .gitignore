@@ -29,6 +29,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# local secrets (DB connection string for manual backups — never commit)
+.secrets/
+
 # vercel
 .vercel
 
