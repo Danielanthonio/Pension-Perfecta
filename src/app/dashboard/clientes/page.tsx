@@ -32,6 +32,7 @@ function ClientesContent() {
   const {
     user,
     prospects,
+    profiles,
     scheduleAssessment,
     deleteProspect,
     restoreProspect,
@@ -48,6 +49,11 @@ function ClientesContent() {
   const endDate = searchParams.get("hasta") || "";
   const stageFilter = searchParams.get("etapa") || "all";
   const subStageFilter = searchParams.get("subetapa") || "all";
+  // Optional ally focus — used by leaders drilling into a specific ally's projects
+  const aliadoFilter = searchParams.get("aliado") || "";
+  const aliadoFocus = aliadoFilter
+    ? profiles.find((p) => p.id === aliadoFilter)
+    : null;
 
   // Page local states
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,9 +115,12 @@ function ClientesContent() {
     }
   };
 
-  // Filter Active vs Deleted
-  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
-  const deletedProspects = prospects.filter((p) => isProspectDeleted(p));
+  // Filter Active vs Deleted (optionally scoped to a single ally when focusing one)
+  const scopedProspects = aliadoFilter
+    ? prospects.filter((p) => p.aliado_id === aliadoFilter)
+    : prospects;
+  const activeProspects = scopedProspects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const deletedProspects = scopedProspects.filter((p) => isProspectDeleted(p));
 
   // Apply filters to active list
   const filteredActive = activeProspects.filter((p) => {
@@ -257,7 +266,30 @@ function ClientesContent() {
 
   return (
     <div className="space-y-6 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
-      
+
+      {/* Ally focus banner — shown when a leader drills into a specific ally's projects */}
+      {aliadoFilter && (
+        <div className="flex items-center justify-between gap-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-2xl px-4 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-black border border-blue-200/40 shrink-0">
+              {(aliadoFocus?.full_name || "A").charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400 leading-none">Proyectos del aliado</span>
+              <span className="block text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate leading-tight mt-0.5">
+                {aliadoFocus?.full_name || "Aliado comercial"}
+              </span>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/clientes"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shrink-0"
+          >
+            <X className="h-3.5 w-3.5" /> Quitar filtro
+          </Link>
+        </div>
+      )}
+
       {/* Tab select and action button row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Colored pill tabs — semantic per stage */}

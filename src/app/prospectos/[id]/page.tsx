@@ -403,7 +403,10 @@ export default function ProspectoDetalle() {
     if (prospects.length > 0) {
       const found = prospects.find((p) => p.id === id);
       if (found) {
-        if (user?.role === "aliado" && found.aliado_id !== user.id) {
+        // Regular allies may only open their own expedientes. Leaders (aliado_tipo === "lider")
+        // are allowed to review any prospect belonging to their assigned team/company — the
+        // prospects list is already scoped to that team at load time, so if it's here, it's allowed.
+        if (user?.role === "aliado" && user?.aliado_tipo !== "lider" && found.aliado_id !== user.id) {
           router.push("/dashboard");
           return;
         }

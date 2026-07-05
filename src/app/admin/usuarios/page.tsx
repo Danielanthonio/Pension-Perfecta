@@ -295,6 +295,39 @@ export default function GestionUsuarios() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 3);
 
+  // Per-role visual identity — keeps colors and labels consistent across the directory,
+  // the accent spine and the "latest registrations" widget (clear color sequences).
+  const getRoleMeta = (r: UserProfile["role"]) => {
+    if (r === "director") {
+      return {
+        label: "Director Operativo",
+        short: "Director",
+        Icon: ShieldCheck,
+        accent: "border-l-emerald-500",
+        avatar: "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800/40",
+        badge: "bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-850",
+      };
+    }
+    if (r === "account_manager") {
+      return {
+        label: "Account Manager",
+        short: "Account Manager",
+        Icon: UserCheck,
+        accent: "border-l-blue-500",
+        avatar: "bg-blue-500/10 text-blue-600 border-blue-200 dark:text-blue-400 dark:border-blue-800/40",
+        badge: "bg-blue-50 text-blue-700 border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-850",
+      };
+    }
+    return {
+      label: "Aliado Comercial",
+      short: "Aliado",
+      Icon: User,
+      accent: "border-l-teal-500",
+      avatar: "bg-teal-500/10 text-teal-650 border-teal-200 dark:text-teal-400 dark:border-teal-800/40",
+      badge: "bg-teal-50 text-teal-700 border-teal-150 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-850",
+    };
+  };
+
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       {/* Top Header */}
@@ -557,73 +590,64 @@ export default function GestionUsuarios() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Usuario</th>
+                      <th className="pl-7 pr-6 py-4">Usuario</th>
                       <th className="px-6 py-4">Teléfono</th>
                       <th className="px-6 py-4 text-center">Rol del Sistema</th>
                       <th className="px-6 py-4 text-center">Estado</th>
-                      <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                      <th className="px-6 py-4 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
                     {filteredProfiles.map((p) => {
-                      const isDirector = p.role === "director";
-                      const isAM = p.role === "account_manager";
                       const isUserActive = p.is_active !== false;
+                      const meta = getRoleMeta(p.role);
+                      const RoleIcon = meta.Icon;
                       return (
-                        <tr key={p.id} className={`hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors group ${!isUserActive ? "opacity-75" : ""}`}>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={p.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group ${!isUserActive ? "opacity-60" : ""}`}>
+                          <td className={`px-6 py-4 whitespace-nowrap border-l-4 ${meta.accent}`}>
                             <div className="flex items-center gap-3">
-                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border transition-all ${
-                                isDirector
-                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/40"
-                                  : isAM
-                                    ? "bg-blue-500/10 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-800/40"
-                                    : "bg-teal-500/10 text-teal-650 border-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-800/40"
-                              }`}>
+                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border transition-all shrink-0 ${meta.avatar}`}>
                                 {p.full_name.charAt(0)}
                               </div>
-                              <div>
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">{p.full_name}</span>
-                                <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5 font-medium leading-none">{p.email}</span>
+                              <div className="min-w-0">
+                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate">{p.full_name}</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5 font-medium leading-none truncate">{p.email}</span>
                               </div>
                             </div>
                           </td>
 
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">
+                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400 tabular-nums">
                               {p.phone || "N/A"}
                             </span>
                           </td>
 
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${
-                                isDirector
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-850"
-                                  : isAM
-                                    ? "bg-blue-50 text-blue-600 border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-850"
-                                    : "bg-teal-50 text-teal-600 border-teal-150 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-850"
-                              }`}
-                            >
-                              {isDirector ? "Director Operativo" : isAM ? "Account Manager" : "Aliado Comercial"}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${meta.badge}`}>
+                              <RoleIcon className="h-3 w-3" strokeWidth={2.4} />
+                              {meta.label}
                             </span>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            {/* Toggle Switch */}
-                            <button
-                              onClick={() => handleToggleUserActive(p)}
-                              className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                              style={{ backgroundColor: isUserActive ? "#10B981" : "#D1D5DB" }}
-                            >
-                              <span
-                                className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                                style={{ transform: isUserActive ? "translateX(16px)" : "translateX(0px)" }}
-                              />
-                            </button>
-                            <span className="block text-[8px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase">
-                              {isUserActive ? "Activo" : "Inactivo"}
-                            </span>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {/* Status: clear label + toggle */}
+                            <div className="flex items-center justify-center gap-2">
+                              <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${isUserActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${isUserActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                                {isUserActive ? "Activo" : "Inactivo"}
+                              </span>
+                              <button
+                                onClick={() => handleToggleUserActive(p)}
+                                title={isUserActive ? "Desactivar acceso" : "Activar acceso"}
+                                className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                                style={{ backgroundColor: isUserActive ? "#10B981" : "#D1D5DB" }}
+                              >
+                                <span
+                                  className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                  style={{ transform: isUserActive ? "translateX(16px)" : "translateX(0px)" }}
+                                />
+                              </button>
+                            </div>
                           </td>
 
                           <td className="px-6 py-4 whitespace-nowrap text-right text-xs">

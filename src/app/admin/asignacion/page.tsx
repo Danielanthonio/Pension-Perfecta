@@ -279,17 +279,9 @@ export default function AsignacionAliados() {
         </div>
       </div>
 
-      {/* Allocation Tip banner */}
-      <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/15 dark:border-emerald-500/10 rounded-3xl p-6 relative overflow-hidden">
-        <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-emerald-500/5 rounded-full blur-2xl" />
-        <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest block">Asignación en Tiempo Real</span>
-        <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight mt-1">Flujo Automatizado</h4>
-        <p className="text-[11px] text-slate-550 dark:text-slate-450 mt-3 leading-relaxed font-semibold">
-          Al seleccionar un Account Manager o un Líder de Grupo, la asignación se actualizará y guardará inmediatamente. Se enviará automáticamente una notificación al aliado comercial correspondiente.
-        </p>
-      </div>
-
-      {/* Cartera de Supervisores Section */}
+      {/* Cartera de Supervisores Section — only useful for Directors (distribution across AMs).
+          Hidden for AMs, where it would only render their own single redundant card. */}
+      {!isAM && (
       <div className="space-y-4">
         <div>
           <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Cartera de Supervisores</span>
@@ -342,6 +334,7 @@ export default function AsignacionAliados() {
           )}
         </div>
       </div>
+      )}
 
       {/* Main Content Layout */}
       <div className="space-y-6">

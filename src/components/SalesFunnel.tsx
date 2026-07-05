@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Prospect, useApp } from "@/utils/context/AppContext";
 import {
   ChevronDown,
@@ -17,6 +17,8 @@ import {
   CircleDollarSign,
   Shield,
   User,
+  LayoutGrid,
+  AlignLeft,
 } from "lucide-react";
 
 interface SalesFunnelProps {
@@ -27,6 +29,21 @@ interface SalesFunnelProps {
 export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesProp }: SalesFunnelProps) {
   const { user, profiles } = useApp();
   const [funnelView, setFunnelView] = useState<"consolidated" | "personal" | "team_all" | string>("consolidated");
+
+  // Optional funnel visualization: card grid (default) or proportional horizontal bars.
+  const [layout, setLayout] = useState<"cards" | "bars">("cards");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("pp_funnel_layout");
+      if (saved === "cards" || saved === "bars") setLayout(saved);
+    } catch {}
+  }, []);
+  const changeLayout = (next: "cards" | "bars") => {
+    setLayout(next);
+    try {
+      localStorage.setItem("pp_funnel_layout", next);
+    } catch {}
+  };
 
   const showAccountManagers = user?.role === "director";
   const showAliadosCard = user?.role === "director" || user?.role === "account_manager";
@@ -230,6 +247,49 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
 
   const isLeader = user?.aliado_tipo === "lider";
 
+  // Pipeline stages only (exclude the AM / Aliados head-count tiles) for the bar view
+  const pipelineSteps = steps.filter(
+    (s) => s.label !== "ACCOUNT MANAGERS" && s.label !== "ALIADOS"
+  );
+  const maxStepValue = Math.max(...pipelineSteps.map((s) => s.value), 1);
+
+  // Financiamiento tiles are shared across both layouts
+  const financiamientoBlocks = (
+    <>
+      {/* Financiamientos Aprobados block */}
+      <div className="relative flex-1 min-w-[168px] h-[140px] rounded-2xl border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-br from-indigo-50/80 to-white dark:from-indigo-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-indigo-200/50 dark:hover:shadow-none overflow-hidden">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-indigo-500/10">
+            <CircleDollarSign className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-indigo-600 dark:text-indigo-400 leading-tight">
+            Financiamientos<br />Aprobados
+          </span>
+        </div>
+        <span className="text-xl font-bold tabular-nums tracking-tight text-indigo-700 dark:text-indigo-300 truncate">
+          {formatCurrency(finAprobados)}
+        </span>
+        <span className="absolute bottom-0 inset-x-0 h-1 bg-indigo-500" />
+      </div>
+
+      {/* Financiamientos Otorgados block */}
+      <div className="relative flex-1 min-w-[168px] h-[140px] rounded-2xl border border-emerald-100 dark:border-emerald-950/60 bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-200/50 dark:hover:shadow-none overflow-hidden">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/10">
+            <Gift className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-emerald-600 dark:text-emerald-400 leading-tight">
+            Financiamientos<br />Otorgados
+          </span>
+        </div>
+        <span className="text-xl font-bold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-300 truncate">
+          {formatCurrency(finOtorgados)}
+        </span>
+        <span className="absolute bottom-0 inset-x-0 h-1 bg-emerald-500" />
+      </div>
+    </>
+  );
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 p-5 sm:p-6 shadow-sm shadow-slate-200/40 dark:shadow-none space-y-5 w-full">
       {/* Visual Header */}
@@ -243,13 +303,42 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
             <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-tight truncate">Pipeline de conversión de prospectos</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 ring-1 ring-inset ring-emerald-500/20 shrink-0">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Optional view switch: card grid vs proportional bars */}
+          <div className="flex items-center gap-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/70 p-0.5 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/50">
+            <button
+              onClick={() => changeLayout("cards")}
+              title="Vista de tarjetas"
+              aria-pressed={layout === "cards"}
+              className={`flex items-center justify-center h-6 w-6 rounded-lg transition-all ${
+                layout === "cards"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" strokeWidth={2.4} />
+            </button>
+            <button
+              onClick={() => changeLayout("bars")}
+              title="Vista de embudo (barras)"
+              aria-pressed={layout === "bars"}
+              className={`flex items-center justify-center h-6 w-6 rounded-lg transition-all ${
+                layout === "bars"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+              }`}
+            >
+              <AlignLeft className="h-3.5 w-3.5" strokeWidth={2.4} />
+            </button>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="hidden sm:inline">En tiempo real</span>
           </span>
-          <span className="hidden sm:inline">En tiempo real</span>
-        </span>
+        </div>
       </div>
 
       {/* Horizontal View Filter (Only for Leaders) */}
@@ -365,7 +454,8 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
           </div>
         </div>
       )}
-          {/* Funnel row — wraps so every stage stays visible without horizontal scroll (consistent across roles) */}
+          {/* Funnel row (card grid) — wraps so every stage stays visible without horizontal scroll (consistent across roles) */}
+          {layout === "cards" && (
           <div className="flex flex-wrap items-stretch gap-2.5 pb-1 w-full select-none">
             {steps.map((step, idx) => {
               const IconComponent = step.icon;
@@ -426,6 +516,53 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
               <span className="absolute bottom-0 inset-x-0 h-1 bg-emerald-500" />
             </div>
           </div>
+          )}
+
+          {/* Funnel row (bar view) — proportional horizontal funnel, optional alternative to the card grid */}
+          {layout === "bars" && (
+            <div className="space-y-4 pb-1 w-full">
+              <div className="space-y-2">
+                {pipelineSteps.map((step, idx) => {
+                  const IconComponent = step.icon;
+                  const pct = step.value > 0 ? Math.max((step.value / maxStepValue) * 100, 6) : 0;
+                  const firstValue = pipelineSteps[0]?.value || 0;
+                  const conv = idx === 0 ? 100 : firstValue > 0 ? (step.value / firstValue) * 100 : 0;
+                  return (
+                    <div key={step.label} className="flex items-center gap-3">
+                      {/* Stage label */}
+                      <div className="w-32 sm:w-44 shrink-0 flex items-center gap-2 justify-end">
+                        <div className={`h-6 w-6 rounded-lg flex items-center justify-center ring-1 ring-inset ring-black/5 dark:ring-white/10 shrink-0 ${step.iconWrap}`}>
+                          <IconComponent className="h-3.5 w-3.5" strokeWidth={2.2} />
+                        </div>
+                        <span className={`text-[10px] font-semibold uppercase tracking-[0.06em] leading-tight text-right ${step.labelColor}`}>
+                          {step.label}
+                        </span>
+                      </div>
+                      {/* Proportional bar */}
+                      <div className="flex-1 h-9 rounded-lg bg-slate-100 dark:bg-slate-800/40 overflow-hidden relative min-w-0">
+                        <div
+                          className={`h-full ${step.accent} rounded-lg transition-all duration-500 flex items-center justify-end pr-2.5`}
+                          style={{ width: `${pct}%` }}
+                        >
+                          {pct >= 24 && (
+                            <span className="text-[10px] font-bold text-white/90 tabular-nums">{conv.toFixed(0)}%</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Absolute value */}
+                      <span className="w-12 text-right text-base font-bold tabular-nums tracking-tight text-slate-900 dark:text-white shrink-0">
+                        {step.value}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Financiamiento tiles below the funnel */}
+              <div className="flex flex-wrap items-stretch gap-2.5">
+                {financiamientoBlocks}
+              </div>
+            </div>
+          )}
 
           {/* Rates row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">

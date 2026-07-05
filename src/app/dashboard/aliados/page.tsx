@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useApp } from "@/utils/context/AppContext";
-import { Users, UserX } from "lucide-react";
+import { Users, UserX, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 function AliadosContent() {
   const { user: contextUser, profiles, prospects, isProspectDeleted, isProspectPurged, isDemoMode } = useApp();
@@ -119,6 +120,7 @@ function AliadosContent() {
                     <th className="px-6 py-4">Empresa</th>
                     <th className="px-6 py-4">Account Manager</th>
                     <th className="px-6 py-4">Líder Asignado</th>
+                    <th className="px-6 py-4 text-right">Proyectos</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150 dark:divide-slate-850 text-xs">
@@ -151,6 +153,15 @@ function AliadosContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-indigo-600 dark:text-indigo-400 font-extrabold">
                         {a.lider_nombre || user.full_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <Link
+                          href={`/dashboard/clientes?aliado=${a.id}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[11px] font-bold rounded-xl border border-blue-200/60 dark:border-blue-900/40 transition-colors"
+                          title={`Revisar los proyectos de ${a.name}`}
+                        >
+                          Ver proyectos <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
                       </td>
                     </tr>
                   ))}
