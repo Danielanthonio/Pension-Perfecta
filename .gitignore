@@ -32,6 +32,10 @@ yarn-error.log*
 # local secrets (DB connection string for manual backups — never commit)
 .secrets/
 
+# local scratch / debugging scripts (never deploy; may contain old/inert creds)
+scratch/
+architecture-output.md
+
 # vercel
 .vercel
 
