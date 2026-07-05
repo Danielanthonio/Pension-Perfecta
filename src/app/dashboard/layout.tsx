@@ -56,15 +56,19 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
           href={href}
           onClick={onLinkClick}
           title={label}
-          className={`flex items-center py-3 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase ${
-            collapsed ? "px-4 md:justify-center md:px-0" : "px-4"
+          className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase ${
+            collapsed ? "px-2 md:justify-center md:px-2" : "px-2"
           } ${
             active
               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/10"
               : "text-slate-400 hover:text-white hover:bg-slate-800/50"
           }`}
         >
-          <Icon className={`h-5 w-5 stroke-[2.5] shrink-0 ${collapsed ? "mr-3 md:mr-0" : "mr-3"}`} />
+          <span className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-colors ${collapsed ? "md:mr-0 mr-3" : "mr-3"} ${
+            active ? "bg-white/15" : "bg-slate-800/70 group-hover:bg-slate-700/70"
+          }`}>
+            <Icon className="h-4 w-4 stroke-[2.5]" />
+          </span>
           <span className={collapsed ? "md:hidden" : ""}>{label}</span>
         </Link>
       ))}
@@ -141,9 +145,11 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
       </div>
 
       {/* Rango de Fechas */}
-      <div className="px-4 space-y-3">
-        <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
-          <Calendar className="h-3.5 w-3.5 text-emerald-400" />
+      <div className="mx-3 p-3.5 space-y-3 rounded-2xl bg-slate-900/50 border border-slate-800/70 shadow-inner shadow-black/20">
+        <div className="flex items-center gap-2 text-slate-300 text-xs font-bold">
+          <span className="h-6 w-6 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center ring-1 ring-inset ring-emerald-500/20">
+            <Calendar className="h-3.5 w-3.5" />
+          </span>
           <span>Rango de fechas</span>
         </div>
         
@@ -442,13 +448,16 @@ export default function DashboardLayout({
               <Menu className="h-5 w-5" />
             </button>
 
-            <div className="hidden sm:block">
-              <h2 className="text-lg font-black text-slate-800 dark:text-white leading-tight">
-                {headerInfo.title}
-              </h2>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-none mt-1 font-medium">
-                {headerInfo.subtitle}
-              </p>
+            <div className="hidden sm:flex items-center gap-3">
+              <span className="h-9 w-1 rounded-full bg-gradient-to-b from-emerald-400 to-teal-600" />
+              <div>
+                <h2 className="text-lg font-black text-slate-800 dark:text-white leading-tight tracking-tight">
+                  {headerInfo.title}
+                </h2>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-none mt-1 font-medium">
+                  {headerInfo.subtitle}
+                </p>
+              </div>
             </div>
           </div>
 

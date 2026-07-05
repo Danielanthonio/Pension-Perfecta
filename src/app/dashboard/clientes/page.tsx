@@ -223,64 +223,79 @@ function ClientesContent() {
     setActiveTab("activos"); // Switch tab to see active projects
   };
 
+  // Shared executive table cells — keep every tab consistent and scroll-free
+  const renderProspectoCell = (p: Prospect) => (
+    <div className="flex items-center gap-3">
+      <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 shrink-0 group-hover:bg-emerald-50/60 dark:group-hover:bg-emerald-950/20 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-all">
+        {p.full_name.charAt(0)}
+      </div>
+      <div className="min-w-0">
+        <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate max-w-[210px]">{p.full_name}</span>
+        <span className="block font-mono tabular-nums text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-none">{p.nss}</span>
+        <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[210px]">{p.curp}</span>
+      </div>
+    </div>
+  );
+
+  const renderContactoCell = (p: Prospect) => (
+    <div className="min-w-0">
+      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 block truncate max-w-[190px]">{p.email || "—"}</span>
+      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block mt-0.5">Tel {p.phone}</span>
+    </div>
+  );
+
+  const renderEtapaCell = (p: Prospect) => (
+    <div className="flex flex-col items-start gap-1.5">
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+        {getStageLabel(p.status)}
+      </span>
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+        {getSubStageLabel(p.status)}
+      </span>
+    </div>
+  );
+
   return (
     <div className="space-y-6 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
       
       {/* Tab select and action button row */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Segmented Controller Tab Selector */}
-        <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl flex-1 max-w-3xl flex border border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab("evaluacion")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "evaluacion"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            <Layers className="h-4 w-4" />
-            Evaluados ({enEvaluacion.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("listo")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "listo"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-550 dark:text-slate-400 hover:text-slate-850 dark:hover:text-white"
-            }`}
-          >
-            Listo para Presentar ({listoPresentar.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("activos")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "activos"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            Proyectos Activos ({proyectosActivos.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("rechazados")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "rechazados"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            Rechazados ({rechazados.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("papelera")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "papelera"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            Papelera ({filteredDeleted.length})
-          </button>
+        {/* Colored pill tabs — semantic per stage */}
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          {[
+            { id: "evaluacion", label: "Evaluados", count: enEvaluacion.length, Icon: Layers,
+              active: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/50",
+              badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300", dot: "bg-blue-500" },
+            { id: "listo", label: "Listo para Presentar", count: listoPresentar.length, Icon: CheckSquare,
+              active: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50",
+              badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300", dot: "bg-emerald-500" },
+            { id: "activos", label: "Proyectos Activos", count: proyectosActivos.length, Icon: Folder,
+              active: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50",
+              badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300", dot: "bg-indigo-500" },
+            { id: "rechazados", label: "Rechazados", count: rechazados.length, Icon: XCircle,
+              active: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50",
+              badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300", dot: "bg-rose-500" },
+            { id: "papelera", label: "Papelera", count: filteredDeleted.length, Icon: Trash2,
+              active: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
+              badge: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200", dot: "bg-slate-400" },
+          ].map(({ id, label, count, Icon, active, badge, dot }) => {
+            const on = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id as typeof activeTab)}
+                className={`inline-flex items-center gap-2 pl-3 pr-2.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-[0.97] ${
+                  on ? `${active} shadow-sm` : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 ring-1 ring-inset ring-transparent"
+                }`}
+              >
+                <Icon className={`h-3.5 w-3.5 ${on ? "" : "opacity-70"}`} />
+                <span>{label}</span>
+                <span className={`min-w-[20px] text-center px-1.5 py-0.5 rounded-lg text-[10px] font-black tabular-nums ${on ? badge : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <Link
@@ -312,7 +327,7 @@ function ClientesContent() {
         {/* TAB 1: EVALUADOS */}
         {activeTab === "evaluacion" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2 mb-6">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Evaluados Técnicamente</h3>
             </div>
 
@@ -329,55 +344,30 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4.5">Nombre Completo</th>
-                      <th className="px-6 py-4.5">NSS</th>
-                      <th className="px-6 py-4.5">CURP</th>
-                      <th className="px-6 py-4.5">Teléfono</th>
-                      <th className="px-6 py-4.5">Email</th>
-                      <th className="px-6 py-4.5">Etapa</th>
-                      <th className="px-6 py-4.5">Subetapa</th>
-                      <th className="px-6 py-4.5">Fecha Registro</th>
-                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-4 py-3.5">Registro</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {enEvaluacion.map((p) => {
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                            {p.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.nss}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
-                            {p.curp}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.phone}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
-                              {getStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
-                              {getSubStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
+                          <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/20 text-slate-550 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                className="inline-flex p-2 bg-slate-100 dark:bg-slate-800 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-950/20 text-slate-550 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                title="Ver Expediente"
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </Link>
@@ -387,7 +377,7 @@ function ClientesContent() {
                                     await deleteProspect(p.id);
                                   }
                                 }}
-                                className="inline-flex p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-650 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                className="inline-flex p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-650 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
                                 title="Mover a Papelera"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -423,60 +413,34 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4.5">Nombre Completo</th>
-                      <th className="px-6 py-4.5">NSS</th>
-                      <th className="px-6 py-4.5">CURP</th>
-                      <th className="px-6 py-4.5">Teléfono</th>
-                      <th className="px-6 py-4.5">Email</th>
-                      <th className="px-6 py-4.5">Crédito Total</th>
-                      <th className="px-6 py-4.5">Etapa</th>
-                      <th className="px-6 py-4.5">Subetapa</th>
-                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Crédito Total</th>
+                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {listoPresentar.map((p) => {
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                            {p.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.nss}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
-                            {p.curp}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.phone}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
                             {p.simulation ? (
                               <div>
-                                <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                                <span className="block text-xs font-black text-emerald-700 dark:text-emerald-300 tabular-nums">
                                   ${p.simulation.totalCredito.toLocaleString()}
                                 </span>
-                                <span className="block text-[9px] text-slate-400 dark:text-slate-500">M40 + Gestión</span>
+                                <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">M40 + Gestión</span>
                               </div>
                             ) : (
                               <span className="text-slate-400 italic text-[11px]">N/A</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
-                              {getStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
-                              {getSubStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <Link
                                 href={`/prospectos/${p.id}`}
@@ -707,13 +671,10 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4.5">Nombre Completo</th>
-                      <th className="px-6 py-4.5">NSS</th>
-                      <th className="px-6 py-4.5">CURP</th>
-                      <th className="px-6 py-4.5">Fecha Eliminación</th>
-                      <th className="px-6 py-4.5">Días Restantes</th>
-                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Eliminado · Vence</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -723,25 +684,17 @@ function ClientesContent() {
                         ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24)))
                         : 7;
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                            {p.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.nss}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
-                            {p.curp}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/15 dark:text-red-400 dark:border-red-800/50" : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/15 dark:text-amber-400 dark:border-amber-800/50"}`}>
-                              {remainingDays} {remainingDays === 1 ? "día" : "días"}
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
+                          <td className="px-4 py-3.5">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                              {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                            </span>
+                            <span className={`inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 text-red-600 border-red-100 dark:bg-red-950/15 dark:text-red-400 dark:border-red-800/50" : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/15 dark:text-amber-400 dark:border-amber-800/50"}`}>
+                              Vence en {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <button
                                 onClick={async () => {
@@ -796,51 +749,25 @@ function ClientesContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4.5">Nombre Completo</th>
-                      <th className="px-6 py-4.5">NSS</th>
-                      <th className="px-6 py-4.5">CURP</th>
-                      <th className="px-6 py-4.5">Teléfono</th>
-                      <th className="px-6 py-4.5">Email</th>
-                      <th className="px-6 py-4.5">Motivo del Rechazo</th>
-                      <th className="px-6 py-4.5">Etapa</th>
-                      <th className="px-6 py-4.5">Subetapa</th>
-                      <th className="px-6 py-4.5 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Motivo del Rechazo</th>
+                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {rechazados.map((p) => {
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                            {p.full_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.nss}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350 uppercase">
-                            {p.curp}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.phone}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-350">
-                            {p.email}
-                          </td>
-                          <td className="px-6 py-4 text-xs font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
                             {p.notes_director || <span className="text-slate-400 italic">Sin motivo especificado</span>}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
-                              {getStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
-                              {getSubStageLabel(p.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <Link
                                 href={`/prospectos/${p.id}`}

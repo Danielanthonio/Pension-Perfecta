@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Prospect, useApp } from "@/utils/context/AppContext";
 import {
-  ChevronRight,
   ChevronDown,
   Users,
   FileText,
@@ -366,44 +365,37 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
           </div>
         </div>
       )}
-          {/* Funnel row */}
-          <div className="flex flex-row items-stretch gap-1.5 overflow-x-auto pb-3 w-full select-none no-scrollbar">
+          {/* Funnel row — wraps so every stage stays visible without horizontal scroll (consistent across roles) */}
+          <div className="flex flex-wrap items-stretch gap-2.5 pb-1 w-full select-none">
             {steps.map((step, idx) => {
               const IconComponent = step.icon;
               return (
-                <React.Fragment key={step.label}>
-                  <div className="group relative flex-1 min-w-[124px] h-[144px] rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center gap-2 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70 dark:hover:shadow-none hover:border-slate-300 dark:hover:border-slate-700 overflow-hidden">
-                    {/* Icon chip */}
-                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center ring-1 ring-inset ring-black/5 dark:ring-white/10 ${step.iconWrap}`}>
-                      <IconComponent className="h-[18px] w-[18px]" strokeWidth={2.2} />
-                    </div>
-                    {/* Label */}
-                    <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] text-center leading-tight px-1.5 ${step.labelColor}`}>
-                      {step.label}
-                    </span>
-                    {/* Value */}
-                    <span className="text-[26px] font-bold tabular-nums tracking-tight text-slate-900 dark:text-white leading-none">
-                      {step.value}
-                    </span>
-                    {/* Accent bar */}
-                    <span className={`absolute bottom-0 inset-x-0 h-1 ${step.accent}`} />
+                <div
+                  key={step.label}
+                  className="group relative flex-1 min-w-[130px] h-[140px] rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center justify-center gap-2 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70 dark:hover:shadow-none hover:border-slate-300 dark:hover:border-slate-700 overflow-hidden"
+                >
+                  {/* Step index */}
+                  <span className="absolute top-2.5 right-3 text-[10px] font-black tabular-nums text-slate-300 dark:text-slate-700">{idx + 1}</span>
+                  {/* Icon chip */}
+                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center ring-1 ring-inset ring-black/5 dark:ring-white/10 ${step.iconWrap}`}>
+                    <IconComponent className="h-[18px] w-[18px]" strokeWidth={2.2} />
                   </div>
-                  {idx < steps.length - 1 && (
-                    <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0">
-                      <ChevronRight className="h-4 w-4 stroke-[2.5]" />
-                    </div>
-                  )}
-                </React.Fragment>
+                  {/* Label */}
+                  <span className={`text-[10px] font-semibold uppercase tracking-[0.07em] text-center leading-tight px-1.5 ${step.labelColor}`}>
+                    {step.label}
+                  </span>
+                  {/* Value */}
+                  <span className="text-[26px] font-bold tabular-nums tracking-tight text-slate-900 dark:text-white leading-none">
+                    {step.value}
+                  </span>
+                  {/* Accent bar */}
+                  <span className={`absolute bottom-0 inset-x-0 h-1 ${step.accent}`} />
+                </div>
               );
             })}
 
-            {/* Chevron connector to Aprobados financing */}
-            <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0">
-              <ChevronRight className="h-4 w-4 stroke-[2.5]" />
-            </div>
-
             {/* Financiamientos Aprobados block */}
-            <div className="relative flex-1 min-w-[176px] h-[144px] rounded-2xl border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-br from-indigo-50/80 to-white dark:from-indigo-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-indigo-200/50 dark:hover:shadow-none overflow-hidden">
+            <div className="relative flex-1 min-w-[168px] h-[140px] rounded-2xl border border-indigo-100 dark:border-indigo-950/60 bg-gradient-to-br from-indigo-50/80 to-white dark:from-indigo-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-indigo-200/50 dark:hover:shadow-none overflow-hidden">
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-indigo-500/10">
                   <CircleDollarSign className="h-4 w-4" strokeWidth={2.2} />
@@ -418,13 +410,8 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
               <span className="absolute bottom-0 inset-x-0 h-1 bg-indigo-500" />
             </div>
 
-            {/* Chevron connector to Otorgados financing */}
-            <div className="flex items-center justify-center text-slate-300 dark:text-slate-700 shrink-0">
-              <ChevronRight className="h-4 w-4 stroke-[2.5]" />
-            </div>
-
             {/* Financiamientos Otorgados block */}
-            <div className="relative flex-1 min-w-[176px] h-[144px] rounded-2xl border border-emerald-100 dark:border-emerald-950/60 bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-200/50 dark:hover:shadow-none overflow-hidden">
+            <div className="relative flex-1 min-w-[168px] h-[140px] rounded-2xl border border-emerald-100 dark:border-emerald-950/60 bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-slate-900 p-4 flex flex-col justify-center gap-2.5 shadow-sm shadow-slate-200/40 dark:shadow-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-200/50 dark:hover:shadow-none overflow-hidden">
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/10">
                   <Gift className="h-4 w-4" strokeWidth={2.2} />

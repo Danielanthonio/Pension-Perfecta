@@ -355,67 +355,53 @@ function ClientesAdminContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Prospecto</th>
-                      <th className="px-6 py-4">NSS / CURP</th>
-                      <th className="px-6 py-4">Aliado Comercial</th>
-                      <th className="px-6 py-4">Líder Asignado</th>
-                      <th className="px-6 py-4">Fecha Eliminación</th>
-                      <th className="px-6 py-4">Días Restantes</th>
-                      <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Asignación</th>
+                      <th className="px-4 py-3.5">Eliminado · Vence</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredDeletedProspects.map((p) => {
                       const deletedAt = getProspectDeletedAt(p);
                       const remainingDays = deletedAt ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 7;
+                      const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
+                      const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
+                      const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group">
+                          <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750">
+                              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 shrink-0">
                                 {p.full_name.charAt(0)}
                               </div>
-                              <div>
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight">
+                              <div className="min-w-0">
+                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate max-w-[220px]">
                                   {p.full_name}
                                 </span>
-                                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none">
-                                  Tel: {p.phone}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                                  <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">{p.nss}</span>
+                                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                                  <span>Tel {p.phone}</span>
+                                </div>
+                                <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-400">
-                            <div>
-                              <span>NSS: {p.nss}</span>
-                              <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
-                            </div>
+                          <td className="px-4 py-3.5">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
+                            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">
-                              {(() => {
-                                const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
-                                if (!allyProfile) return "Sin Líder";
-                                const leaders = profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id));
-                                return leaders.length > 0
-                                  ? leaders.map((prof) => prof.full_name).join(", ")
-                                  : "Sin Líder";
-                              })()}
+                          <td className="px-4 py-3.5">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                              {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50" : "bg-amber-50 dark:bg-amber-950/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50"}`}>
+                              Vence en {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50" : "bg-amber-50 dark:bg-amber-950/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50"}`}>
-                              {remainingDays} {remainingDays === 1 ? "día" : "días"}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <button
                                 onClick={async () => {
@@ -461,91 +447,72 @@ function ClientesAdminContent() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="px-6 py-4">Prospecto</th>
-                      <th className="px-6 py-4">NSS / CURP</th>
-                      <th className="px-6 py-4">Aliado Comercial</th>
-                      <th className="px-6 py-4">Líder Asignado</th>
-                      <th className="px-6 py-4">Expediente</th>
-                      <th className="px-6 py-4">Estado Interno (8 Etapas)</th>
-                      <th className="px-6 py-4 relative"><span className="sr-only">Acciones</span></th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Asignación</th>
+                      <th className="px-4 py-3.5">Expediente</th>
+                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredProspects.map((p) => {
                       const hasAfore = p.documents.some((d) => d.file_type === "AFORE");
                       const hasImss = p.documents.some((d) => d.file_type === "IMSS");
+                      const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
+                      const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
+                      const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group">
+                          {/* Prospecto: nombre + NSS/CURP + tel consolidados */}
+                          <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div className={`h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 transition-all ${
-                                isAM 
+                              <div className={`h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 shrink-0 transition-all ${
+                                isAM
                                   ? "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500 dark:group-hover:text-blue-400"
                                   : "group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-950/20 group-hover:text-emerald-500 dark:group-hover:text-emerald-400"
                               }`}>
                                 {p.full_name.charAt(0)}
                               </div>
-                              <div>
+                              <div className="min-w-0">
                                 <Link
                                   href={`/prospectos/${p.id}`}
-                                  className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 block hover:underline leading-tight ${
+                                  className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 block hover:underline leading-tight truncate max-w-[220px] ${
                                     isAM ? "hover:text-blue-600 dark:hover:text-blue-400" : "hover:text-emerald-600 dark:hover:text-emerald-400"
                                   }`}
                                 >
                                   {p.full_name}
                                 </Link>
-                                <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none">
-                                  Tel: {p.phone}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                                  <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">{p.nss}</span>
+                                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                                  <span>Tel {p.phone}</span>
+                                </div>
+                                <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-slate-600 dark:text-slate-400">
-                            <div>
-                              <span>NSS: {p.nss}</span>
-                              <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wide mt-0.5">CURP: {p.curp}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{p.aliado_name || "Asesor Comercial"}</span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400">
-                              {(() => {
-                                const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
-                                if (!allyProfile) return "Sin Líder";
-                                const leaders = profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id));
-                                return leaders.length > 0
-                                  ? leaders.map((prof) => prof.full_name).join(", ")
-                                  : "Sin Líder";
-                              })()}
+                          {/* Asignación: aliado + líder */}
+                          <td className="px-4 py-3.5">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
+                            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">
+                              Líder: {leaderNames}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          {/* Expediente */}
+                          <td className="px-4 py-3.5">
                             <div className="flex items-center gap-1.5">
-                              {hasAfore ? (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold border border-emerald-100 dark:border-emerald-850">
-                                  AFORE
-                                </span>
-                              ) : (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/20 text-red-500 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
-                                  No AFORE
-                                </span>
-                              )}
-                              {hasImss ? (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold border border-emerald-100 dark:border-emerald-850">
-                                  IMSS
-                                </span>
-                              ) : (
-                                <span className="inline-flex px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/20 text-red-500 dark:text-red-400 text-[9px] font-bold border border-red-100 dark:border-red-850">
-                                  No IMSS
-                                </span>
-                              )}
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${hasAfore ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${hasAfore ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />AFORE
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${hasImss ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${hasImss ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />IMSS
+                              </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col gap-1.5 min-w-[150px]">
+                          {/* Etapa · Subetapa */}
+                          <td className="px-4 py-3.5">
+                            <div className="flex flex-col gap-1.5 w-[164px]">
                               <select
                                 value={getStageAndSubStage(p.status).stage}
                                 onChange={async (e) => {
@@ -554,7 +521,7 @@ function ClientesAdminContent() {
                                   const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
                                   await handleStageChange(p.id, newStatus as any);
                                 }}
-                                className={`py-1.5 px-3 border rounded-xl text-[10px] font-black outline-none transition-all cursor-pointer dark:bg-slate-900 ${
+                                className={`py-1.5 px-2.5 border rounded-lg text-[10px] font-black outline-none transition-all cursor-pointer dark:bg-slate-900 ${
                                   isAM ? "focus:ring-1 focus:ring-blue-500" : "focus:ring-1 focus:ring-emerald-500"
                                 } ${getStageColor(p.status)}`}
                               >
@@ -580,22 +547,27 @@ function ClientesAdminContent() {
                               </select>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <Link
-                              href={`/prospectos/${p.id}`}
-                              className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-                                isAM ? "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" : "text-emerald-650 hover:text-emerald-800 dark:text-emerald-450 dark:hover:text-emerald-300"
-                              }`}
-                            >
-                              Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                            </Link>
-                            <button
-                              onClick={() => openDeleteModal(p)}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-400 dark:text-red-400 hover:text-red-650 dark:hover:text-red-300 transition-colors ml-3 p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
-                              title="Eliminar prospecto"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                          {/* Acciones */}
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border transition-all active:scale-95 ${
+                                  isAM
+                                    ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                    : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                                }`}
+                              >
+                                Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                              </Link>
+                              <button
+                                onClick={() => openDeleteModal(p)}
+                                className="inline-flex items-center justify-center h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent hover:border-red-100 dark:hover:border-red-900/40"
+                                title="Eliminar prospecto"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

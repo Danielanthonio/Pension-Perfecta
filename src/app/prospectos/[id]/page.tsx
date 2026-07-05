@@ -28,6 +28,15 @@ import {
   Copy,
   Check,
   Heart,
+  X,
+  CircleDollarSign,
+  Target,
+  Maximize2,
+  Minimize2,
+  MessageSquare,
+  Building2,
+  UserCircle2,
+  User,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
@@ -61,7 +70,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, profiles, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment } = useApp();
+  const { user, prospects, profiles, empresasMultialiado, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -247,6 +256,10 @@ export default function ProspectoDetalle() {
   const [selectedDocType, setSelectedDocType] = useState<"AFORE" | "IMSS" | null>(null);
   const [selectedDocName, setSelectedDocName] = useState<string>("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [docFullscreen, setDocFullscreen] = useState(false);
+  const [leftTab, setLeftTab] = useState<"docs" | "chat">("docs");
+  const [chatMessages, setChatMessages] = useState<{ id: string; author: string; role: string; text: string; ts: number }[]>([]);
+  const [chatInput, setChatInput] = useState("");
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
@@ -517,6 +530,38 @@ export default function ProspectoDetalle() {
   const incrementoMensual = pensionMejorada - pensionActual;
   const roiMeses = incrementoMensual > 0 ? Math.ceil(totalCredito / incrementoMensual) : 0;
   const aportacion = Math.max(0, financiamiento - aforePensionarse);
+  const cumpleSemanas = semanas >= 500;
+  const fmtMXN = (n: number) => `$${Math.round(n || 0).toLocaleString("es-MX")}`;
+
+  // Internal evaluation chat / bitácora — persisted per prospect (queda como antecedente del cliente)
+  useEffect(() => {
+    if (!prospect) return;
+    try {
+      const raw = localStorage.getItem(`pp_chat_${prospect.id}`);
+      setChatMessages(raw ? JSON.parse(raw) : []);
+    } catch {
+      setChatMessages([]);
+    }
+  }, [prospect?.id]);
+
+  const sendChat = () => {
+    const text = chatInput.trim();
+    if (!text || !prospect) return;
+    const msg = {
+      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
+      author: user?.full_name || "Usuario",
+      role: user?.role || "aliado",
+      text,
+      ts: Date.now(),
+    };
+    const next = [...chatMessages, msg];
+    setChatMessages(next);
+    try { localStorage.setItem(`pp_chat_${prospect.id}`, JSON.stringify(next)); } catch {}
+    setChatInput("");
+  };
+
+  const roleLabelShort = (r: string) => r === "director" ? "Director" : r === "account_manager" ? "Account Mgr" : "Aliado";
+  const roleAccent = (r: string) => r === "director" ? "bg-teal-500" : r === "account_manager" ? "bg-blue-500" : "bg-emerald-500";
 
   const renderCalculator = (customClassName = "lg:h-[820px] h-auto") => (
     <div className={`bg-[#070e1b] rounded-3xl border border-[#1b2b48] shadow-2xl flex flex-col transition-all overflow-hidden ${customClassName}`}>
@@ -1048,7 +1093,11 @@ export default function ProspectoDetalle() {
 
             {/* Gorgeous visual PDF display canvas */}
             {selectedDocType !== null && (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[600px] h-[500px] transition-all">
+              <>
+              {docFullscreen && (
+                <div onClick={() => setDocFullscreen(false)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in" />
+              )}
+              <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col transition-all ${docFullscreen ? "fixed inset-2 sm:inset-5 z-[60] rounded-2xl shadow-2xl h-auto" : "rounded-3xl shadow-sm lg:h-[600px] h-[500px]"}`}>
                 {/* PDF Chrome Bar */}
                 <div className="h-11 bg-slate-800 text-slate-200 px-4 flex items-center justify-between border-b border-slate-700 shrink-0 text-xs">
                   <div className="flex items-center gap-2 font-mono truncate max-w-[150px] sm:max-w-xs text-[10px]">
@@ -1094,6 +1143,13 @@ export default function ProspectoDetalle() {
                     >
                       <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     </button>
+                    <button
+                      onClick={() => setDocFullscreen((v) => !v)}
+                      className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
+                      title={docFullscreen ? "Reducir vista" : "Ampliar documento"}
+                    >
+                      {docFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                    </button>
                   </div>
                 </div>
 
@@ -1109,8 +1165,8 @@ export default function ProspectoDetalle() {
                     </div>
                   ) : realFileData ? (
                     realFileData.startsWith("data:application/pdf") || realFileData.startsWith("http") ? (
-                      <div 
-                        className="w-full bg-white dark:bg-slate-900 shadow-2xl border border-slate-350 dark:border-slate-800 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[500px]"
+                      <div
+                        className={`w-full bg-white dark:bg-slate-900 shadow-2xl border border-slate-350 dark:border-slate-800 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top ${docFullscreen ? "h-[calc(100vh-150px)]" : "h-[500px]"}`}
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <iframe
@@ -1234,6 +1290,7 @@ export default function ProspectoDetalle() {
                   )}
                 </div>
               </div>
+              </>
             )}
           </div>
 
@@ -1835,77 +1892,218 @@ export default function ProspectoDetalle() {
         </div>
       </div>
 
-      {/* Main Core Layout: 3 Columns Split */}
-      <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
-        
-        {/* Columna Izquierda: Repositorio de Archivos B2B (~19%) */}
-        <div className="w-full lg:w-[19%] flex flex-col shrink-0">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[350px] transition-all">
-            {/* Header info */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex flex-col gap-1 flex-shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">Repositorio</span>
-              <span className="text-[9px] text-indigo-600 font-black tracking-wider uppercase">Archivos B2B</span>
+      {/* Antecedentes: cadena comercial y trazabilidad */}
+      {(() => {
+        const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
+        const amId = aliadoProfile?.account_manager_id || null;
+        const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
+        const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
+        const empresa = prospect.empresa_multialiado_id ? empresasMultialiado.find((e) => e.id === prospect.empresa_multialiado_id) : null;
+        const created = new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+        const nodes = [
+          { label: "Cliente", name: prospect.full_name, sub: `NSS ${prospect.nss}`, Icon: UserCircle2,
+            wrap: "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 ring-indigo-500/15" },
+          { label: "Aliado que lo creó", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B",
+            sub: aliadoProfile?.aliado_tipo === "lider" ? "Líder comercial" : "Asesor B2B", Icon: User,
+            wrap: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 ring-emerald-500/15" },
+          { label: "Account Manager", name: amProfile?.full_name || "Gestión directa", sub: amProfile ? "Soporte B2B y dictámenes" : "Sin AM asignado", Icon: ShieldCheck,
+            wrap: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-blue-500/15" },
+          { label: empresa ? "Líder / Empresa" : "Líder asignado", name: leaders.length ? leaders.map((l) => l.full_name).join(", ") : "Sin líder",
+            sub: empresa?.nombre || (leaders.length ? "Estructura de liderazgo" : "Gestión individual"), Icon: Building2,
+            wrap: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 ring-teal-500/15" },
+        ];
+        return (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-900 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <ShieldCheck className="h-4 w-4" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Antecedentes del expediente</h3>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Cadena comercial y trazabilidad · Creado {created}</p>
+              </div>
             </div>
-
-            {/* Left pane: File folders */}
-            <div className="flex-1 p-3.5 space-y-3 bg-slate-50/50 overflow-y-auto">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1 px-1">
-                Documentos Enviados
-              </span>
-              
-              {prospect.documents.map((doc) => {
-                const isActive = selectedDoc?.id === doc.id;
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {nodes.map((n, i) => {
+                const Ico = n.Icon;
                 return (
-                  <button
-                    key={doc.id}
-                    onClick={() => {
-                      setSelectedDoc(doc);
-                      setSelectedDocType(doc.file_type as any);
-                      setSelectedDocName(doc.file_name);
-                    }}
-                    className={`w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-1.5 active:scale-97 transform ${
-                      isActive
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/10"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileText className={`h-4.5 w-4.5 ${isActive ? "text-white" : "text-slate-400"}`} />
-                      <span className="text-[9px] font-black uppercase tracking-wider">
-                        Expediente {doc.file_type}
-                      </span>
+                  <div key={i} className="relative rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 p-3.5 flex items-start gap-3">
+                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-inset ${n.wrap}`}>
+                      <Ico className="h-4 w-4" strokeWidth={2.1} />
                     </div>
-                    <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
-                      {doc.file_name}
-                    </span>
-                    <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 pt-1.5 w-full text-left">
-                      <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
-                        Por: {(() => {
-                          const uploader = profiles.find(p => p.id === doc.uploaded_by);
-                          if (uploader) return uploader.full_name;
-                          return doc.uploaded_by === user?.id ? user?.full_name : "Sistema";
-                        })()}
-                      </span>
-                      <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
-                        Subido: {new Date(doc.uploaded_at).toLocaleDateString()}
-                      </span>
+                    <div className="min-w-0">
+                      <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 leading-none">{n.label}</span>
+                      <span className="block text-xs font-black text-slate-800 dark:text-white mt-1.5 truncate leading-tight" title={n.name}>{n.name}</span>
+                      <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5 truncate">{n.sub}</span>
                     </div>
-                  </button>
+                    {i < nodes.length - 1 && (
+                      <ChevronRight className="hidden lg:block h-4 w-4 text-slate-300 dark:text-slate-700 absolute -right-[11px] top-1/2 -translate-y-1/2 z-10" strokeWidth={2.5} />
+                    )}
+                  </div>
                 );
               })}
-
-              {prospect.documents.length === 0 && (
-                <div className="text-center py-8 text-slate-400 text-xs font-semibold">
-                  No se adjuntaron expedientes.
-                </div>
-              )}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Main Core Layout: 3 Columns Split */}
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
+
+        {/* Columna Izquierda: Documentos + Bitácora de evaluación (~21%) */}
+        <div className="w-full lg:w-[21%] flex flex-col shrink-0">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[440px] transition-all">
+            {/* Tabs: Documentos / Bitácora */}
+            <div className="flex items-stretch gap-1.5 p-1.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+              <button
+                onClick={() => setLeftTab("docs")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
+                  leftTab === "docs"
+                    ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" /> Docs
+              </button>
+              <button
+                onClick={() => setLeftTab("chat")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
+                  leftTab === "chat"
+                    ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+              >
+                <MessageSquare className="h-3.5 w-3.5" /> Bitácora
+                {chatMessages.length > 0 && (
+                  <span className="min-w-[16px] px-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] font-black leading-none tabular-nums">{chatMessages.length}</span>
+                )}
+              </button>
+            </div>
+
+            {leftTab === "docs" ? (
+              /* Documentos */
+              <div className="flex-1 p-3.5 space-y-3 bg-slate-50/50 dark:bg-slate-950/20 overflow-y-auto no-scrollbar">
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest block mb-1 px-1">
+                  Documentos Enviados
+                </span>
+                {prospect.documents.map((doc) => {
+                  const isActive = selectedDoc?.id === doc.id;
+                  return (
+                    <button
+                      key={doc.id}
+                      onClick={() => {
+                        setSelectedDoc(doc);
+                        setSelectedDocType(doc.file_type as any);
+                        setSelectedDocName(doc.file_name);
+                      }}
+                      className={`w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-1.5 active:scale-[0.97] transform ${
+                        isActive
+                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/10"
+                          : "bg-white dark:bg-slate-850/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+                        <span className="text-[9px] font-black uppercase tracking-wider">
+                          Expediente {doc.file_type}
+                        </span>
+                      </div>
+                      <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
+                        {doc.file_name}
+                      </span>
+                      <div className="flex flex-col gap-0.5 mt-1 border-t border-white/10 pt-1.5 w-full text-left">
+                        <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                          Por: {(() => {
+                            const uploader = profiles.find(p => p.id === doc.uploaded_by);
+                            if (uploader) return uploader.full_name;
+                            return doc.uploaded_by === user?.id ? user?.full_name : "Sistema";
+                          })()}
+                        </span>
+                        <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                          Subido: {new Date(doc.uploaded_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+                {prospect.documents.length === 0 && (
+                  <div className="text-center py-8 text-slate-400 text-xs font-semibold">
+                    No se adjuntaron expedientes.
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Bitácora / Chat interno de evaluación */
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3.5 bg-slate-50/40 dark:bg-slate-950/20 no-scrollbar">
+                  {chatMessages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center px-3 py-10 text-slate-400 dark:text-slate-500">
+                      <div className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                        <MessageSquare className="h-5 w-5" />
+                      </div>
+                      <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sin mensajes aún</p>
+                      <p className="text-[10px] font-medium mt-1 leading-relaxed">Inicia la bitácora de evaluación. Cada mensaje queda como antecedente del cliente.</p>
+                    </div>
+                  ) : (
+                    chatMessages.map((m) => {
+                      const mine = m.author === user?.full_name;
+                      return (
+                        <div key={m.id} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`h-1.5 w-1.5 rounded-full ${roleAccent(m.role)}`} />
+                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 truncate max-w-[90px]">{mine ? "Tú" : m.author}</span>
+                            <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{roleLabelShort(m.role)}</span>
+                            <span className="ml-auto text-[8px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums shrink-0">
+                              {new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <div className="rounded-2xl rounded-tl-sm bg-white dark:bg-slate-850/70 border border-slate-150 dark:border-slate-800 px-3 py-2 text-[11px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words shadow-sm">
+                            {m.text}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendChat();
+                        }
+                      }}
+                      rows={1}
+                      placeholder="Escribe un mensaje…"
+                      className="flex-1 resize-none bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2 text-[11px] font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all max-h-24"
+                    />
+                    <button
+                      onClick={sendChat}
+                      disabled={!chatInput.trim()}
+                      className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+                      title="Enviar (Enter)"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-[8px] text-slate-400 dark:text-slate-600 font-semibold mt-1.5 px-1 leading-tight">
+                    Queda registrado en el historial de antecedentes del cliente.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Columna Central: Visor PDF Grande (~48%) */}
-        <div className="w-full lg:w-[48%] flex flex-col shrink-0">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[550px] transition-all">
+        {/* Columna Central: Visor PDF Grande (~46%) */}
+        <div className="w-full lg:w-[46%] flex flex-col shrink-0">
+          {docFullscreen && selectedDocType !== null && (
+            <div onClick={() => setDocFullscreen(false)} className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 animate-fade-in" />
+          )}
+          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col transition-all ${docFullscreen && selectedDocType !== null ? "fixed inset-2 sm:inset-5 z-[60] rounded-2xl shadow-2xl h-auto" : "rounded-3xl shadow-sm lg:h-[800px] h-[550px]"}`}>
             {selectedDocType === null ? (
               <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
                 <div className="text-center max-w-[280px] space-y-4 text-slate-400">
@@ -1988,6 +2186,13 @@ export default function ProspectoDetalle() {
                     >
                       <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                     </button>
+                    <button
+                      onClick={() => setDocFullscreen((v) => !v)}
+                      className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-300 hover:text-white"
+                      title={docFullscreen ? "Reducir vista" : "Ampliar documento"}
+                    >
+                      {docFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                    </button>
                     <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-black uppercase tracking-wider border border-indigo-500/20 leading-none">
                       Secure PDF
                     </span>
@@ -2006,8 +2211,8 @@ export default function ProspectoDetalle() {
                     </div>
                   ) : realFileData ? (
                     realFileData.startsWith("data:application/pdf") || realFileData.startsWith("http") ? (
-                      <div 
-                        className="w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top h-[690px]"
+                      <div
+                        className={`w-full bg-white shadow-2xl border border-slate-350 rounded-lg overflow-hidden flex flex-col transition-all duration-300 transform origin-top ${docFullscreen ? "h-[calc(100vh-150px)]" : "h-[690px]"}`}
                         style={{ transform: `scale(${zoomLevel / 100})`, width: "100%", maxWidth: "100%" }}
                       >
                         <iframe
@@ -2248,65 +2453,122 @@ export default function ProspectoDetalle() {
 
       {/* Sticky Bottom Actions Bar (Matches reference design) */}
       {(user?.role === "director" || user?.role === "account_manager") && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 py-5.5 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] rounded-t-[36px] z-40">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-[0_-12px_40px_rgba(15,23,42,0.10)] dark:shadow-[0_-12px_40px_rgba(0,0,0,0.55)]">
+          <div className="max-w-[1700px] mx-auto px-4 sm:px-8 py-3.5">
           {isApproved && !isEditingApproved ? (
-            <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 shadow-sm">
-                <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
-                <div>
-                  <h4 className="text-xs font-black text-slate-800">Expediente Aprobado</h4>
-                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">El dictamen Ley 73 ya ha sido emitido y notificado al aliado comercial.</p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 w-full">
+              <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                <div className="h-11 w-11 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/20">
+                  <CheckCircle className="h-5 w-5" strokeWidth={2.4} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-black text-slate-800 dark:text-white tracking-tight">Dictamen emitido · Expediente aprobado</h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5 truncate">
+                    Financiamiento {fmtMXN(totalCredito)} · Pensión estimada {fmtMXN(pensionMejorada)}/mes · Notificado al aliado comercial.
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsEditingApproved(true)}
-                className="py-3 px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all transform active:translate-y-[1px] shadow hover:-translate-y-[1px]"
+                className="py-3 px-6 bg-slate-800 hover:bg-slate-900 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-900 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-sm shrink-0"
               >
                 Cambiar decisión
               </button>
             </div>
           ) : (
-            <div className="max-w-[1700px] mx-auto space-y-3 w-full animate-fade-in">
-              {isEditingApproved && (
-                <div className="flex justify-end pr-2">
-                  <button 
-                    onClick={() => setIsEditingApproved(false)}
-                    className="text-[10px] text-slate-400 hover:text-slate-700 font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors"
-                  >
-                    ✕ Cancelar edición
-                  </button>
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4 w-full animate-fade-in">
+              {/* LEFT: Executive dictamen summary ribbon */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em] flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${cumpleSemanas ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    Resumen del dictamen
+                  </span>
+                  {isEditingApproved && (
+                    <button
+                      onClick={() => setIsEditingApproved(false)}
+                      className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                    >
+                      <X className="h-3 w-3" /> Cancelar edición
+                    </button>
+                  )}
                 </div>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full">
+                <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
+                  {/* Semanas + requisito */}
+                  <div className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 border shrink-0 ${cumpleSemanas ? "bg-emerald-50 dark:bg-emerald-950/25 border-emerald-100 dark:border-emerald-900/40" : "bg-rose-50 dark:bg-rose-950/25 border-rose-100 dark:border-rose-900/40"}`}>
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${cumpleSemanas ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
+                      {cumpleSemanas ? <CheckCircle className="h-4 w-4" strokeWidth={2.5} /> : <AlertCircle className="h-4 w-4" strokeWidth={2.5} />}
+                    </div>
+                    <div className="leading-none">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Semanas</span>
+                      <span className="block text-sm font-black text-slate-800 dark:text-white tabular-nums mt-0.5">{semanas} <span className={`text-[9px] font-bold ${cumpleSemanas ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{cumpleSemanas ? "· Cumple" : "· Incompleto"}</span></span>
+                    </div>
+                  </div>
+                  {/* Financiamiento total */}
+                  <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-2 border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/40 shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-500/12 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                      <CircleDollarSign className="h-4 w-4" strokeWidth={2.2} />
+                    </div>
+                    <div className="leading-none">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Financiamiento</span>
+                      <span className="block text-sm font-black text-slate-800 dark:text-white tabular-nums mt-0.5">{fmtMXN(totalCredito)}</span>
+                    </div>
+                  </div>
+                  {/* Pensión estimada */}
+                  <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-2 border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 shrink-0">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <Heart className="h-4 w-4" strokeWidth={2.2} />
+                    </div>
+                    <div className="leading-none">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Pensión estimada</span>
+                      <span className="block text-sm font-black text-emerald-700 dark:text-emerald-300 tabular-nums mt-0.5">{fmtMXN(pensionMejorada)}<span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">/mes</span></span>
+                    </div>
+                  </div>
+                  {/* ROI */}
+                  {roiMeses > 0 && (
+                    <div className="hidden xl:flex items-center gap-2.5 rounded-xl px-3.5 py-2 border border-slate-150 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/40 shrink-0">
+                      <div className="h-8 w-8 rounded-lg bg-amber-500/12 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <Target className="h-4 w-4" strokeWidth={2.2} />
+                      </div>
+                      <div className="leading-none">
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Recuperación</span>
+                        <span className="block text-sm font-black text-slate-800 dark:text-white tabular-nums mt-0.5">{roiMeses} <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">meses</span></span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT: Decision buttons */}
+              <div className="flex items-center gap-2.5 shrink-0 lg:border-l lg:border-slate-200 lg:dark:border-slate-800 lg:pl-4">
                 {/* Rechazar */}
                 <button
                   onClick={() => setShowRejectionModal(true)}
-                  className="w-full py-4.5 px-6 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-650 hover:to-rose-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-red-800 flex items-center justify-center gap-2.5 shadow-md shadow-red-500/25 active:shadow-sm"
+                  className="flex-1 lg:flex-none py-3.5 px-4 lg:px-5 bg-white dark:bg-slate-800/60 text-red-600 dark:text-red-400 border-2 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-300 dark:hover:border-red-800 rounded-2xl text-xs font-extrabold uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-2"
                 >
-                  <XCircle className="h-5 w-5 stroke-[2.5]" />
+                  <XCircle className="h-5 w-5 stroke-[2.4]" />
                   Rechazar
                 </button>
-                
                 {/* Condicionar */}
                 <button
                   onClick={() => setShowConditionModal(true)}
-                  className="w-full py-4.5 px-6 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-amber-700 flex items-center justify-center gap-2.5 shadow-md shadow-amber-500/25 active:shadow-sm"
+                  className="flex-1 lg:flex-none py-3.5 px-4 lg:px-5 bg-white dark:bg-slate-800/60 text-amber-700 dark:text-amber-400 border-2 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:border-amber-300 dark:hover:border-amber-800 rounded-2xl text-xs font-extrabold uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-2"
                 >
-                  <Info className="h-5 w-5 stroke-[2.5]" />
+                  <Info className="h-5 w-5 stroke-[2.4]" />
                   Condicionar
                 </button>
-
                 {/* Aprobar */}
                 <button
                   onClick={() => setShowApprovalModal(true)}
-                  className="w-full py-4.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-650 hover:to-teal-700 text-white rounded-2xl text-xs sm:text-sm font-extrabold uppercase tracking-widest transition-all transform active:translate-y-[2px] active:border-b-2 hover:-translate-y-[1px] border-b-4 border-emerald-800 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-500/30 active:shadow-sm"
+                  className="flex-[1.4] lg:flex-none py-3.5 px-5 lg:px-8 bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-2xl text-xs font-extrabold uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40 ring-1 ring-inset ring-white/10"
                 >
                   <CheckCircle className="h-5 w-5 stroke-[2.5]" />
-                  Aprobar
+                  Aprobar dictamen
                 </button>
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 
