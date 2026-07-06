@@ -258,7 +258,6 @@ export default function ProspectoDetalle() {
   const [selectedDocName, setSelectedDocName] = useState<string>("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [docFullscreen, setDocFullscreen] = useState(false);
-  const [leftTab, setLeftTab] = useState<"docs" | "chat">("docs");
   const [chatMessages, setChatMessages] = useState<{ id: string; author: string; role: string; text: string; ts: number; recipientName?: string | null; recipientRole?: string | null }[]>([]);
   const [chatInput, setChatInput] = useState("");
   // Directed bitácora: to whom this message is addressed ("all" = seguimiento general).
@@ -786,6 +785,46 @@ export default function ProspectoDetalle() {
         </p>
       </div>
     </div>
+  );
+
+  // Bitácora como widget flotante (botón siempre visible + ventana emergente).
+  // Reutilizado por aliado, director y account manager para una experiencia idéntica.
+  const renderFloatingBitacora = () => (
+    <>
+      {chatOpen && (
+        <div className="fixed z-50 inset-x-3 bottom-24 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[380px] h-[68vh] sm:h-[560px] max-h-[calc(100vh-140px)] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600">
+            <div className="h-8 w-8 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
+              <MessageSquare className="h-4 w-4" strokeWidth={2.2} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-black text-white tracking-tight leading-none">Bitácora del cliente</h3>
+              <p className="text-[10px] text-white/70 font-semibold mt-1 leading-none">Seguimiento con la cadena comercial</p>
+            </div>
+            <button
+              onClick={() => setChatOpen(false)}
+              className="h-8 w-8 rounded-lg text-white/80 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors shrink-0"
+              title="Cerrar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {renderBitacora()}
+        </div>
+      )}
+      <button
+        onClick={() => setChatOpen((o) => !o)}
+        className="fixed z-50 right-5 bottom-5 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
+        title="Bitácora del cliente"
+      >
+        {chatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
+        {!chatOpen && chatMessages.length > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-900 tabular-nums">
+            {chatMessages.length}
+          </span>
+        )}
+      </button>
+    </>
   );
 
   const renderCalculator = (customClassName = "lg:h-[820px] h-auto") => (
@@ -1755,39 +1794,7 @@ export default function ProspectoDetalle() {
         </div>
 
         {/* Bitácora del cliente — botón flotante + ventana emergente (siempre accesible) */}
-        {chatOpen && (
-          <div className="fixed z-50 inset-x-3 bottom-24 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[380px] h-[68vh] sm:h-[560px] max-h-[calc(100vh-140px)] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600">
-              <div className="h-8 w-8 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
-                <MessageSquare className="h-4 w-4" strokeWidth={2.2} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-black text-white tracking-tight leading-none">Bitácora del cliente</h3>
-                <p className="text-[10px] text-white/70 font-semibold mt-1 leading-none">Seguimiento con tu Account Manager y Dirección</p>
-              </div>
-              <button
-                onClick={() => setChatOpen(false)}
-                className="h-8 w-8 rounded-lg text-white/80 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors shrink-0"
-                title="Cerrar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {renderBitacora()}
-          </div>
-        )}
-        <button
-          onClick={() => setChatOpen((o) => !o)}
-          className="fixed z-50 right-5 bottom-5 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
-          title="Bitácora del cliente"
-        >
-          {chatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-          {!chatOpen && chatMessages.length > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-900 tabular-nums">
-              {chatMessages.length}
-            </span>
-          )}
-        </button>
+        {renderFloatingBitacora()}
 
         {/* Calculator Modal */}
         {showCalculatorModal && (
@@ -2213,36 +2220,17 @@ export default function ProspectoDetalle() {
         {/* Columna Izquierda: Documentos + Bitácora de evaluación (~21%) */}
         <div className="w-full lg:w-[21%] flex flex-col shrink-0">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col lg:h-[800px] h-[440px] transition-all">
-            {/* Tabs: Documentos / Bitácora */}
-            <div className="flex items-stretch gap-1.5 p-1.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
-              <button
-                onClick={() => setLeftTab("docs")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
-                  leftTab === "docs"
-                    ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" /> Docs
-              </button>
-              <button
-                onClick={() => setLeftTab("chat")}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${
-                  leftTab === "chat"
-                    ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                }`}
-              >
-                <MessageSquare className="h-3.5 w-3.5" /> Bitácora
-                {chatMessages.length > 0 && (
-                  <span className="min-w-[16px] px-1 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[8px] font-black leading-none tabular-nums">{chatMessages.length}</span>
-                )}
-              </button>
+            {/* Encabezado del panel de documentos (la bitácora ahora es la ventana emergente flotante) */}
+            <div className="flex items-center gap-2 px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+              <FileText className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+              <span className="text-[10px] font-black uppercase tracking-wide text-slate-700 dark:text-slate-200">Documentos</span>
+              {prospect.documents.length > 0 && (
+                <span className="ml-auto min-w-[16px] px-1 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[8px] font-black leading-none tabular-nums">{prospect.documents.length}</span>
+              )}
             </div>
 
-            {leftTab === "docs" ? (
-              /* Documentos */
-              <div className="flex-1 p-3.5 space-y-3 bg-slate-50/50 dark:bg-slate-950/20 overflow-y-auto no-scrollbar">
+            {/* Documentos */}
+            <div className="flex-1 p-3.5 space-y-3 bg-slate-50/50 dark:bg-slate-950/20 overflow-y-auto no-scrollbar">
                 <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest block mb-1 px-1">
                   Documentos Enviados
                 </span>
@@ -2291,11 +2279,7 @@ export default function ProspectoDetalle() {
                     No se adjuntaron expedientes.
                   </div>
                 )}
-              </div>
-            ) : (
-              /* Bitácora / seguimiento del cliente (compositor con selector "Para:") */
-              renderBitacora()
-            )}
+            </div>
           </div>
         </div>
 
@@ -3126,6 +3110,9 @@ export default function ProspectoDetalle() {
 
       {/* User Settings Modal */}
       <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* Bitácora del cliente — botón flotante + ventana emergente (igual que el aliado) */}
+      {renderFloatingBitacora()}
 
       {/* Audit Modal (Creditia report) */}
       {auditOpen && auditResult && (
