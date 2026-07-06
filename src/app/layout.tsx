@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppContextProvider } from "@/utils/context/AppContext";
 import ToastSimulator from "@/components/ToastSimulator";
+import GlobalChat from "@/components/GlobalChat";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({
         <AppContextProvider>
           {children}
           <ToastSimulator />
+          <GlobalChat />
         </AppContextProvider>
       </body>
     </html>

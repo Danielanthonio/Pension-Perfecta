@@ -137,6 +137,7 @@ interface AppContextType {
   invitationCodes: InvitationCode[];
   notifications: NotificationItem[];
   profiles: UserProfile[];
+  messagingContacts: UserProfile[];
   toast: ToastMessage | null;
   isDemoMode: boolean;
   isProvisionalSession: boolean;
@@ -3865,6 +3866,24 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     return [];
   }, [user, profiles]);
 
+  // Contactos del chat general (mensajería directa). Se computa del `profiles` crudo (no del
+  // filtrado `exposedProfiles`) para poder incluir a la dirección, con la que todos pueden
+  // hablar. Regla: aliado ↔ su AM + directores; AM ↔ sus aliados + directores; director ↔ todos.
+  // En producción, que un aliado/AM pueda "ver" a la dirección requiere la política RLS aditiva
+  // de la migración 20260706000001 (sin ella, el fetch de profiles no los devuelve).
+  const messagingContacts = React.useMemo(() => {
+    if (!user) return [] as UserProfile[];
+    const others = profiles.filter(p => p.id !== user.id && p.is_active !== false);
+    if (user.role === "director") return others;
+    if (user.role === "account_manager") {
+      return others.filter(p => (p.role === "aliado" && p.account_manager_id === user.id) || p.role === "director");
+    }
+    if (user.role === "aliado") {
+      return others.filter(p => p.id === user.account_manager_id || p.role === "director");
+    }
+    return [] as UserProfile[];
+  }, [user, profiles]);
+
   const exposedProspects = React.useMemo(() => {
     if (!user) return [];
     if (user.role === "director") return prospects;
@@ -3899,6 +3918,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         invitationCodes,
         notifications,
         profiles: exposedProfiles,
+        messagingContacts,
         toast,
         isDemoMode,
         isProvisionalSession,
