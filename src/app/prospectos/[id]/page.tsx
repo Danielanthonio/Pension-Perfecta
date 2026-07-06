@@ -35,7 +35,6 @@ import {
   Maximize2,
   Minimize2,
   Building2,
-  UserCircle2,
   User,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -572,7 +571,7 @@ export default function ProspectoDetalle() {
 
   // Fechas clave del proyecto (agenda, firma carta, análisis de riesgo, cerrada ganada,
   // pagada/cerrada) tomadas del historial de estados. Reutilizado por aliado, AM y director.
-  const renderKeyDates = () => {
+  const renderKeyDates = (variant: "vertical" | "horizontal" = "vertical", bare = false) => {
     if (!prospect) return null;
     const milestones = [
       { status: "asesoria_agendada", label: "Agenda del proyecto" },
@@ -595,17 +594,87 @@ export default function ProspectoDetalle() {
         return { label: m.label, date, state };
       }),
     ];
+    const N = rows.length;
+    // Índice más avanzado alcanzado (done o en curso), para el largo de la barra de progreso.
+    const reached = rows.reduce((acc, r, i) => (r.state !== "pending" ? i : acc), 0);
+
+    const header = (
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+          <Calendar className="h-4 w-4" strokeWidth={2.2} />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Fechas clave del proyecto</h3>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Se registran solas al avanzar de etapa</p>
+        </div>
+      </div>
+    );
+
+    if (variant === "horizontal") {
+      // Centros de los nodos en columnas de igual ancho: col i -> (i+0.5)/N.
+      const edge = (0.5 / N) * 100;
+      const timeline = (
+        <div className="relative pt-1">
+          {/* Pista y progreso: de centro del primer nodo a centro del último */}
+          <div className="absolute top-[13px] h-0.5 bg-slate-200 dark:bg-slate-800" style={{ left: `${edge}%`, right: `${edge}%` }} aria-hidden="true" />
+          <div className="absolute top-[13px] h-0.5 bg-emerald-500 transition-all duration-500" style={{ left: `${edge}%`, width: `${(reached / N) * 100}%` }} aria-hidden="true" />
+          <ol className="relative grid" style={{ gridTemplateColumns: `repeat(${N}, minmax(0,1fr))` }}>
+            {rows.map((r, i) => (
+              <li key={i} className="flex flex-col items-center text-center px-1">
+                <span
+                  className={`relative z-10 h-7 w-7 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0 ${
+                    r.state === "done"
+                      ? "bg-emerald-500 border-emerald-600 text-white"
+                      : r.state === "current"
+                      ? "bg-blue-600 border-blue-700 text-white ring-4 ring-blue-500/10 dark:ring-blue-500/5 scale-110"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
+                  }`}
+                >
+                  {r.state === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : i}
+                  {r.state === "current" && (
+                    <span className="absolute inset-0 rounded-full bg-blue-500/30 animate-ping" aria-hidden="true" />
+                  )}
+                </span>
+                <span
+                  className={`mt-2 text-[9px] font-bold uppercase tracking-wide leading-tight ${
+                    r.state === "current"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : r.state === "done"
+                      ? "text-slate-700 dark:text-slate-200"
+                      : "text-slate-400 dark:text-slate-500"
+                  }`}
+                >
+                  {r.label}
+                </span>
+                <span
+                  className={`mt-1 text-[9px] font-bold tabular-nums ${
+                    r.state === "done"
+                      ? "text-slate-500 dark:text-slate-400"
+                      : r.state === "current"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-slate-300 dark:text-slate-600"
+                  }`}
+                >
+                  {r.date || (r.state === "current" ? "En curso" : "Pendiente")}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      );
+      // bare: solo la línea de tiempo, sin tarjeta ni título (se incrusta en el header).
+      if (bare) return timeline;
+      return (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+          {header}
+          {timeline}
+        </div>
+      );
+    }
+
     return (
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-        <div className="flex items-center gap-2.5 mb-4">
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Calendar className="h-4 w-4" strokeWidth={2.2} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Fechas clave del proyecto</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Se registran solas al avanzar de etapa</p>
-          </div>
-        </div>
+        {header}
         <div className="relative pl-1">
           {/* Riel vertical: los anillos de los puntos lo recortan a la altura de cada hito */}
           <div className="absolute left-[10px] top-3 bottom-3 w-0.5 -translate-x-1/2 bg-slate-200 dark:bg-slate-800" aria-hidden="true" />
@@ -1861,8 +1930,9 @@ export default function ProspectoDetalle() {
         </div>
       </div>
 
-      {/* Profile banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+      {/* Profile banner (identidad + cadena comercial integrada) */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col gap-4 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4 flex-1">
           <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center text-xl font-black shrink-0">
             {editForm.full_name ? editForm.full_name.charAt(0) : prospect.full_name.charAt(0)}
@@ -2014,67 +2084,60 @@ export default function ProspectoDetalle() {
             </button>
           )}
         </div>
-      </div>
+        </div>
 
-      {/* Antecedentes: cadena comercial y trazabilidad */}
-      {(() => {
-        const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
-        const amId = aliadoProfile?.account_manager_id || null;
-        const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
-        const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
-        const empresa = prospect.empresa_multialiado_id ? empresasMultialiado.find((e) => e.id === prospect.empresa_multialiado_id) : null;
-        const created = new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-        const nodes = [
-          { label: "Cliente", name: prospect.full_name, sub: `NSS ${prospect.nss}`, Icon: UserCircle2,
-            wrap: "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 ring-indigo-500/15" },
-          { label: "Aliado que lo creó", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B",
-            sub: aliadoProfile?.aliado_tipo === "lider" ? "Líder comercial" : "Asesor B2B", Icon: User,
-            wrap: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 ring-emerald-500/15" },
-          { label: "Account Manager", name: amProfile?.full_name || "Gestión directa", sub: amProfile ? "Soporte B2B y dictámenes" : "Sin AM asignado", Icon: ShieldCheck,
-            wrap: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-blue-500/15" },
-          { label: empresa ? "Líder / Empresa" : "Líder asignado", name: leaders.length ? leaders.map((l) => l.full_name).join(", ") : "Sin líder",
-            sub: empresa?.nombre || (leaders.length ? "Estructura de liderazgo" : "Gestión individual"), Icon: Building2,
-            wrap: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 ring-teal-500/15" },
-        ];
-        return (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-900 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <ShieldCheck className="h-4 w-4" strokeWidth={2.2} />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Antecedentes del expediente</h3>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Cadena comercial y trazabilidad · Creado {created}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {nodes.map((n, i) => {
+        {/* Cadena comercial (Aliado → Account Manager → Líder/Empresa) integrada al header.
+            El cliente ya aparece arriba, así que no se repite aquí. */}
+        {(() => {
+          const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
+          const amId = aliadoProfile?.account_manager_id || null;
+          const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
+          const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
+          const empresa = prospect.empresa_multialiado_id ? empresasMultialiado.find((e) => e.id === prospect.empresa_multialiado_id) : null;
+          const created = new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+          const chain = [
+            { label: "Aliado que lo creó", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B", Icon: User,
+              wrap: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" },
+            { label: "Account Manager", name: amProfile?.full_name || "Gestión directa", Icon: ShieldCheck,
+              wrap: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" },
+            { label: empresa ? "Líder / Empresa" : "Líder asignado",
+              name: leaders.length ? leaders.map((l) => l.full_name).join(", ") : (empresa?.nombre || "Sin líder"), Icon: Building2,
+              wrap: "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400" },
+          ];
+          return (
+            <div className="border-t border-slate-150 dark:border-slate-800 pt-4 flex flex-wrap items-center gap-x-2 gap-y-3">
+              {chain.map((n, i) => {
                 const Ico = n.Icon;
                 return (
-                  <div key={i} className="relative rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 p-3.5 flex items-start gap-3">
-                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-inset ${n.wrap}`}>
-                      <Ico className="h-4 w-4" strokeWidth={2.1} />
+                  <React.Fragment key={i}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${n.wrap}`}>
+                        <Ico className="h-4 w-4" strokeWidth={2.1} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 leading-none">{n.label}</span>
+                        <span className="block text-[11px] font-black text-slate-800 dark:text-white mt-1 truncate leading-none max-w-[240px]" title={n.name}>{n.name}</span>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <span className="block text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 leading-none">{n.label}</span>
-                      <span className="block text-xs font-black text-slate-800 dark:text-white mt-1.5 truncate leading-tight" title={n.name}>{n.name}</span>
-                      <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5 truncate">{n.sub}</span>
-                    </div>
-                    {i < nodes.length - 1 && (
-                      <ChevronRight className="hidden lg:block h-4 w-4 text-slate-300 dark:text-slate-700 absolute -right-[11px] top-1/2 -translate-y-1/2 z-10" strokeWidth={2.5} />
+                    {i < chain.length - 1 && (
+                      <ChevronRight className="h-4 w-4 text-slate-300 dark:text-slate-700 shrink-0" strokeWidth={2.5} />
                     )}
-                  </div>
+                  </React.Fragment>
                 );
               })}
+              <span className="ml-auto text-[10px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums shrink-0">Creado {created}</span>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
-      {/* Fechas clave del proyecto (agenda, firma, riesgo, ganada, pagada) */}
-      {renderKeyDates()}
+        {/* Línea de tiempo del proyecto, incrustada en el header (sin tarjeta ni título
+            aparte). Las fechas se registran solas al avanzar de etapa. */}
+        <div className="border-t border-slate-150 dark:border-slate-800 pt-5">
+          {renderKeyDates("horizontal", true)}
+        </div>
+      </div>
 
-      {/* Main Core Layout: 3 Columns Split */}
+      {/* Main Core Layout: 3 Columns Split — documentos justo después del header */}
       <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
 
         {/* Columna Izquierda: Documentos + Bitácora de evaluación (~21%) */}
