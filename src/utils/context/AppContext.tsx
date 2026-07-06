@@ -95,6 +95,7 @@ export interface Prospect {
   notes_director?: string;
   empresa_multialiado_id?: string | null;
   simulation?: Simulation;
+  sim_emitted_at?: string | null;
   documents: DocumentItem[];
   google_drive_folder?: string;
   google_drive_url?: string;
@@ -625,6 +626,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         aportacion: dbProspect.aportacion !== null ? Number(dbProspect.aportacion) : 0,
         creditoNomina: dbProspect.credito_nomina !== null ? Number(dbProspect.credito_nomina) : 0,
       } : undefined,
+      sim_emitted_at: dbProspect.sim_emitted_at || null,
       documents: (dbProspect.documents || []).map((doc: any) => ({
         id: doc.id,
         prospect_id: doc.prospect_id,
@@ -2378,6 +2380,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           notifTitle = "Expediente Rechazado ❌";
           notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
           toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
+        } else if (newStatus === "cerrado_perdido") {
+          notifTitle = "Proyecto Cerrado Perdido";
+          notifMsg = `El proyecto de ${target.full_name} se cerró como perdido. ${comments || "Sin motivo especificado."}`;
         } else if (newStatus === "pagado_comision") {
           notifTitle = "¡Comisión Liberada! 💰✨";
           notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
@@ -2393,7 +2398,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             id: `notif-${Math.random().toString(36).substr(2, 9)}`,
             title: notifTitle,
             message: notifMsg,
-            type: newStatus === "rechazado" ? "alert" : newStatus === "pagado_comision" ? "success" : "info",
+            type: newStatus === "rechazado" ? "alert" : newStatus === "cerrado_perdido" ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
             read: false,
             created_at: new Date().toISOString(),
           };
@@ -2428,6 +2433,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             notifTitle = "Expediente Rechazado ❌";
             notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
             toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
+          } else if (newStatus === "cerrado_perdido") {
+            notifTitle = "Proyecto Cerrado Perdido";
+            notifMsg = `El proyecto de ${target.full_name} se cerró como perdido. ${comments || "Sin motivo especificado."}`;
           } else if (newStatus === "pagado_comision") {
             notifTitle = "¡Comisión Liberada! 💰✨";
             notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
@@ -2443,7 +2451,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             user_id: target.aliado_id,
             title: notifTitle,
             message: notifMsg,
-            type: newStatus === "rechazado" ? "error" : newStatus === "pagado_comision" ? "success" : "info",
+            type: newStatus === "rechazado" ? "error" : newStatus === "cerrado_perdido" ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
             read: false,
           });
 
@@ -2559,6 +2567,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             ...p,
             status: newStatus,
             simulation: fullSimulation,
+            sim_emitted_at: new Date().toISOString(),
             notes_director: simulationData.comments,
             updated_at: new Date().toISOString(),
           };
@@ -2599,23 +2608,31 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       try {
-        const { error } = await supabase
+        const emittedAt = new Date().toISOString();
+        const basePayload: any = {
+          status: newStatus,
+          sim_semanas: simulationData.semanas,
+          sim_pension_actual: simulationData.pensionActual,
+          sim_pension_mejorada: simulationData.pensionMejorada,
+          sim_financiamiento: simulationData.financiamiento,
+          sim_costo_gestion: simulationData.costoGestion,
+          sim_comments: simulationData.comments,
+          notes_director: simulationData.comments,
+          afore_pensionarse: aforePensionarse,
+          aportacion: aportacion,
+          credito_nomina: creditoNomina,
+        };
+
+        let { error } = await supabase
           .from("prospects")
-          .update({
-            status: newStatus,
-            sim_semanas: simulationData.semanas,
-            sim_pension_actual: simulationData.pensionActual,
-            sim_pension_mejorada: simulationData.pensionMejorada,
-            sim_financiamiento: simulationData.financiamiento,
-            sim_costo_gestion: simulationData.costoGestion,
-            sim_comments: simulationData.comments,
-            notes_director: simulationData.comments,
-            afore_pensionarse: aforePensionarse,
-            aportacion: aportacion,
-            credito_nomina: creditoNomina,
-          })
+          .update({ ...basePayload, sim_emitted_at: emittedAt })
           .eq("id", id);
-          
+
+        if (error) {
+          // La columna sim_emitted_at puede no estar migrada aún — reintentar sin ella
+          // para que la emisión del dictamen nunca falle.
+          ({ error } = await supabase.from("prospects").update(basePayload).eq("id", id));
+        }
         if (error) throw error;
 
         setProspects((prev) =>
@@ -2625,6 +2642,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                 ...p,
                 status: newStatus,
                 simulation: fullSimulation,
+                sim_emitted_at: emittedAt,
                 notes_director: simulationData.comments,
               };
             }
@@ -3937,6 +3955,18 @@ export function useApp() {
     throw new Error("useApp must be used within an AppContextProvider");
   }
   return context;
+}
+
+// Vigencia del cálculo: los cálculos valen hasta el corte del 15 o el de fin de mes.
+// Emitido día 1–15 → vigente hasta el 15; emitido 16–fin → vigente hasta el último día del mes.
+export function getCalcValidUntil(emittedAt: string | Date | null | undefined): Date | null {
+  if (!emittedAt) return null;
+  const d = new Date(emittedAt);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  if (d.getDate() <= 15) return new Date(y, m, 15);
+  return new Date(y, m + 1, 0); // último día del mes
 }
 
 export const STAGES_LIST = [

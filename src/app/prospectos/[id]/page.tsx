@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
+import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, getCalcValidUntil, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
 import { createClient } from "@/utils/supabase/client";
 import {
   ArrowLeft,
@@ -264,8 +264,13 @@ export default function ProspectoDetalle() {
   const [chatRecipient, setChatRecipient] = useState<string>("all");
   // Aliado view: bitácora shown as a floating popup window.
   const [chatOpen, setChatOpen] = useState(false);
+  // Fechas clave por etapa (desde prospect_status_history): status -> primer timestamp.
+  const [statusDates, setStatusDates] = useState<Record<string, number>>({});
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  // Cerrado perdido (lo marca el Account Manager / Director; exige motivo)
+  const [showLostModal, setShowLostModal] = useState(false);
+  const [lostReason, setLostReason] = useState("");
 
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [realFileData, setRealFileData] = useState<string | null>(null);
@@ -623,6 +628,33 @@ export default function ProspectoDetalle() {
     loadChat();
   }, [loadChat]);
 
+  // Fechas clave por etapa: primera vez que el prospecto alcanzó cada estado.
+  const loadStatusHistory = useCallback(async () => {
+    if (!prospectId || isDemoMode) return;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("prospect_status_history")
+        .select("status, changed_at")
+        .eq("prospect_id", prospectId)
+        .order("changed_at", { ascending: true });
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => {
+        const t = new Date(r.changed_at).getTime();
+        if (map[r.status] === undefined || t < map[r.status]) map[r.status] = t;
+      });
+      setStatusDates(map);
+    } catch {
+      // Tabla no migrada aún o error transitorio — sin fechas registradas.
+      setStatusDates({});
+    }
+  }, [prospectId, isDemoMode, prospect?.status]);
+
+  useEffect(() => {
+    loadStatusHistory();
+  }, [loadStatusHistory]);
+
   // Live updates: reflect messages other participants post, in real time.
   // Safe no-op if realtime is not enabled for the table.
   useEffect(() => {
@@ -826,6 +858,61 @@ export default function ProspectoDetalle() {
       </button>
     </>
   );
+
+  // Fechas clave del proyecto (agenda, firma carta, análisis de riesgo, cerrada ganada,
+  // pagada/cerrada) tomadas del historial de estados. Reutilizado por aliado, AM y director.
+  const renderKeyDates = () => {
+    if (!prospect) return null;
+    const milestones = [
+      { status: "asesoria_agendada", label: "Agenda del proyecto", desc: "Asesoría comercial agendada" },
+      { status: "doc_proceso", label: "Firma carta de compromiso", desc: "Cliente firmó la carta de compromiso" },
+      { status: "analisis_riesgo", label: "Análisis de riesgo", desc: "Ingresó a análisis de riesgo" },
+      { status: "firma_programada", label: "Cerrada ganada", desc: "Líneas de captura pagadas" },
+      { status: "pagado_comision", label: "Pagada / cerrada", desc: "Comisión pagada" },
+    ];
+    const fmt = (t?: number) => t ? new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <Calendar className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Fechas clave del proyecto</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Trazabilidad de avance comercial</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 px-3.5 py-2.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <span className="block text-[11px] font-black text-slate-800 dark:text-white leading-tight">Proyecto creado</span>
+              <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500">Registro del prospecto</span>
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 tabular-nums shrink-0">
+              {new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          </div>
+          {milestones.map((m) => {
+            const date = fmt(statusDates[m.status]);
+            const done = !!date;
+            return (
+              <div key={m.status} className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${done ? "border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30" : "border-dashed border-slate-200 dark:border-slate-800 bg-transparent"}`}>
+                <span className={`h-2 w-2 rounded-full shrink-0 ${done ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"}`} />
+                <div className="min-w-0 flex-1">
+                  <span className={`block text-[11px] font-black leading-tight ${done ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}>{m.label}</span>
+                  <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500">{m.desc}</span>
+                </div>
+                <span className={`text-[10px] font-bold tabular-nums shrink-0 ${done ? "text-slate-500 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"}`}>
+                  {date || "Pendiente"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const renderCalculator = (customClassName = "lg:h-[820px] h-auto") => (
     <div className={`bg-[#070e1b] rounded-3xl border border-[#1b2b48] shadow-2xl flex flex-col transition-all overflow-hidden ${customClassName}`}>
@@ -1623,6 +1710,23 @@ export default function ProspectoDetalle() {
                         VER CALCULADORA
                       </button>
 
+                      {/* Vigencia del cálculo */}
+                      {(() => {
+                        const validUntil = getCalcValidUntil(prospect.sim_emitted_at || prospect.updated_at);
+                        if (!validUntil) return null;
+                        return (
+                          <div className="flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 bg-white/95 dark:bg-slate-950 border border-amber-200 dark:border-amber-900/40">
+                            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              Cálculo vigente hasta el{" "}
+                              <span className="font-black text-amber-700 dark:text-amber-300">
+                                {validUntil.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       {/* Direct scheduling button for Aliado */}
                       {prospect.status === "aprobado_listo" && (
                         <div className="bg-white/95 dark:bg-slate-900 rounded-2xl p-4 border border-indigo-150 dark:border-indigo-900/50 space-y-3 shadow-sm text-center">
@@ -1654,6 +1758,9 @@ export default function ProspectoDetalle() {
                 </div>
               );
             })()}
+
+            {/* Fechas clave del proyecto (agenda, firma, riesgo, ganada, pagada) */}
+            {renderKeyDates()}
 
             {/* Timeline Historial del Expediente */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex-1 flex flex-col">
@@ -1822,6 +1929,11 @@ export default function ProspectoDetalle() {
 
   const handleStageChange = async (newStageId: string) => {
     if (!prospect) return;
+    // Cerrar perdido exige un motivo: se abre el modal en lugar de cambiar el estado directo.
+    if (newStageId === "cerrado_perdido") {
+      setShowLostModal(true);
+      return;
+    }
     const defaultSubStage = SUB_STAGES_BY_STAGE[newStageId]?.[0] || "";
     const newStatus = getStatusFromStageAndSubStage(newStageId, defaultSubStage);
     await updateProspectStatus(prospect.id, newStatus as any, `Etapa cambiada a ${newStageId}`);
@@ -1874,6 +1986,17 @@ export default function ProspectoDetalle() {
 
     await updateProspectStatus(prospect.id, "rechazado", rejectionReason);
     setShowRejectionModal(false);
+    router.push(backPath);
+  };
+
+  const handleCloseLost = async () => {
+    if (!lostReason.trim()) {
+      alert("Por favor indica el motivo por el que se cierra perdido este proyecto.");
+      return;
+    }
+    await updateProspectStatus(prospect.id, "cerrado_perdido", `Cerrado perdido: ${lostReason.trim()}`);
+    setShowLostModal(false);
+    setLostReason("");
     router.push(backPath);
   };
 
@@ -2213,6 +2336,9 @@ export default function ProspectoDetalle() {
           </div>
         );
       })()}
+
+      {/* Fechas clave del proyecto (agenda, firma, riesgo, ganada, pagada) */}
+      {renderKeyDates()}
 
       {/* Main Core Layout: 3 Columns Split */}
       <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
@@ -2734,6 +2860,15 @@ export default function ProspectoDetalle() {
                   <XCircle className="h-5 w-5 stroke-[2.4]" />
                   Rechazar
                 </button>
+                {/* Cerrar Perdido */}
+                <button
+                  onClick={() => setShowLostModal(true)}
+                  className="flex-1 lg:flex-none py-3.5 px-4 lg:px-5 bg-white dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 rounded-2xl text-xs font-extrabold uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+                  title="El proyecto no continuará (cliente no acepta la propuesta)"
+                >
+                  <Minimize2 className="h-5 w-5 stroke-[2.4]" />
+                  Cerrar Perdido
+                </button>
                 {/* Condicionar */}
                 <button
                   onClick={() => setShowConditionModal(true)}
@@ -2893,6 +3028,54 @@ export default function ProspectoDetalle() {
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95"
               >
                 Confirmar Rechazo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cerrar Perdido modal overlay */}
+      {showLostModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 mx-4">
+            <div className="flex items-center gap-3 border-b border-slate-150 pb-3">
+              <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center border border-slate-200">
+                <Minimize2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">Cerrar proyecto como Perdido</h3>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">El proyecto se marca como no continuado. Queda registrado el motivo como antecedente.</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Motivo del cierre perdido (obligatorio)
+              </label>
+              <textarea
+                value={lostReason}
+                onChange={(e) => setLostReason(e.target.value)}
+                rows={4}
+                placeholder="Escribe el motivo (ej. El cliente no acepta la propuesta, ya no está interesado, eligió otra opción...)"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-slate-500 outline-none rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors resize-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShowLostModal(false);
+                  setLostReason("");
+                }}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCloseLost}
+                className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md shadow-slate-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95"
+              >
+                Confirmar cierre perdido
               </button>
             </div>
           </div>

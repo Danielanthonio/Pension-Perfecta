@@ -40,6 +40,8 @@ export default function GestorAliados() {
   const [selectedAlly, setSelectedAlly] = useState<UserProfile | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  // Ranking de gestión: métrica por la que se ordenan los aliados en el directorio.
+  const [rankBy, setRankBy] = useState<"ganados" | "comision" | "conversion" | "volumen">("ganados");
 
   // Get all allies dynamically from profiles list
   const allies = profiles.filter((p) => p.role === "aliado");
@@ -128,6 +130,25 @@ export default function GestorAliados() {
       leadQuality,
     };
   };
+
+  // Ranking de gestión: valor de la métrica elegida y comparador (desc) para ordenar aliados.
+  const RANK_OPTIONS: { id: "ganados" | "comision" | "conversion" | "volumen"; label: string }[] = [
+    { id: "ganados", label: "Proyectos ganados" },
+    { id: "comision", label: "Comisión / crédito" },
+    { id: "conversion", label: "Tasa de conversión" },
+    { id: "volumen", label: "Volumen de prospectos" },
+  ];
+  const rankValue = (a: UserProfile) => {
+    const m = getAllyMetrics(a);
+    switch (rankBy) {
+      case "comision": return m.comisionTotal;
+      case "conversion": return m.conversionRate;
+      case "volumen": return m.total;
+      case "ganados":
+      default: return m.financed;
+    }
+  };
+  const sortByRank = (a: UserProfile, b: UserProfile) => rankValue(b) - rankValue(a);
 
   // Filter allies list based on search term
   const filteredAllies = allies.filter(
@@ -392,17 +413,33 @@ export default function GestorAliados() {
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Directorio Comercial</span>
                 <span className="text-xs font-bold text-slate-600 mt-1 block">Supervisa y audita las métricas individuales de cada asesor comercial.</span>
               </div>
-              <div className="relative w-full sm:w-60">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Search className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar asesor..."
-                  className="pl-9 pr-4 py-2 w-full bg-white hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Ranking de gestión */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 hidden sm:block">Ordenar por</span>
+                  <select
+                    value={rankBy}
+                    onChange={(e) => setRankBy(e.target.value as typeof rankBy)}
+                    className="w-full sm:w-auto py-2 pl-3 pr-8 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-indigo-500 transition-colors shadow-sm cursor-pointer"
+                    title="Ranking de gestión: métrica por la que se ordenan los aliados"
+                  >
+                    {RANK_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="relative w-full sm:w-56">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Search className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar asesor..."
+                    className="pl-9 pr-4 py-2 w-full bg-white hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm"
+                  />
+                </div>
               </div>
             </div>
 
@@ -421,7 +458,7 @@ export default function GestorAliados() {
               <div className="p-6 space-y-8">
                 {/* 1. Category: Independientes */}
                 {(() => {
-                  const independentAllies = filteredAllies.filter(a => !a.empresa_multialiado_id);
+                  const independentAllies = filteredAllies.filter(a => !a.empresa_multialiado_id).sort(sortByRank);
                   return (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-850 pb-2">
@@ -533,13 +570,13 @@ export default function GestorAliados() {
                     const companyProfiles = filteredAllies.filter(a => a.empresa_multialiado_id === company.id);
                     if (companyProfiles.length === 0 && searchTerm) return null; // Hide empty companies when searching
 
-                    const companyLeaders = companyProfiles.filter(a => a.aliado_tipo === "lider");
+                    const companyLeaders = companyProfiles.filter(a => a.aliado_tipo === "lider").sort(sortByRank);
                     const companyAlliesOnly = companyProfiles.filter(a => a.aliado_tipo === "aliado");
-                    
+
                     // Allies with no leader in the same company
-                    const alliesWithoutLeader = companyAlliesOnly.filter(a => 
+                    const alliesWithoutLeader = companyAlliesOnly.filter(a =>
                       !a.lider_ids || a.lider_ids.length === 0 || !a.lider_ids.some(id => companyLeaders.some(l => l.id === id))
-                    );
+                    ).sort(sortByRank);
 
                     return (
                       <div key={company.id} className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-slate-900">
@@ -584,7 +621,7 @@ export default function GestorAliados() {
                                 {companyLeaders.map((leader) => {
                                   const leaderStats = getAllyMetrics(leader);
                                   const isLeaderActive = leader.is_active !== false;
-                                  const associatedAllies = companyAlliesOnly.filter(a => a.lider_ids?.includes(leader.id));
+                                  const associatedAllies = companyAlliesOnly.filter(a => a.lider_ids?.includes(leader.id)).sort(sortByRank);
 
                                   return (
                                     <React.Fragment key={leader.id}>

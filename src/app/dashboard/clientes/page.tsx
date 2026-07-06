@@ -44,6 +44,9 @@ function ClientesContent() {
 
   const searchParams = useSearchParams();
 
+  // Los aliados ya no pueden eliminar/enviar proyectos a la papelera (solo AM/Dirección).
+  const canDelete = user?.role !== "aliado";
+
   // URL Filter parameters
   const startDate = searchParams.get("desde") || "";
   const endDate = searchParams.get("hasta") || "";
@@ -403,17 +406,19 @@ function ClientesContent() {
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </Link>
-                              <button
-                                onClick={async () => {
-                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
-                                    await deleteProspect(p.id);
-                                  }
-                                }}
-                                className="inline-flex p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-650 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
-                                title="Mover a Papelera"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                      await deleteProspect(p.id);
+                                    }
+                                  }}
+                                  className="inline-flex p-2 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-650 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                  title="Mover a Papelera"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -497,17 +502,19 @@ function ClientesContent() {
                               >
                                 <CheckSquare className="h-4 w-4" />
                               </button>
-                              <button
-                                onClick={async () => {
-                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
-                                    await deleteProspect(p.id);
-                                  }
-                                }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
-                                title="Mover a Papelera"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                      await deleteProspect(p.id);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                  title="Mover a Papelera"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -600,17 +607,19 @@ function ClientesContent() {
                           >
                             Expediente <ArrowUpRight className="h-3 w-3" />
                           </Link>
-                          <button
-                            onClick={async () => {
-                              if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
-                                await deleteProspect(p.id);
-                              }
-                            }}
-                            className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
-                            title="Mover a Papelera"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={async () => {
+                                if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                  await deleteProspect(p.id);
+                                }
+                              }}
+                              className="p-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
+                              title="Mover a Papelera"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -808,17 +817,19 @@ function ClientesContent() {
                               >
                                 <FileText className="h-4 w-4" />
                               </Link>
-                              <button
-                                onClick={async () => {
-                                  if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
-                                    await deleteProspect(p.id);
-                                  }
-                                }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
-                                title="Mover a Papelera"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                      await deleteProspect(p.id);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                  title="Mover a Papelera"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

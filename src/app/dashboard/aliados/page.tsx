@@ -11,6 +11,26 @@ function AliadosContent() {
 
   const [liderAliadosData, setLiderAliadosData] = useState<any>(null);
   const [loadingLiderAliados, setLoadingLiderAliados] = useState(false);
+  // Ranking de gestión: métrica por la que se ordenan los aliados del líder.
+  const [rankBy, setRankBy] = useState<"ganados" | "comision" | "conversion" | "volumen">("ganados");
+  const RANK_OPTIONS: { id: "ganados" | "comision" | "conversion" | "volumen"; label: string }[] = [
+    { id: "ganados", label: "Proyectos ganados" },
+    { id: "comision", label: "Crédito gestionado" },
+    { id: "conversion", label: "Tasa de conversión" },
+    { id: "volumen", label: "Volumen de prospectos" },
+  ];
+  const rankValueFor = (allyId: string) => {
+    const ps = prospects.filter((p) => p.aliado_id === allyId && !isProspectDeleted(p) && !isProspectPurged(p));
+    const financed = ps.filter((p) => p.status === "pagado_comision").length;
+    const total = ps.length;
+    switch (rankBy) {
+      case "comision": return ps.reduce((s, p) => s + (p.simulation?.totalCredito || 0), 0);
+      case "conversion": return total > 0 ? Math.round((financed / total) * 100) : 0;
+      case "volumen": return total;
+      case "ganados":
+      default: return financed;
+    }
+  };
 
   useEffect(() => {
     if (user?.aliado_tipo === "lider") {
@@ -90,6 +110,19 @@ function AliadosContent() {
               Visualiza los asesores comerciales asignados bajo tu liderazgo en la empresa <strong className="text-blue-550 dark:text-blue-400">"{user.lider_grupo || "Sin Empresa"}"</strong>.
             </span>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider hidden sm:block">Ordenar por</span>
+            <select
+              value={rankBy}
+              onChange={(e) => setRankBy(e.target.value as typeof rankBy)}
+              className="py-2 pl-3 pr-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-blue-500 transition-colors shadow-sm cursor-pointer"
+              title="Ranking de gestión: métrica por la que se ordenan los aliados"
+            >
+              {RANK_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {loadingLiderAliados ? (
@@ -124,7 +157,7 @@ function AliadosContent() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-150 dark:divide-slate-850 text-xs">
-                  {liderAliadosData.aliados_asignados.map((a: any) => (
+                  {[...liderAliadosData.aliados_asignados].sort((a: any, b: any) => rankValueFor(b.id) - rankValueFor(a.id)).map((a: any) => (
                     <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
