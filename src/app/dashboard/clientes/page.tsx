@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 function ClientesContent() {
   const {
@@ -41,6 +42,7 @@ function ClientesContent() {
     isProspectDeleted,
     isProspectPurged,
     getProspectDeletedAt,
+    isDemoMode,
   } = useApp();
 
   const searchParams = useSearchParams();
@@ -68,6 +70,10 @@ function ClientesContent() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
+
+  // Fechas por etapa desde prospect_status_history: prospectId -> (status -> primer timestamp ms).
+  // El sistema las registra automáticamente en cada cambio de estado (trigger en BD).
+  const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
 
   // Get stage label
   const getStageLabel = (status: Prospect["status"]) => {
@@ -197,6 +203,66 @@ function ClientesContent() {
 
   // "Cerrado perdido" no es un rechazo: es solo un estado del cliente. Va en su propia pestaña.
   const cerradosPerdidos = filteredActive.filter((p) => p.status === "cerrado_perdido");
+
+  // Estado -> hito del stepper (paralelo a activeSteps): la fecha del cambio a cada estado.
+  const STEP_STATUSES = [
+    "asesoria_agendada", // 0 · Agenda Asesoría (la registra el sistema al agendar)
+    "doc_proceso",       // 1 · Firma Carta Compromiso
+    "analisis_riesgo",   // 2 · Análisis de Riesgo
+    "firma_programada",  // 3 · Cerrada Ganada
+    "pagado_comision",   // 4 · Pagado / Cerrado
+  ];
+  // Fecha y hora en Ciudad de México, tal como quedó registrada al cambiar de estado.
+  const fmtStepDateTime = (t?: number) =>
+    t
+      ? new Date(t).toLocaleString("es-MX", {
+          timeZone: "America/Mexico_City",
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
+
+  // Cargar el historial de fechas de los proyectos activos visibles.
+  const activeIdsKey = proyectosActivos.map((p) => p.id).sort().join(",");
+  useEffect(() => {
+    if (isDemoMode) {
+      setStatusDates({});
+      return;
+    }
+    const ids = activeIdsKey ? activeIdsKey.split(",") : [];
+    if (ids.length === 0) {
+      setStatusDates({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("prospect_status_history")
+          .select("prospect_id, status, changed_at")
+          .in("prospect_id", ids)
+          .order("changed_at", { ascending: true });
+        if (error) throw error;
+        const map: Record<string, Record<string, number>> = {};
+        (data || []).forEach((r: any) => {
+          const t = new Date(r.changed_at).getTime();
+          if (!map[r.prospect_id]) map[r.prospect_id] = {};
+          const cur = map[r.prospect_id][r.status];
+          if (cur === undefined || t < cur) map[r.prospect_id][r.status] = t;
+        });
+        if (!cancelled) setStatusDates(map);
+      } catch {
+        // Tabla no migrada aún o error transitorio — el stepper se muestra sin fechas.
+        if (!cancelled) setStatusDates({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeIdsKey, isDemoMode]);
 
   const getActiveStageIndex = (status: Prospect["status"]) => {
     switch (status) {
@@ -666,6 +732,14 @@ function ClientesContent() {
                                 >
                                   {step.label}
                                 </span>
+                                {(() => {
+                                  const dt = fmtStepDateTime(statusDates[p.id]?.[STEP_STATUSES[idx]]);
+                                  return dt ? (
+                                    <span className="text-[8px] font-semibold text-slate-400 dark:text-slate-500 mt-1 text-center hidden sm:block tabular-nums whitespace-nowrap">
+                                      {dt}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                             );
                           })}
