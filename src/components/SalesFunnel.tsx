@@ -72,47 +72,54 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     return assignedAllies.map((a) => a.id);
   }, [assignedAllies]);
 
+  // "Cerrado perdido" es SOLO un estado de cliente: no forma parte del embudo/pipeline,
+  // así que se excluye de todos los conteos del funnel (base y etapas).
+  const activeProspects = useMemo(
+    () => prospects.filter((p) => p.status !== "cerrado_perdido"),
+    [prospects]
+  );
+
   // Filter prospects dynamically based on selected funnel view
   const displayProspects = useMemo(() => {
     if (!user || user.aliado_tipo !== "lider") {
-      return prospects;
+      return activeProspects;
     }
 
     if (funnelView === "consolidated") {
       // Level 1: Leader + assigned allies
-      return prospects.filter(
+      return activeProspects.filter(
         (p) => p.aliado_id === user.id || assignedAllyIds.includes(p.aliado_id || "")
       );
     } else if (funnelView === "personal") {
       // Level 2: Only leader
-      return prospects.filter((p) => p.aliado_id === user.id);
+      return activeProspects.filter((p) => p.aliado_id === user.id);
     } else if (funnelView === "team_all") {
       // Level 2: Only assigned allies consolidated
-      return prospects.filter((p) => assignedAllyIds.includes(p.aliado_id || ""));
+      return activeProspects.filter((p) => assignedAllyIds.includes(p.aliado_id || ""));
     } else {
       // Level 3: Specific assigned ally
-      return prospects.filter((p) => p.aliado_id === funnelView);
+      return activeProspects.filter((p) => p.aliado_id === funnelView);
     }
-  }, [prospects, funnelView, user, assignedAllyIds]);
+  }, [activeProspects, funnelView, user, assignedAllyIds]);
 
-  // Count active prospects for each tree view option
+  // Count active prospects for each tree view option (también excluye cerrado_perdido)
   const ownProspectsCount = useMemo(() => {
     if (!user) return 0;
-    return prospects.filter((p) => p.aliado_id === user.id).length;
-  }, [prospects, user]);
+    return activeProspects.filter((p) => p.aliado_id === user.id).length;
+  }, [activeProspects, user]);
 
   const teamProspectsCount = useMemo(() => {
-    return prospects.filter((p) => assignedAllyIds.includes(p.aliado_id || "")).length;
-  }, [prospects, assignedAllyIds]);
+    return activeProspects.filter((p) => assignedAllyIds.includes(p.aliado_id || "")).length;
+  }, [activeProspects, assignedAllyIds]);
 
   const consolidatedProspectsCount = useMemo(() => {
     if (!user) return 0;
-    return prospects.filter((p) => p.aliado_id === user.id || assignedAllyIds.includes(p.aliado_id || "")).length;
-  }, [prospects, user, assignedAllyIds]);
+    return activeProspects.filter((p) => p.aliado_id === user.id || assignedAllyIds.includes(p.aliado_id || "")).length;
+  }, [activeProspects, user, assignedAllyIds]);
 
   const getAllyProspectsCount = useCallback((allyId: string) => {
-    return prospects.filter((p) => p.aliado_id === allyId).length;
-  }, [prospects]);
+    return activeProspects.filter((p) => p.aliado_id === allyId).length;
+  }, [activeProspects]);
 
   // 1. Filter counts according to the specific mappings using displayProspects
   const proyectosCount = displayProspects.length;
@@ -126,7 +133,7 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   ).length;
 
   const rechazadosCount = displayProspects.filter((p) =>
-    ["rechazado", "cerrado_perdido"].includes(p.status)
+    p.status === "rechazado"
   ).length;
 
   const otorgadosCount = displayProspects.filter((p) =>
