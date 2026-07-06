@@ -313,7 +313,7 @@ function ClientesContent() {
             { id: "papelera", label: "Papelera", count: filteredDeleted.length, Icon: Trash2,
               active: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
               badge: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200", dot: "bg-slate-400" },
-          ].map(({ id, label, count, Icon, active, badge, dot }) => {
+          ].filter((t) => canDelete || t.id !== "papelera").map(({ id, label, count, Icon, active, badge, dot }) => {
             const on = activeTab === id;
             return (
               <button
@@ -691,8 +691,8 @@ function ClientesContent() {
           </div>
         )}
 
-        {/* TAB 4: PAPELERA */}
-        {activeTab === "papelera" && (
+        {/* TAB 4: PAPELERA (oculta para aliados: no pueden eliminar ni gestionar la papelera) */}
+        {canDelete && activeTab === "papelera" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
