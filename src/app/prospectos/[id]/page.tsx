@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
+import { getActiveStageIndex } from "@/components/ui/projectStepper";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -574,13 +575,26 @@ export default function ProspectoDetalle() {
   const renderKeyDates = () => {
     if (!prospect) return null;
     const milestones = [
-      { status: "asesoria_agendada", label: "Agenda del proyecto", desc: "Asesoría comercial agendada" },
-      { status: "doc_proceso", label: "Firma carta de compromiso", desc: "Cliente firmó la carta de compromiso" },
-      { status: "analisis_riesgo", label: "Análisis de riesgo", desc: "Ingresó a análisis de riesgo" },
-      { status: "firma_programada", label: "Cerrada ganada", desc: "Líneas de captura pagadas" },
-      { status: "pagado_comision", label: "Pagada / cerrada", desc: "Comisión pagada" },
+      { status: "asesoria_agendada", label: "Agenda del proyecto" },
+      { status: "doc_proceso", label: "Firma carta de compromiso" },
+      { status: "analisis_riesgo", label: "Análisis de riesgo" },
+      { status: "firma_programada", label: "Cerrada ganada" },
+      { status: "pagado_comision", label: "Pagada / cerrada" },
     ];
     const fmt = (t?: number) => t ? new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
+    // Puntero al hito en curso (mismo criterio que el stepper). Se oculta en estados
+    // terminales, donde no hay un "siguiente paso" real.
+    const activeIndex = getActiveStageIndex(prospect.status);
+    const terminal = ["rechazado", "cerrado_perdido"].includes(prospect.status);
+    type RowState = "done" | "current" | "pending";
+    const rows: { label: string; date: string | null; state: RowState }[] = [
+      { label: "Proyecto creado", date: fmt(new Date(prospect.created_at).getTime()), state: "done" },
+      ...milestones.map((m, idx) => {
+        const date = fmt(statusDates[m.status]);
+        const state: RowState = date ? "done" : (!terminal && idx === activeIndex ? "current" : "pending");
+        return { label: m.label, date, state };
+      }),
+    ];
     return (
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
         <div className="flex items-center gap-2.5 mb-4">
@@ -589,36 +603,49 @@ export default function ProspectoDetalle() {
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Fechas clave del proyecto</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Trazabilidad de avance comercial</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Se registran solas al avanzar de etapa</p>
           </div>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 px-3.5 py-2.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="block text-[11px] font-black text-slate-800 dark:text-white leading-tight">Proyecto creado</span>
-              <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500">Registro del prospecto</span>
-            </div>
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 tabular-nums shrink-0">
-              {new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-          </div>
-          {milestones.map((m) => {
-            const date = fmt(statusDates[m.status]);
-            const done = !!date;
-            return (
-              <div key={m.status} className={`flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${done ? "border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30" : "border-dashed border-slate-200 dark:border-slate-800 bg-transparent"}`}>
-                <span className={`h-2 w-2 rounded-full shrink-0 ${done ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"}`} />
-                <div className="min-w-0 flex-1">
-                  <span className={`block text-[11px] font-black leading-tight ${done ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}>{m.label}</span>
-                  <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500">{m.desc}</span>
-                </div>
-                <span className={`text-[10px] font-bold tabular-nums shrink-0 ${done ? "text-slate-500 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"}`}>
-                  {date || "Pendiente"}
+        <div className="relative pl-1">
+          {/* Riel vertical: los anillos de los puntos lo recortan a la altura de cada hito */}
+          <div className="absolute left-[10px] top-3 bottom-3 w-0.5 -translate-x-1/2 bg-slate-200 dark:bg-slate-800" aria-hidden="true" />
+          <ul className="relative space-y-0.5">
+            {rows.map((r, i) => (
+              <li key={i} className="flex items-center gap-3 py-1.5">
+                <span
+                  className={`relative z-10 h-3 w-3 rounded-full ring-4 ring-white dark:ring-slate-900 shrink-0 ${
+                    r.state === "done"
+                      ? "bg-emerald-500"
+                      : r.state === "current"
+                      ? "bg-blue-600"
+                      : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  {r.state === "current" && (
+                    <span className="absolute inset-0 rounded-full bg-blue-500/40 animate-ping" aria-hidden="true" />
+                  )}
                 </span>
-              </div>
-            );
-          })}
+                <span
+                  className={`flex-1 text-[11px] font-bold leading-tight truncate ${
+                    r.state === "pending" ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-white"
+                  }`}
+                >
+                  {r.label}
+                </span>
+                <span
+                  className={`text-[10px] font-bold tabular-nums shrink-0 ${
+                    r.state === "done"
+                      ? "text-slate-500 dark:text-slate-300"
+                      : r.state === "current"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-slate-300 dark:text-slate-600"
+                  }`}
+                >
+                  {r.date || (r.state === "current" ? "En curso" : "Pendiente")}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     );
