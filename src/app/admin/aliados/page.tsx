@@ -95,11 +95,14 @@ export default function GestorAliados() {
     ).length;
 
     const financed = allyProspects.filter((p) => p.status === "pagado_comision").length;
-    const rejected = allyProspects.filter((p) => ["rechazado", "cerrado_perdido"].includes(p.status)).length;
+    const rejected = allyProspects.filter((p) => p.status === "rechazado").length;
+    // "Cerrado perdido" es solo un estado del cliente, no un rechazo ni parte del funnel.
+    const lost = allyProspects.filter((p) => p.status === "cerrado_perdido").length;
 
-    // Conversion Rates
-    const conversionRate = total > 0 ? Math.round((financed / total) * 100) : 0;
-    const approvalRate = total > 0 ? Math.round(((approved + financed) / total) * 100) : 0;
+    // Conversion Rates — el cerrado perdido no cuenta en la base de conversión.
+    const rateBase = total - lost;
+    const conversionRate = rateBase > 0 ? Math.round((financed / rateBase) * 100) : 0;
+    const approvalRate = rateBase > 0 ? Math.round(((approved + financed) / rateBase) * 100) : 0;
 
     // Commissions: $15,000 per financed, and pending for approved
     const comisionPagada = financed * 15000;
@@ -108,8 +111,8 @@ export default function GestorAliados() {
 
     // Lead quality metric
     let leadQuality: "Alta" | "Media" | "Baja" | "N/A" = "N/A";
-    if (total > 0) {
-      const positiveRate = (approved + financed) / total;
+    if (rateBase > 0) {
+      const positiveRate = (approved + financed) / rateBase;
       if (positiveRate >= 0.6) leadQuality = "Alta";
       else if (positiveRate >= 0.25) leadQuality = "Media";
       else leadQuality = "Baja";
@@ -122,6 +125,7 @@ export default function GestorAliados() {
       approved,
       financed,
       rejected,
+      lost,
       conversionRate,
       approvalRate,
       comisionPagada,
@@ -181,15 +185,18 @@ export default function GestorAliados() {
   ).length;
 
   const globalFinanced = filteredProspectsGlobal.filter((p) => p.status === "pagado_comision").length;
-  const globalRejected = filteredProspectsGlobal.filter((p) => ["rechazado", "cerrado_perdido"].includes(p.status)).length;
+  const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
+  const globalLost = filteredProspectsGlobal.filter((p) => p.status === "cerrado_perdido").length;
 
   // Global Averages
   const avgProspectsPerAlly = allies.length > 0 ? (totalProspectsSent / allies.length).toFixed(1) : "0.0";
   const avgApprovalsPerAlly = allies.length > 0 ? ((globalApproved + globalFinanced) / allies.length).toFixed(1) : "0.0";
   const avgFinancementsPerAlly = allies.length > 0 ? (globalFinanced / allies.length).toFixed(1) : "0.0";
-  
-  const globalConversionRate = totalProspectsSent > 0 ? Math.round((globalFinanced / totalProspectsSent) * 100) : 0;
-  const globalApprovalRate = totalProspectsSent > 0 ? Math.round(((globalApproved + globalFinanced) / totalProspectsSent) * 100) : 0;
+
+  // El cerrado perdido no cuenta en la base de las tasas de conversión/aprobación.
+  const globalRateBase = totalProspectsSent - globalLost;
+  const globalConversionRate = globalRateBase > 0 ? Math.round((globalFinanced / globalRateBase) * 100) : 0;
+  const globalApprovalRate = globalRateBase > 0 ? Math.round(((globalApproved + globalFinanced) / globalRateBase) * 100) : 0;
 
   // Rankings
   // 1. By Productivity (total leads sent)
@@ -968,7 +975,9 @@ export default function GestorAliados() {
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-150"
                                     : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
                                     ? "bg-amber-50 text-amber-700 border-amber-150"
-                                    : ["rechazado", "cerrado_perdido"].includes(p.status)
+                                    : p.status === "cerrado_perdido"
+                                    ? "bg-slate-100 text-slate-500 border-slate-200"
+                                    : p.status === "rechazado"
                                     ? "bg-rose-50 text-rose-600 border-rose-150"
                                     : "bg-indigo-50 text-indigo-600 border-indigo-150"
                                 }`}
@@ -979,7 +988,9 @@ export default function GestorAliados() {
                                   ? "Evaluación"
                                   : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
                                   ? "Condicionado"
-                                  : ["rechazado", "cerrado_perdido"].includes(p.status)
+                                  : p.status === "cerrado_perdido"
+                                  ? "Cerrado Perdido"
+                                  : p.status === "rechazado"
                                   ? "Rechazado"
                                   : "Aprobado"}
                               </span>

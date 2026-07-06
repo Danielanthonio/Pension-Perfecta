@@ -156,9 +156,8 @@ function PipelineManagerContent() {
       const condicionados = prospectsList.filter((p) =>
         ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
       ).length;
-      const rechazados = prospectsList.filter((p) =>
-        ["rechazado", "cerrado_perdido"].includes(p.status)
-      ).length;
+      // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
+      const rechazados = prospectsList.filter((p) => p.status === "rechazado").length;
 
       const approvedStatuses = [
         "aprobado_listo",

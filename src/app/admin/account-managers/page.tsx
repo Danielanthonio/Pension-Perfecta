@@ -48,9 +48,8 @@ export default function GestionAccountManagers() {
       ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
     ).length;
 
-    const rechazados = groupProspects.filter((p) =>
-      ["rechazado", "cerrado_perdido"].includes(p.status)
-    ).length;
+    // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
+    const rechazados = groupProspects.filter((p) => p.status === "rechazado").length;
 
     const otorgados = groupProspects.filter((p) => p.status === "pagado_comision").length;
 

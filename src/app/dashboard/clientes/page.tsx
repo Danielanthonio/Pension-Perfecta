@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Layers,
   XCircle,
+  MinusCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -60,7 +61,7 @@ function ClientesContent() {
 
   // Page local states
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "rechazados" | "papelera">("evaluacion");
+  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "rechazados" | "cerrados" | "papelera">("evaluacion");
 
   // States for Scheduling Modal
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -192,9 +193,10 @@ function ClientesContent() {
     (p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada"))
   );
 
-  const rechazados = filteredActive.filter((p) =>
-    ["rechazado", "cerrado_perdido"].includes(p.status)
-  );
+  const rechazados = filteredActive.filter((p) => p.status === "rechazado");
+
+  // "Cerrado perdido" no es un rechazo: es solo un estado del cliente. Va en su propia pestaña.
+  const cerradosPerdidos = filteredActive.filter((p) => p.status === "cerrado_perdido");
 
   const getActiveStageIndex = (status: Prospect["status"]) => {
     switch (status) {
@@ -310,6 +312,9 @@ function ClientesContent() {
             { id: "rechazados", label: "Rechazados", count: rechazados.length, Icon: XCircle,
               active: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50",
               badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300", dot: "bg-rose-500" },
+            { id: "cerrados", label: "Cerrados Perdidos", count: cerradosPerdidos.length, Icon: MinusCircle,
+              active: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50",
+              badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300", dot: "bg-amber-500" },
             { id: "papelera", label: "Papelera", count: filteredDeleted.length, Icon: Trash2,
               active: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
               badge: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200", dot: "bg-slate-400" },
@@ -774,7 +779,7 @@ function ClientesContent() {
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                Prospectos Rechazados o Cerrados Perdidos
+                Prospectos Rechazados
               </h3>
             </div>
 
@@ -783,7 +788,7 @@ function ClientesContent() {
                 <XCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos rechazados</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
-                  Aquí aparecerán los clientes cuyos expedientes no hayan sido aprobados o se hayan cerrado como perdidos.
+                  Aquí aparecerán los clientes cuyos expedientes no hayan sido aprobados.
                 </p>
               </div>
             ) : (
@@ -800,6 +805,79 @@ function ClientesContent() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {rechazados.map((p) => {
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                          <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
+                            {p.notes_director || <span className="text-slate-400 italic">Sin motivo especificado</span>}
+                          </td>
+                          <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <Link
+                                href={`/prospectos/${p.id}`}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
+                                title="Ver Expediente"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Link>
+                              {canDelete && (
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`¿Enviar a ${p.full_name} a la papelera por 7 días?`)) {
+                                      await deleteProspect(p.id);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
+                                  title="Mover a Papelera"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: CERRADOS PERDIDOS */}
+        {activeTab === "cerrados" && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                Prospectos Cerrados Perdidos
+              </h3>
+            </div>
+
+            {cerradosPerdidos.length === 0 ? (
+              <div className="py-16 text-center">
+                <MinusCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay clientes cerrados perdidos</h4>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                  Aquí aparecerán los clientes marcados como cerrados perdidos. Es solo un estado de seguimiento y no cuenta como rechazo.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
+                      <th className="px-5 py-3.5">Prospecto</th>
+                      <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Motivo del Cierre</th>
+                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-5 py-3.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {cerradosPerdidos.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
