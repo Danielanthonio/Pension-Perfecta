@@ -34,7 +34,6 @@ import {
   Target,
   Maximize2,
   Minimize2,
-  MessageSquare,
   Building2,
   UserCircle2,
   User,
@@ -258,12 +257,6 @@ export default function ProspectoDetalle() {
   const [selectedDocName, setSelectedDocName] = useState<string>("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [docFullscreen, setDocFullscreen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ id: string; author: string; role: string; text: string; ts: number; recipientName?: string | null; recipientRole?: string | null }[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  // Directed bitácora: to whom this message is addressed ("all" = seguimiento general).
-  const [chatRecipient, setChatRecipient] = useState<string>("all");
-  // Aliado view: bitácora shown as a floating popup window.
-  const [chatOpen, setChatOpen] = useState(false);
   // Fechas clave por etapa (desde prospect_status_history): status -> primer timestamp.
   const [statusDates, setStatusDates] = useState<Record<string, number>>({});
   const [showRejectionModal, setShowRejectionModal] = useState(false);
@@ -545,88 +538,9 @@ export default function ProspectoDetalle() {
   const cumpleSemanas = semanas >= 500;
   const fmtMXN = (n: number) => `$${Math.round(n || 0).toLocaleString("es-MX")}`;
 
-  // Internal evaluation chat / bitácora — persisted server-side in `prospect_messages`
-  // so it is shared across aliado / account manager / director and survives browser wipes.
-  // Degrades gracefully to localStorage in demo mode or if the table isn't migrated yet.
+  // El chat pasó a ser global (mensajería directa persona ↔ persona); ver
+  // src/components/GlobalChat.tsx. Aquí solo se conserva prospectId para las fechas por etapa.
   const prospectId = prospect?.id;
-
-  // Commercial chain of this prospect — the people a message can be addressed to ("Para: …").
-  // Excludes the current user (you don't send a note to yourself).
-  const bitacoraParticipants = (() => {
-    if (!prospect) return [] as { id: string; name: string; role: string; hint: string }[];
-    const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
-    const amId = aliadoProfile?.account_manager_id || null;
-    const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
-    const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
-    const directors = profiles.filter((p) => p.role === "director");
-    const seen = new Set<string>();
-    const list: { id: string; name: string; role: string; hint: string }[] = [];
-    const push = (p: any, hint: string) => {
-      if (!p || !p.id || seen.has(p.id) || p.id === user?.id) return;
-      seen.add(p.id);
-      list.push({ id: p.id, name: p.full_name, role: p.role, hint });
-    };
-    push(aliadoProfile, aliadoProfile?.aliado_tipo === "lider" ? "Líder comercial" : "Aliado");
-    push(amProfile, "Account Manager");
-    leaders.forEach((l) => push(l, "Líder"));
-    directors.forEach((d) => push(d, "Dirección"));
-    return list;
-  })();
-
-  const loadChatFromLocal = useCallback((pid: string) => {
-    try {
-      const raw = localStorage.getItem(`pp_chat_${pid}`);
-      setChatMessages(raw ? JSON.parse(raw) : []);
-    } catch {
-      setChatMessages([]);
-    }
-  }, []);
-
-  const loadChat = useCallback(async () => {
-    if (!prospectId) return;
-    if (isDemoMode) {
-      loadChatFromLocal(prospectId);
-      return;
-    }
-    try {
-      const supabase = createClient();
-      let data: any[] | null = null;
-      let error: any = null;
-      ({ data, error } = await supabase
-        .from("prospect_messages")
-        .select("id, author_name, author_role, text, created_at, recipient_name, recipient_role")
-        .eq("prospect_id", prospectId)
-        .order("created_at", { ascending: true }));
-      if (error) {
-        // recipient_* columns may not be migrated yet — retry with the base columns
-        // so the shared history still loads (don't fall back to per-browser localStorage).
-        ({ data, error } = await supabase
-          .from("prospect_messages")
-          .select("id, author_name, author_role, text, created_at")
-          .eq("prospect_id", prospectId)
-          .order("created_at", { ascending: true }));
-      }
-      if (error) throw error;
-      setChatMessages(
-        (data || []).map((m: any) => ({
-          id: m.id,
-          author: m.author_name,
-          role: m.author_role,
-          text: m.text,
-          ts: new Date(m.created_at).getTime(),
-          recipientName: m.recipient_name ?? null,
-          recipientRole: m.recipient_role ?? null,
-        }))
-      );
-    } catch {
-      // Table not migrated yet or a transient error — keep working with the local log.
-      loadChatFromLocal(prospectId);
-    }
-  }, [prospectId, isDemoMode, loadChatFromLocal]);
-
-  useEffect(() => {
-    loadChat();
-  }, [loadChat]);
 
   // Fechas clave por etapa: primera vez que el prospecto alcanzó cada estado.
   const loadStatusHistory = useCallback(async () => {
@@ -654,210 +568,6 @@ export default function ProspectoDetalle() {
   useEffect(() => {
     loadStatusHistory();
   }, [loadStatusHistory]);
-
-  // Live updates: reflect messages other participants post, in real time.
-  // Safe no-op if realtime is not enabled for the table.
-  useEffect(() => {
-    if (isDemoMode || !prospectId) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`prospect_messages_${prospectId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "prospect_messages", filter: `prospect_id=eq.${prospectId}` },
-        () => loadChat()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [prospectId, isDemoMode, loadChat]);
-
-  const persistChatLocal = (pid: string, msg: { id: string; author: string; role: string; text: string; ts: number; recipientName?: string | null; recipientRole?: string | null }) => {
-    try {
-      const raw = localStorage.getItem(`pp_chat_${pid}`);
-      const arr = raw ? JSON.parse(raw) : [];
-      localStorage.setItem(`pp_chat_${pid}`, JSON.stringify([...arr, msg]));
-    } catch {}
-  };
-
-  const sendChat = async () => {
-    const text = chatInput.trim();
-    if (!text || !prospect) return;
-    const recip = bitacoraParticipants.find((p) => p.id === chatRecipient) || null;
-    const localMsg = {
-      id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
-      author: user?.full_name || "Usuario",
-      role: user?.role || "aliado",
-      text,
-      ts: Date.now(),
-      recipientName: recip?.name ?? null,
-      recipientRole: recip?.role ?? null,
-    };
-
-    // Optimistic append + clear input for a responsive feel.
-    setChatMessages((prev) => [...prev, localMsg]);
-    setChatInput("");
-
-    if (isDemoMode) {
-      persistChatLocal(prospect.id, localMsg);
-      return;
-    }
-
-    try {
-      const supabase = createClient();
-      const basePayload = {
-        prospect_id: prospect.id,
-        author_id: user?.id ?? null,
-        author_name: user?.full_name || "Usuario",
-        author_role: user?.role || "aliado",
-        text,
-      };
-      const payload = recip
-        ? { ...basePayload, recipient_id: recip.id, recipient_name: recip.name, recipient_role: recip.role }
-        : basePayload;
-      let { error } = await supabase.from("prospect_messages").insert(payload);
-      if (error && recip) {
-        // recipient_* columns may not be migrated yet — post the message without them
-        // so the note still goes through (routing falls back to the prospect creator).
-        ({ error } = await supabase.from("prospect_messages").insert(basePayload));
-      }
-      if (error) throw error;
-      // Re-sync with canonical server ordering (and any concurrent messages).
-      loadChat();
-    } catch {
-      // Table not migrated / transient error — keep the note locally so it isn't lost.
-      persistChatLocal(prospect.id, localMsg);
-    }
-  };
-
-  const roleLabelShort = (r: string) => r === "director" ? "Director" : r === "account_manager" ? "Account Mgr" : "Aliado";
-  const roleAccent = (r: string) => r === "director" ? "bg-teal-500" : r === "account_manager" ? "bg-blue-500" : "bg-emerald-500";
-
-  // Bitácora de seguimiento: mensajes + compositor con selector "Para:".
-  // Reutilizado por la vista del aliado y la del director/account manager.
-  const renderBitacora = () => (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto p-3 space-y-3.5 bg-slate-50/40 dark:bg-slate-950/20 no-scrollbar">
-        {chatMessages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-3 py-10 text-slate-400 dark:text-slate-500">
-            <div className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
-              <MessageSquare className="h-5 w-5" />
-            </div>
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sin mensajes aún</p>
-            <p className="text-[10px] font-medium mt-1 leading-relaxed">Inicia el seguimiento del cliente. Cada mensaje queda como antecedente y puede dirigirse a una persona.</p>
-          </div>
-        ) : (
-          chatMessages.map((m) => {
-            const mine = m.author === user?.full_name;
-            return (
-              <div key={m.id} className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`h-1.5 w-1.5 rounded-full ${roleAccent(m.role)}`} />
-                  <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{mine ? "Tú" : m.author}</span>
-                  <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{roleLabelShort(m.role)}</span>
-                  {m.recipientName && (
-                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 rounded-md px-1.5 py-0.5 leading-none">
-                      → {m.recipientName}
-                    </span>
-                  )}
-                  <span className="ml-auto text-[8px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums shrink-0">
-                    {new Date(m.ts).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                </div>
-                <div className="rounded-2xl rounded-tl-sm bg-white dark:bg-slate-850/70 border border-slate-150 dark:border-slate-800 px-3 py-2 text-[11px] font-medium text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words shadow-sm">
-                  {m.text}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-      <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
-        {bitacoraParticipants.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 shrink-0">Para</span>
-            <select
-              value={chatRecipient}
-              onChange={(e) => setChatRecipient(e.target.value)}
-              className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg px-2 py-1.5 text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all cursor-pointer"
-            >
-              <option value="all">Todos · seguimiento general</option>
-              {bitacoraParticipants.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} · {p.hint}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="flex items-end gap-2">
-          <textarea
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendChat();
-              }
-            }}
-            rows={1}
-            placeholder={chatRecipient === "all" ? "Escribe un mensaje…" : `Mensaje para ${bitacoraParticipants.find((p) => p.id === chatRecipient)?.name || ""}…`}
-            className="flex-1 resize-none bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2 text-[11px] font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all max-h-24"
-          />
-          <button
-            onClick={sendChat}
-            disabled={!chatInput.trim()}
-            className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-sm shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
-            title="Enviar (Enter)"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="text-[8px] text-slate-400 dark:text-slate-600 font-semibold mt-1.5 px-1 leading-tight">
-          Queda registrado en el seguimiento del cliente. Todos en la cadena comercial pueden leerlo.
-        </p>
-      </div>
-    </div>
-  );
-
-  // Bitácora como widget flotante (botón siempre visible + ventana emergente).
-  // Reutilizado por aliado, director y account manager para una experiencia idéntica.
-  const renderFloatingBitacora = () => (
-    <>
-      {chatOpen && (
-        <div className="fixed z-50 inset-x-3 bottom-24 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[380px] h-[68vh] sm:h-[560px] max-h-[calc(100vh-140px)] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600">
-            <div className="h-8 w-8 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
-              <MessageSquare className="h-4 w-4" strokeWidth={2.2} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-black text-white tracking-tight leading-none">Bitácora del cliente</h3>
-              <p className="text-[10px] text-white/70 font-semibold mt-1 leading-none">Seguimiento con la cadena comercial</p>
-            </div>
-            <button
-              onClick={() => setChatOpen(false)}
-              className="h-8 w-8 rounded-lg text-white/80 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors shrink-0"
-              title="Cerrar"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          {renderBitacora()}
-        </div>
-      )}
-      <button
-        onClick={() => setChatOpen((o) => !o)}
-        className="fixed z-50 right-5 bottom-5 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
-        title="Bitácora del cliente"
-      >
-        {chatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
-        {!chatOpen && chatMessages.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-900 tabular-nums">
-            {chatMessages.length}
-          </span>
-        )}
-      </button>
-    </>
-  );
 
   // Fechas clave del proyecto (agenda, firma carta, análisis de riesgo, cerrada ganada,
   // pagada/cerrada) tomadas del historial de estados. Reutilizado por aliado, AM y director.
@@ -1899,9 +1609,6 @@ export default function ProspectoDetalle() {
           </div>
 
         </div>
-
-        {/* Bitácora del cliente — botón flotante + ventana emergente (siempre accesible) */}
-        {renderFloatingBitacora()}
 
         {/* Calculator Modal */}
         {showCalculatorModal && (
@@ -3293,9 +3000,6 @@ export default function ProspectoDetalle() {
 
       {/* User Settings Modal */}
       <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-
-      {/* Bitácora del cliente — botón flotante + ventana emergente (igual que el aliado) */}
-      {renderFloatingBitacora()}
 
       {/* Audit Modal (Creditia report) */}
       {auditOpen && auditResult && (
