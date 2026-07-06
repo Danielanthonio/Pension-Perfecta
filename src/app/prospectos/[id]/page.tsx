@@ -263,6 +263,8 @@ export default function ProspectoDetalle() {
   const [chatInput, setChatInput] = useState("");
   // Directed bitácora: to whom this message is addressed ("all" = seguimiento general).
   const [chatRecipient, setChatRecipient] = useState<string>("all");
+  // Aliado view: bitácora shown as a floating popup window.
+  const [chatOpen, setChatOpen] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
@@ -1752,22 +1754,40 @@ export default function ProspectoDetalle() {
 
         </div>
 
-        {/* Bitácora / seguimiento del cliente — visible también para el aliado creador */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-[460px]">
-          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-              <MessageSquare className="h-4 w-4" strokeWidth={2.2} />
+        {/* Bitácora del cliente — botón flotante + ventana emergente (siempre accesible) */}
+        {chatOpen && (
+          <div className="fixed z-50 inset-x-3 bottom-24 sm:inset-x-auto sm:right-6 sm:bottom-24 sm:w-[380px] h-[68vh] sm:h-[560px] max-h-[calc(100vh-140px)] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600">
+              <div className="h-8 w-8 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
+                <MessageSquare className="h-4 w-4" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-black text-white tracking-tight leading-none">Bitácora del cliente</h3>
+                <p className="text-[10px] text-white/70 font-semibold mt-1 leading-none">Seguimiento con tu Account Manager y Dirección</p>
+              </div>
+              <button
+                onClick={() => setChatOpen(false)}
+                className="h-8 w-8 rounded-lg text-white/80 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors shrink-0"
+                title="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div className="min-w-0">
-              <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Bitácora del cliente</h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Seguimiento y comunicación con tu Account Manager y Dirección</p>
-            </div>
-            {chatMessages.length > 0 && (
-              <span className="ml-auto min-w-[20px] px-1.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[9px] font-black leading-none tabular-nums shrink-0">{chatMessages.length}</span>
-            )}
+            {renderBitacora()}
           </div>
-          {renderBitacora()}
-        </div>
+        )}
+        <button
+          onClick={() => setChatOpen((o) => !o)}
+          className="fixed z-50 right-5 bottom-5 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white flex items-center justify-center shadow-2xl shadow-blue-500/30 transition-all active:scale-95"
+          title="Bitácora del cliente"
+        >
+          {chatOpen ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
+          {!chatOpen && chatMessages.length > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-white dark:border-slate-900 tabular-nums">
+              {chatMessages.length}
+            </span>
+          )}
+        </button>
 
         {/* Calculator Modal */}
         {showCalculatorModal && (
