@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { useApp, UserProfile } from "@/utils/context/AppContext";
+import { StatCard } from "@/components/ui/StatCard";
+import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
   Users,
   UserPlus,
@@ -23,6 +25,7 @@ import {
   Key,
   X,
   UserX,
+  ChevronDown,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -81,6 +84,9 @@ export default function GestionUsuarios() {
   // Deletion Modal States
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Collapsible panel for the secondary widgets (latest registrations + codes)
+  const [showExtras, setShowExtras] = useState(false);
 
   // Form Validations
   const isNameValid = fullName.trim().length >= 3;
@@ -273,6 +279,24 @@ export default function GestionUsuarios() {
       return p.is_active === false;
     });
 
+  const sortU = useSortable<UserProfile>(
+    filteredProfiles,
+    {
+      nombre: (p) => p.full_name,
+      correo: (p) => p.email,
+      rol: (p) => (p.role === "director" ? 0 : p.role === "account_manager" ? 1 : 2),
+      estado: (p) => (p.is_active === false ? 0 : 1),
+    },
+    "nombre",
+    "asc"
+  );
+  const sortOptionsUsers = [
+    { id: "nombre", label: "Nombre" },
+    { id: "correo", label: "Correo" },
+    { id: "rol", label: "Rol" },
+    { id: "estado", label: "Estado" },
+  ];
+
   // User Counts Statistics
   const totalUsers = isCurrentUserAM
     ? profiles.filter((p) => p.role === "aliado").length
@@ -330,23 +354,22 @@ export default function GestionUsuarios() {
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-            {isCurrentUserAM ? "Gestión de Aliados y Accesos" : "Gestión de Usuarios"}
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            {isCurrentUserAM
-              ? "Registra nuevos aliados comerciales bajo tu gestión y genera sus códigos de invitación."
-              : "Administra los accesos de directores operativos, account managers y aliados comerciales, controla sus estados de activación e invitaciones."}
-          </p>
-        </div>
+      {/* Top actions */}
+      <div className="flex items-center justify-end gap-2.5">
+        <button
+          onClick={() => setShowExtras((v) => !v)}
+          aria-expanded={showExtras}
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all active:scale-95"
+        >
+          <Key className="h-3.5 w-3.5 text-slate-400" />
+          Registros y códigos
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showExtras ? "rotate-180" : ""}`} />
+        </button>
         <button
           onClick={handleOpenCreateModal}
-          className="inline-flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-2xl shadow-md text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-600 dark:hover:to-teal-600 transition-all transform hover:-translate-y-0.5 active:scale-95 shadow-emerald-500/10"
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all hover:-translate-y-0.5 active:scale-95"
         >
-          <UserPlus className="h-4.5 w-4.5" />
+          <UserPlus className="h-4 w-4" />
           {isCurrentUserAM ? "Registrar Aliado" : "Registrar Colaborador"}
         </button>
       </div>
@@ -409,92 +432,26 @@ export default function GestionUsuarios() {
 
       {/* Statistics Cards Grid */}
       {isCurrentUserAM ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Asignados</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-400">Inactivos</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Mi Rol</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-blue-600 dark:text-blue-400">Account Manager</span>
-              <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">Gestor</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Mis Invitaciones Libres</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{unusedCodesCount}</span>
-              <span className="text-[9px] bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full font-bold">Invitaciones</span>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatCard label="Aliados Asignados" value={totalAllies} tone="slate" icon={Users} sub={`${totalActive} act · ${totalInactive} inact`} />
+          <StatCard label="Activos" value={totalActive} tone="emerald" icon={UserCheck} />
+          <StatCard label="Invitaciones Libres" value={unusedCodesCount} tone="cyan" icon={Key} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Usuarios Totales</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-                {totalActive} <span className="text-emerald-500 dark:text-emerald-450">Activos</span> / {totalInactive} <span className="text-rose-500 dark:text-rose-450">Inactivos</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Directores Operativos</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{totalDirectors}</span>
-              <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">Dirección</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-blue-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Managers</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{totalAMs}</span>
-              <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full font-bold">Gestión AM</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-teal-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Aliados Comerciales</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-teal-650 dark:text-teal-400">{totalAllies}</span>
-              <span className="text-[9px] bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full font-bold">Ventas</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-            <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Invitaciones Libres</span>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">{unusedCodesCount}</span>
-              <span className="text-[9px] bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 px-2 py-0.5 rounded-full font-bold">Invitaciones</span>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <StatCard label="Usuarios Totales" value={totalUsers} tone="slate" icon={Users} sub={`${totalActive} act · ${totalInactive} inact`} />
+          <StatCard label="Directores" value={totalDirectors} tone="emerald" icon={ShieldCheck} />
+          <StatCard label="Account Managers" value={totalAMs} tone="blue" icon={UserCheck} />
+          <StatCard label="Aliados" value={totalAllies} tone="teal" icon={User} />
+          <StatCard label="Invitaciones Libres" value={unusedCodesCount} tone="cyan" icon={Key} />
         </div>
       )}
 
-      {/* Main Content Layout: Directories + Codes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Left Area (2/3 width): Directory and List */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content Layout: collapsible extras above, full-width directory below */}
+      <div className="flex flex-col gap-5">
+
+        {/* Directory (full width) */}
+        <div className="order-2 space-y-6">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             
             {/* Search, Filter Roles, Filter Status */}
@@ -558,18 +515,21 @@ export default function GestionUsuarios() {
                   </div>
                 )}
 
-                {/* Filter by Activation Status */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 dark:text-slate-500 font-bold text-[10px] uppercase">Estado:</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(e: any) => setStatusFilter(e.target.value)}
-                    className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-750 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Todos los estados</option>
-                    <option value="active">Activos</option>
-                    <option value="inactive">Inactivos</option>
-                  </select>
+                {/* Filter by Activation Status + Sort */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">Estado</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(e: any) => setStatusFilter(e.target.value)}
+                      className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
+                    >
+                      <option value="all">Todos los estados</option>
+                      <option value="active">Activos</option>
+                      <option value="inactive">Inactivos</option>
+                    </select>
+                  </div>
+                  <SortControl options={sortOptionsUsers} sort={sortU} accent="emerald" />
                 </div>
               </div>
             </div>
@@ -587,49 +547,42 @@ export default function GestionUsuarios() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                      <th className="pl-7 pr-6 py-4">Usuario</th>
-                      <th className="px-6 py-4">Teléfono</th>
-                      <th className="px-6 py-4 text-center">Rol del Sistema</th>
-                      <th className="px-6 py-4 text-center">Estado</th>
-                      <th className="px-6 py-4 text-right">Acciones</th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
+                      <SortHeader col="nombre" label="Usuario" sort={sortU} className="pl-6" />
+                      <SortHeader col="rol" label="Rol del Sistema" sort={sortU} align="center" />
+                      <SortHeader col="estado" label="Estado" sort={sortU} align="center" />
+                      <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
-                    {filteredProfiles.map((p) => {
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                    {sortU.sorted.map((p) => {
                       const isUserActive = p.is_active !== false;
                       const meta = getRoleMeta(p.role);
                       const RoleIcon = meta.Icon;
                       return (
-                        <tr key={p.id} className={`hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group ${!isUserActive ? "opacity-60" : ""}`}>
-                          <td className={`px-6 py-4 whitespace-nowrap border-l-4 ${meta.accent}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border transition-all shrink-0 ${meta.avatar}`}>
+                        <tr key={p.id} className={`hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group ${!isUserActive ? "opacity-60" : ""}`}>
+                          <td className={`pl-5 pr-4 py-2.5 border-l-2 ${meta.accent}`}>
+                            <div className="flex items-center gap-2.5">
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold border shrink-0 ${meta.avatar}`}>
                                 {p.full_name.charAt(0)}
                               </div>
                               <div className="min-w-0">
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate">{p.full_name}</span>
-                                <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5 font-medium leading-none truncate">{p.email}</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200 block leading-tight truncate">{p.full_name}</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none block truncate">{p.email}</span>
                               </div>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-650 dark:text-slate-400 tabular-nums">
-                              {p.phone || "N/A"}
-                            </span>
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-center">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${meta.badge}`}>
                               <RoleIcon className="h-3 w-3" strokeWidth={2.4} />
                               {meta.label}
                             </span>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             {/* Status: clear label + toggle */}
                             <div className="flex items-center justify-center gap-2">
                               <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${isUserActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}>
@@ -650,7 +603,7 @@ export default function GestionUsuarios() {
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-right text-xs">
                             <div className="flex items-center justify-end gap-2">
                               {/* Copy email */}
                               <button
@@ -677,7 +630,7 @@ export default function GestionUsuarios() {
                               {/* Simulate Activation Email */}
                               <button
                                 onClick={() => handleSimulateActivation(p.full_name, p.email)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 dark:border-slate-750 hover:bg-slate-55 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition-colors"
                                 title="Enviar Enlace de Acceso"
                               >
                                 <Send className="h-3.5 w-3.5" />
@@ -704,11 +657,12 @@ export default function GestionUsuarios() {
           </div>
         </div>
 
-        {/* Right Area (1/3 width): Latest Registrations + Invitation Codes */}
-        <div className="space-y-6">
-          
+        {/* Collapsible extras (latest registrations + invitation codes) — shown above the directory */}
+        {showExtras && (
+        <div className="order-1 grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
+
           {/* Latest registrations Widget */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
             <div>
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Últimos Registros</span>
               <span className="text-xs font-bold text-slate-650 dark:text-slate-400 block mt-0.5">Novedades recientes en los accesos del sistema.</span>
@@ -750,7 +704,7 @@ export default function GestionUsuarios() {
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <Key className="h-4.5 w-4.5 text-emerald-500" />
+                  <Key className="h-4 w-4 text-emerald-500" />
                   Códigos de Invitación B2B
                 </h3>
                 <p className="text-slate-500 dark:text-slate-450 text-[10px] mt-0.5 leading-normal">
@@ -760,7 +714,7 @@ export default function GestionUsuarios() {
               <button
                 onClick={handleGenerateCode}
                 disabled={isGenerating}
-                className="p-2 bg-emerald-55 hover:bg-emerald-100/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all disabled:opacity-50 border border-emerald-100 dark:border-emerald-800/50"
+                className="p-2 bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all disabled:opacity-50 border border-emerald-100 dark:border-emerald-800/50"
                 title="Generar Nuevo Código"
               >
                 <Key className="h-4 w-4" />
@@ -842,8 +796,10 @@ export default function GestionUsuarios() {
             </div>
           </div>
         </div>
+        )}
       </div>
-                    {/* Creation & Editing Modal (Clean, modern, space-saving) */}
+
+      {/* Creation & Editing Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 mx-4 relative">
@@ -853,7 +809,7 @@ export default function GestionUsuarios() {
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
             >
-              <X className="h-4.5 w-4.5" />
+              <X className="h-4 w-4" />
             </button>
 
             <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-3.5 mb-4">

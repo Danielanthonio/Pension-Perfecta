@@ -409,6 +409,12 @@ export default function AdminLayout({
         subtitle: "Administra credenciales, perfiles y estados de acceso en la plataforma.",
       };
     }
+    if (cleanPath === "/admin/empresas-multialiado") {
+      return {
+        title: "Empresas Multialiado",
+        subtitle: "Administra las empresas que agrupan a tus líderes en la matriz de asignación.",
+      };
+    }
     return {
       title: "Consola de Control",
       subtitle: "Portal Operativo de Pensión Perfecta.",
@@ -504,7 +510,7 @@ export default function AdminLayout({
             <div className="hidden sm:flex items-center gap-3">
               <span className={`h-9 w-1 rounded-full ${isAM ? "bg-gradient-to-b from-blue-400 to-indigo-600" : "bg-gradient-to-b from-emerald-400 to-teal-600"}`} />
               <div>
-                <h2 className="text-lg font-black text-slate-800 dark:text-white leading-tight tracking-tight">
+                <h2 className="text-base font-bold text-slate-800 dark:text-white leading-tight tracking-tight">
                   {headerInfo.title}
                 </h2>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-none mt-1 font-medium">
@@ -514,15 +520,15 @@ export default function AdminLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-4.5">
+          <div className="flex items-center gap-4">
             {/* Notification Bell */}
             <button
               onClick={() => setNotifDrawerOpen(true)}
               className="relative p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 rounded-xl transition-colors active:scale-95 transform"
             >
-              <Bell className="h-4.5 w-4.5" />
+              <Bell className="h-4 w-4" />
               {unreadNotifsCount > 0 && (
-                <span className="absolute top-[-2px] right-[-2px] h-4.5 min-w-[18px] px-1 rounded-full text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-white dark:border-slate-900 shadow-sm bg-emerald-500">
+                <span className="absolute top-[-2px] right-[-2px] h-4 min-w-[18px] px-1 rounded-full text-white font-extrabold text-[9px] flex items-center justify-center animate-bounce border border-white dark:border-slate-900 shadow-sm bg-emerald-500">
                   {unreadNotifsCount}
                 </span>
               )}
@@ -535,9 +541,9 @@ export default function AdminLayout({
               title={currentTheme === "light" ? "Activar modo oscuro" : "Activar modo claro"}
             >
               {currentTheme === "light" ? (
-                <Moon className="h-4.5 w-4.5" />
+                <Moon className="h-4 w-4" />
               ) : (
-                <Sun className="h-4.5 w-4.5 text-amber-500" />
+                <Sun className="h-4 w-4 text-amber-500" />
               )}
             </button>
 
@@ -570,7 +576,7 @@ export default function AdminLayout({
               className="p-2.5 bg-slate-100 hover:bg-red-50/10 hover:text-red-400 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-400 rounded-xl transition-all border border-slate-200/40 dark:border-slate-700/40 active:scale-95"
               title="Cerrar Sesión"
             >
-              <LogOut className="h-4.5 w-4.5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </header>
@@ -622,7 +628,7 @@ export default function AdminLayout({
                 onClick={() => setNotifDrawerOpen(false)}
                 className="p-1.5 bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -682,11 +688,11 @@ export default function AdminLayout({
                           }`}
                         >
                           {notif.type === "success" ? (
-                            <CheckCircle className="h-4.5 w-4.5" />
+                            <CheckCircle className="h-4 w-4" />
                           ) : notif.type === "alert" ? (
-                            <AlertTriangle className="h-4.5 w-4.5" />
+                            <AlertTriangle className="h-4 w-4" />
                           ) : (
-                            <Info className="h-4.5 w-4.5" />
+                            <Info className="h-4 w-4" />
                           )}
                         </div>
                       </div>

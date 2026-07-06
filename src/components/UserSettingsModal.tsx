@@ -195,7 +195,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
           <div className="hidden md:block">
             <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-2">
-              <div className={`h-7.5 w-7.5 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${avatarBg}`}>
+              <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${avatarBg}`}>
                 {user.full_name.charAt(0)}
               </div>
               <div className="min-w-0">
@@ -220,7 +220,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               onClick={onClose}
               className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-lg transition-colors"
             >
-              <X className="h-4.5 w-4.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
@@ -283,7 +283,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       Perfil
                     </label>
                     <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
-                      <Shield className={`h-4.5 w-4.5 shrink-0 ${textColor}`} />
+                      <Shield className={`h-4 w-4 shrink-0 ${textColor}`} />
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
                         {user.role === "director" ? "Director de Operaciones" : user.role === "account_manager" ? "Account Manager" : "Aliado Comercial"}
                       </span>
@@ -375,7 +375,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
                 <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl flex items-center gap-3">
                   <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${avatarBg}`}>
-                    <Lock className="h-4.5 w-4.5" />
+                    <Lock className="h-4 w-4" />
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-slate-700 dark:text-slate-350">Licencia Segura</h5>

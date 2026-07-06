@@ -100,7 +100,7 @@ export default function ToastSimulator() {
             onClick={handleDismiss}
             className="text-slate-500 hover:text-slate-300 hover:bg-slate-800/80 p-1.5 rounded-lg transition-colors"
           >
-            <X className="h-4.5 w-4.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>

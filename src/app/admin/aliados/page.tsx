@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect, UserProfile } from "@/utils/context/AppContext";
+import { StatCard } from "@/components/ui/StatCard";
 import {
   Users,
   TrendingUp,
@@ -13,6 +14,7 @@ import {
   Eye,
   X,
   ChevronRight,
+  ChevronDown,
   FileText,
   ShieldAlert,
   ArrowUpRight,
@@ -40,6 +42,7 @@ export default function GestorAliados() {
   const [selectedAlly, setSelectedAlly] = useState<UserProfile | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  const [showFunnel, setShowFunnel] = useState(true);
   // Ranking de gestión: métrica por la que se ordenan los aliados en el directorio.
   const [rankBy, setRankBy] = useState<"ganados" | "comision" | "conversion" | "volumen">("ganados");
 
@@ -218,233 +221,129 @@ export default function GestorAliados() {
   };
 
   return (
-    <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Gestión de Aliados</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Audita el rendimiento comercial, calcula las comisiones de la red de asesores y analiza la eficiencia del embudo de prospección.
-          </p>
+    <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
+      {/* Slim date filter row */}
+      <div className="flex flex-wrap items-center justify-end gap-2.5">
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm text-xs text-slate-600 dark:text-slate-300">
+          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="date"
+            value={dateFilter.start}
+            onChange={(e) => setDateFilter((prev) => ({ ...prev, start: e.target.value }))}
+            className="bg-transparent font-semibold border-none outline-none focus:ring-0 cursor-pointer"
+          />
+          <span className="text-slate-350 dark:text-slate-600">→</span>
+          <input
+            type="date"
+            value={dateFilter.end}
+            onChange={(e) => setDateFilter((prev) => ({ ...prev, end: e.target.value }))}
+            className="bg-transparent font-semibold border-none outline-none focus:ring-0 cursor-pointer"
+          />
         </div>
-
-        {/* Date Filter Widgets */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-sm text-xs text-slate-600">
-            <Calendar className="h-4 w-4 text-indigo-500" />
-            <input
-              type="date"
-              value={dateFilter.start}
-              onChange={(e) => setDateFilter((prev) => ({ ...prev, start: e.target.value }))}
-              className="bg-transparent font-semibold border-none outline-none focus:ring-0 cursor-pointer"
-            />
-            <span className="text-slate-350">a</span>
-            <input
-              type="date"
-              value={dateFilter.end}
-              onChange={(e) => setDateFilter((prev) => ({ ...prev, end: e.target.value }))}
-              className="bg-transparent font-semibold border-none outline-none focus:ring-0 cursor-pointer"
-            />
-          </div>
-          {(dateFilter.start || dateFilter.end) && (
-            <button
-              onClick={handleClearDateFilters}
-              className="px-3.5 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-colors"
-            >
-              Limpiar Filtros
-            </button>
-          )}
-        </div>
+        {(dateFilter.start || dateFilter.end) && (
+          <button
+            onClick={handleClearDateFilters}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 rounded-xl transition-colors active:scale-95"
+          >
+            Limpiar
+          </button>
+        )}
       </div>
 
-      {/* Aggregate metrics grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Active Allies */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aliados Activos</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800">
-              {totalActiveAllies} <span className="text-sm font-semibold text-slate-400">/ {allies.length}</span>
-            </span>
-            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">Productivos</span>
-          </div>
-        </div>
-
-        {/* Total prospects sent */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Clientes Enviados</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-600">{totalProspectsSent}</span>
-            <span className="text-[10px] text-slate-400 font-semibold">
-              {globalFinanced} <span className="text-emerald-500 font-bold">Financiados</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Global Conversion Rates */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tasas Promedio</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800">{globalConversionRate}%</span>
-            <span className="text-[10px] text-slate-500">
-              Aprobación: <span className="text-indigo-600 font-bold">{globalApprovalRate}%</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Averages per Ally */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between h-28 relative overflow-hidden">
-          <div className="absolute right-[-10px] top-[-10px] bg-cyan-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Promedios por Aliado</span>
-          <div className="mt-2 flex flex-col gap-0.5 justify-end">
-            <div className="flex justify-between text-xs font-semibold text-slate-700">
-              <span>Enviados:</span>
-              <span className="font-extrabold">{avgProspectsPerAlly}</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Aprobados: {avgApprovalsPerAlly}</span>
-              <span>Financiados: {avgFinancementsPerAlly}</span>
-            </div>
-          </div>
-        </div>
+      {/* Aggregate metrics grid (compact) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <StatCard size="sm" label="Aliados Activos" value={totalActiveAllies} sub={`/ ${allies.length} · productivos`} tone="indigo" icon={Users} />
+        <StatCard size="sm" label="Clientes Enviados" value={totalProspectsSent} sub={`${globalFinanced} financiados`} tone="emerald" icon={TrendingUp} />
+        <StatCard size="sm" label="Tasa Conversión" value={`${globalConversionRate}%`} sub={`Aprob. ${globalApprovalRate}%`} tone="amber" icon={Percent} />
+        <StatCard size="sm" label="Prom. por Aliado" value={avgProspectsPerAlly} sub={`Aprob ${avgApprovalsPerAlly} · Fin ${avgFinancementsPerAlly}`} tone="cyan" icon={BarChart3} />
       </div>
 
-      {/* Allies Conversion Efficiency Funnel */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-        <div>
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
-            <BarChart3 className="h-4.5 w-4.5 text-indigo-500" />
-            Embudo de Eficiencia Comercial (Aliados)
-          </h2>
-          <p className="text-slate-500 text-xs mt-0.5">
-            Muestra el volumen acumulado y el porcentaje de conversión del pipeline total de clientes enviados.
-          </p>
+      {/* Allies Conversion Efficiency Funnel — single-line proportional bars (collapsible) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-4">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setShowFunnel((v) => !v)}
+            aria-expanded={showFunnel}
+            className="flex items-center gap-2 group"
+          >
+            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${showFunnel ? "" : "-rotate-90"}`} />
+            <BarChart3 className="h-4 w-4 text-slate-400" />
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+              Embudo de Eficiencia Comercial
+            </span>
+          </button>
+          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+            Total {totalProspectsSent} · Financiados {globalFinanced}
+          </span>
         </div>
-
-        {/* Funnel Visual Bars */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
-          {/* Stage 1: Clientes Enviados */}
-          <div className="bg-slate-50 border border-slate-150 p-4 rounded-2xl text-center space-y-1 relative overflow-hidden flex flex-col justify-between">
-            <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider block">1. Clientes Enviados</span>
-            <div className="py-2">
-              <span className="text-3xl font-black text-slate-800">{totalProspectsSent}</span>
-              <span className="block text-[10px] text-slate-400 font-bold mt-1">100% Volumen</span>
-            </div>
-            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-slate-650 h-full w-full" />
-            </div>
-          </div>
-
-          {/* Stage 2: Evaluados */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm transition-all hover:shadow-md">
-            <span className="text-[9px] text-indigo-550 font-extrabold uppercase tracking-wider block">2. Evaluados</span>
-            <div className="py-2">
-              <span className="text-3xl font-black text-indigo-600">{globalEvaluation}</span>
-              <span className="block text-[10px] text-indigo-500 font-bold mt-1">
-                {totalProspectsSent > 0 ? Math.round((globalEvaluation / totalProspectsSent) * 100) : 0}% Conv.
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-              <div
-                className="bg-indigo-500 h-full"
-                style={{ width: `${totalProspectsSent > 0 ? (globalEvaluation / totalProspectsSent) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Stage 3: Condicionados */}
-          <div className="bg-amber-550/5 border border-amber-200 p-4 rounded-2xl text-center space-y-1 relative overflow-hidden flex flex-col justify-between">
-            <span className="text-[9px] text-amber-600 font-extrabold uppercase tracking-wider block">3. Condicionados</span>
-            <div className="py-2">
-              <span className="text-3xl font-black text-amber-600">{globalConditioned}</span>
-              <span className="block text-[10px] text-amber-600 font-bold mt-1">
-                {totalProspectsSent > 0 ? Math.round((globalConditioned / totalProspectsSent) * 100) : 0}% Conv.
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-              <div
-                className="bg-amber-500 h-full"
-                style={{ width: `${totalProspectsSent > 0 ? (globalConditioned / totalProspectsSent) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Stage 4: Aprobados */}
-          <div className="bg-emerald-50/20 border border-emerald-100 p-4 rounded-2xl text-center space-y-1 relative overflow-hidden flex flex-col justify-between">
-            <span className="text-[9px] text-emerald-600 font-extrabold uppercase tracking-wider block">4. Aprobados</span>
-            <div className="py-2">
-              <span className="text-3xl font-black text-emerald-600">{globalApproved}</span>
-              <span className="block text-[10px] text-emerald-500 font-bold mt-1">
-                {totalProspectsSent > 0 ? Math.round((globalApproved / totalProspectsSent) * 100) : 0}% Conv.
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-              <div
-                className="bg-emerald-500 h-full"
-                style={{ width: `${totalProspectsSent > 0 ? (globalApproved / totalProspectsSent) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Stage 5: Financiados */}
-          <div className="bg-gradient-to-br from-indigo-50 to-emerald-50 border border-indigo-150 p-4 rounded-2xl text-center space-y-1 relative overflow-hidden flex flex-col justify-between">
-            <span className="text-[9px] text-indigo-700 font-extrabold uppercase tracking-wider block">5. Financiados</span>
-            <div className="py-2">
-              <span className="text-3xl font-black text-indigo-700">{globalFinanced}</span>
-              <span className="block text-[10px] text-indigo-650 font-bold mt-1">
-                {totalProspectsSent > 0 ? Math.round((globalFinanced / totalProspectsSent) * 100) : 0}% Final
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-              <div
-                className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full"
-                style={{ width: `${totalProspectsSent > 0 ? (globalFinanced / totalProspectsSent) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Allies Table + Productivity Rankings */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Left Side: Allies Table (2/3 width) */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-            {/* Search Header */}
-            <div className="p-6 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">Directorio Comercial</span>
-                <span className="text-xs font-bold text-slate-600 mt-1 block">Supervisa y audita las métricas individuales de cada asesor comercial.</span>
+        {showFunnel && (
+        <div className="space-y-1.5 mt-3">
+          {[
+            { label: "Enviados", value: totalProspectsSent, bar: "bg-slate-400 dark:bg-slate-500" },
+            { label: "Evaluados", value: globalEvaluation, bar: "bg-blue-500" },
+            { label: "Condicionados", value: globalConditioned, bar: "bg-amber-500" },
+            { label: "Aprobados", value: globalApproved, bar: "bg-emerald-500" },
+            { label: "Financiados", value: globalFinanced, bar: "bg-indigo-500" },
+          ].map((s, i) => {
+            const denom = Math.max(totalProspectsSent, 1);
+            const pct = s.value > 0 ? Math.max((s.value / denom) * 100, 4) : 0;
+            const conv = i === 0 ? 100 : totalProspectsSent > 0 ? Math.round((s.value / totalProspectsSent) * 100) : 0;
+            return (
+              <div key={s.label} className="flex items-center gap-3">
+                <span className="w-24 sm:w-28 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">
+                  {s.label}
+                </span>
+                <div className="flex-1 h-6 rounded-md bg-slate-100 dark:bg-slate-800/50 overflow-hidden relative min-w-0">
+                  <div
+                    className={`h-full ${s.bar} rounded-md transition-all duration-500 flex items-center justify-end pr-2`}
+                    style={{ width: `${pct}%` }}
+                  >
+                    {pct >= 22 && <span className="text-[10px] font-bold text-white/90 tabular-nums">{conv}%</span>}
+                  </div>
+                </div>
+                <span className="w-8 text-right text-sm font-bold tabular-nums text-slate-900 dark:text-white shrink-0">
+                  {s.value}
+                </span>
               </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {/* Ranking de gestión */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 hidden sm:block">Ordenar por</span>
+            );
+          })}
+        </div>
+        )}
+      </div>
+
+      {/* Allies Directory (full width) */}
+      <div className="grid grid-cols-1 gap-6 items-start">
+
+        <div>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden">
+            {/* Search / Sort Header */}
+            <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Directorio Comercial</span>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-[0.08em] shrink-0 hidden sm:block">Ordenar</span>
                   <select
                     value={rankBy}
                     onChange={(e) => setRankBy(e.target.value as typeof rankBy)}
-                    className="w-full sm:w-auto py-2 pl-3 pr-8 bg-white hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 outline-none focus:border-indigo-500 transition-colors shadow-sm cursor-pointer"
-                    title="Ranking de gestión: métrica por la que se ordenan los aliados"
+                    className="w-full sm:w-auto py-1.5 pl-3 pr-8 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors shadow-sm cursor-pointer"
+                    title="Métrica por la que se ordena el directorio de aliados"
                   >
                     {RANK_OPTIONS.map((o) => (
                       <option key={o.id} value={o.id}>{o.label}</option>
                     ))}
                   </select>
                 </div>
-                <div className="relative w-full sm:w-56">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Search className="h-4 w-4" />
+                <div className="relative w-full sm:w-52">
+                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                    <Search className="h-3.5 w-3.5" />
                   </span>
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Buscar asesor..."
-                    className="pl-9 pr-4 py-2 w-full bg-white hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 transition-colors shadow-sm"
+                    className="pl-8 pr-3 py-1.5 w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs font-semibold outline-none focus:border-emerald-500 transition-colors dark:text-slate-200"
                   />
                 </div>
               </div>
@@ -470,7 +369,7 @@ export default function GestorAliados() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-850 pb-2">
                         <div className="flex items-center gap-2">
-                          <Users className="h-4.5 w-4.5 text-indigo-500" />
+                          <Users className="h-4 w-4 text-indigo-500" />
                           <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
                             Aliados Independientes
                           </h3>
@@ -489,19 +388,19 @@ export default function GestorAliados() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
-                                <th className="px-6 py-4">Aliado</th>
-                                <th className="px-6 py-4">Account Manager</th>
-                                <th className="px-6 py-4 text-center">Estado</th>
-                                <th className="px-6 py-4 text-center">Enviados</th>
-                                <th className="px-6 py-4 text-center">Evaluación</th>
-                                <th className="px-6 py-4 text-center">Condic.</th>
-                                <th className="px-6 py-4 text-center">Aprobados</th>
-                                <th className="px-6 py-4 text-center">Financ.</th>
-                                <th className="px-6 py-4 text-center">Rechaz.</th>
-                                <th className="px-6 py-4 text-center">Conversión</th>
-                                <th className="px-6 py-4 text-center">Lead Quality</th>
-                                <th className="px-6 py-4 text-right">Comisión</th>
-                                <th className="px-6 py-4 relative"><span className="sr-only">Detalle</span></th>
+                                <th className="px-4 py-2.5">Aliado</th>
+                                <th className="px-4 py-2.5">Account Manager</th>
+                                <th className="px-4 py-2.5 text-center">Estado</th>
+                                <th className="px-4 py-2.5 text-center">Enviados</th>
+                                <th className="px-4 py-2.5 text-center">Evaluación</th>
+                                <th className="px-4 py-2.5 text-center">Condic.</th>
+                                <th className="px-4 py-2.5 text-center">Aprobados</th>
+                                <th className="px-4 py-2.5 text-center">Financ.</th>
+                                <th className="px-4 py-2.5 text-center">Rechaz.</th>
+                                <th className="px-4 py-2.5 text-center">Conversión</th>
+                                <th className="px-4 py-2.5 text-center">Lead Quality</th>
+                                <th className="px-4 py-2.5 text-right">Comisión</th>
+                                <th className="px-4 py-2.5 relative"><span className="sr-only">Detalle</span></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-150 dark:divide-slate-800 text-xs">
@@ -510,7 +409,7 @@ export default function GestorAliados() {
                                 const isAllyActive = ally.is_active !== false;
                                 return (
                                   <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-4 py-2.5 whitespace-nowrap">
                                       <div className="flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black border bg-emerald-500/10 text-emerald-600 border-emerald-200">
                                           {ally.full_name.charAt(0)}
@@ -521,24 +420,24 @@ export default function GestorAliados() {
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
+                                    <td className="px-4 py-2.5 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
                                       👤 {getAMName(ally.account_manager_id)}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                                         isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
                                       }`}>
                                         {isAllyActive ? "Activo" : "Inactivo"}
                                       </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{stats.total}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{stats.evaluation}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{stats.conditioned}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{stats.approved}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{stats.financed}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{stats.rejected}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{stats.conversionRate}%</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{stats.total}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{stats.evaluation}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{stats.conditioned}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{stats.approved}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{stats.financed}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{stats.rejected}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{stats.conversionRate}%</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                       <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                         stats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
                                         stats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
@@ -547,8 +446,8 @@ export default function GestorAliados() {
                                         {stats.leadQuality}
                                       </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${stats.comisionTotal.toLocaleString()}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${stats.comisionTotal.toLocaleString()}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                       <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                         <Eye className="h-3.5 w-3.5" /> Detalle
                                       </button>
@@ -567,7 +466,7 @@ export default function GestorAliados() {
                 {/* 2. Category: Empresas */}
                 <div className="space-y-6 pt-4">
                   <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-850 pb-2">
-                    <TrendingUp className="h-4.5 w-4.5 text-blue-500" />
+                    <TrendingUp className="h-4 w-4 text-blue-500" />
                     <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
                       Empresas y Líderes
                     </h3>
@@ -608,19 +507,19 @@ export default function GestorAliados() {
                             <table className="w-full border-collapse">
                               <thead>
                                 <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                                  <th className="px-6 py-4">Aliado / Rol</th>
-                                  <th className="px-6 py-4">Account Manager</th>
-                                  <th className="px-6 py-4 text-center">Estado</th>
-                                  <th className="px-6 py-4 text-center">Enviados</th>
-                                  <th className="px-6 py-4 text-center">Evaluación</th>
-                                  <th className="px-6 py-4 text-center">Condic.</th>
-                                  <th className="px-6 py-4 text-center">Aprobados</th>
-                                  <th className="px-6 py-4 text-center">Financ.</th>
-                                  <th className="px-6 py-4 text-center">Rechaz.</th>
-                                  <th className="px-6 py-4 text-center">Conversión</th>
-                                  <th className="px-6 py-4 text-center">Lead Quality</th>
-                                  <th className="px-6 py-4 text-right">Comisión</th>
-                                  <th className="px-6 py-4 relative"><span className="sr-only">Detalle</span></th>
+                                  <th className="px-4 py-2.5">Aliado / Rol</th>
+                                  <th className="px-4 py-2.5">Account Manager</th>
+                                  <th className="px-4 py-2.5 text-center">Estado</th>
+                                  <th className="px-4 py-2.5 text-center">Enviados</th>
+                                  <th className="px-4 py-2.5 text-center">Evaluación</th>
+                                  <th className="px-4 py-2.5 text-center">Condic.</th>
+                                  <th className="px-4 py-2.5 text-center">Aprobados</th>
+                                  <th className="px-4 py-2.5 text-center">Financ.</th>
+                                  <th className="px-4 py-2.5 text-center">Rechaz.</th>
+                                  <th className="px-4 py-2.5 text-center">Conversión</th>
+                                  <th className="px-4 py-2.5 text-center">Lead Quality</th>
+                                  <th className="px-4 py-2.5 text-right">Comisión</th>
+                                  <th className="px-4 py-2.5 relative"><span className="sr-only">Detalle</span></th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-150 dark:divide-slate-800 text-xs">
@@ -634,7 +533,7 @@ export default function GestorAliados() {
                                     <React.Fragment key={leader.id}>
                                       {/* Leader Header Row */}
                                       <tr className="bg-blue-50/20 dark:bg-blue-950/5 font-semibold text-slate-800 dark:text-slate-200">
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-2.5 whitespace-nowrap">
                                           <div className="flex items-center gap-3">
                                             <div className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black bg-blue-500/10 text-blue-600 border border-blue-200 shrink-0">
                                               {leader.full_name.charAt(0)}
@@ -650,24 +549,24 @@ export default function GestorAliados() {
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-4 py-2.5 whitespace-nowrap">
                                           👤 {getAMName(leader.account_manager_id)}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                                             isLeaderActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-400 border-slate-200"
                                           }`}>
                                             {isLeaderActive ? "Activo" : "Inactivo"}
                                           </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold">{leaderStats.total}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-500">{leaderStats.evaluation}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-amber-600">{leaderStats.conditioned}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-emerald-650">{leaderStats.approved}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-700">{leaderStats.financed}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-rose-500">{leaderStats.rejected}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center text-indigo-650">{leaderStats.conversionRate}%</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold">{leaderStats.total}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-500">{leaderStats.evaluation}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-amber-600">{leaderStats.conditioned}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-emerald-650">{leaderStats.approved}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-700">{leaderStats.financed}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-rose-500">{leaderStats.rejected}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-650">{leaderStats.conversionRate}%</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                           <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                             leaderStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
                                             leaderStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
@@ -676,8 +575,8 @@ export default function GestorAliados() {
                                             {leaderStats.leadQuality}
                                           </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${leaderStats.comisionTotal.toLocaleString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${leaderStats.comisionTotal.toLocaleString()}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                           <button onClick={() => setSelectedAlly(leader)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-150 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                             <Eye className="h-3.5 w-3.5" /> Detalle
                                           </button>
@@ -690,7 +589,7 @@ export default function GestorAliados() {
                                         const isAllyActive = ally.is_active !== false;
                                         return (
                                           <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group">
-                                            <td className="px-6 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-2.5 whitespace-nowrap">
                                               <div className="flex items-center gap-3 pl-6">
                                                 <span className="text-slate-350 dark:text-slate-700 select-none">↳</span>
                                                 <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black bg-emerald-500/10 text-emerald-600 border border-emerald-250 shrink-0">
@@ -702,24 +601,24 @@ export default function GestorAliados() {
                                                 </div>
                                               </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
+                                            <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
                                               👤 {getAMName(ally.account_manager_id)}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                                                 isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
                                               }`}>
                                                 {isAllyActive ? "Activo" : "Inactivo"}
                                               </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                               <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                                 allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
                                                 allyStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
@@ -728,8 +627,8 @@ export default function GestorAliados() {
                                                 {allyStats.leadQuality}
                                               </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                               <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                                 <Eye className="h-3.5 w-3.5" /> Detalle
                                               </button>
@@ -755,7 +654,7 @@ export default function GestorAliados() {
                                       const isAllyActive = ally.is_active !== false;
                                       return (
                                         <tr key={ally.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors group text-xs">
-                                          <td className="px-6 py-4 whitespace-nowrap">
+                                          <td className="px-4 py-2.5 whitespace-nowrap">
                                             <div className="flex items-center gap-3 pl-4">
                                               <div className="h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black bg-slate-500/10 text-slate-600 border border-slate-200 shrink-0">
                                                 {ally.full_name.charAt(0)}
@@ -766,24 +665,24 @@ export default function GestorAliados() {
                                               </div>
                                             </div>
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
+                                          <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
                                             👤 {getAMName(ally.account_manager_id)}
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                                               isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
                                             }`}>
                                               {isAllyActive ? "Activo" : "Inactivo"}
                                             </span>
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                             <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                               allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
                                               allyStats.leadQuality === "Media" ? "bg-amber-50 text-amber-700 border border-amber-150" :
@@ -792,8 +691,8 @@ export default function GestorAliados() {
                                               {allyStats.leadQuality}
                                             </span>
                                           </td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
-                                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                             <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                               <Eye className="h-3.5 w-3.5" /> Detalle
                                             </button>
@@ -813,74 +712,6 @@ export default function GestorAliados() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Right Side: Productivity and Quality Rankings (1/3 width) */}
-        <div className="space-y-6">
-          
-          {/* Ranking 1: Productivity */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                <Award className="h-4.5 w-4.5 text-indigo-500" />
-                Ranking de Productividad
-              </h3>
-              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Total Enviado</span>
-            </div>
-
-            <div className="space-y-3">
-              {alliesByProductivity.map((item, idx) => (
-                <div key={item.ally.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-150">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-black text-slate-400 w-4">#{idx + 1}</span>
-                    <div>
-                      <span className="text-xs font-extrabold text-slate-800 block leading-tight">{item.ally.full_name}</span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">{item.ally.email}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-indigo-600 block">{item.stats.total} leads</span>
-                    <span className="text-[8px] font-bold text-slate-450 uppercase mt-0.5 block">Enviados</span>
-                  </div>
-                </div>
-              ))}
-              {alliesByProductivity.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-4">No hay datos de productividad disponibles.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Ranking 2: Quality */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                <Percent className="h-4.5 w-4.5 text-emerald-500" />
-                Ranking de Calidad (Conversión)
-              </h3>
-              <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Financiados %</span>
-            </div>
-
-            <div className="space-y-3">
-              {alliesByQuality.map((item, idx) => (
-                <div key={item.ally.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-150">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-black text-slate-400 w-4">#{idx + 1}</span>
-                    <div>
-                      <span className="text-xs font-extrabold text-slate-800 block leading-tight">{item.ally.full_name}</span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">{item.ally.email}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-emerald-600 block">{item.stats.conversionRate}%</span>
-                    <span className="text-[8px] font-bold text-slate-450 uppercase mt-0.5 block">Tasa Conversión</span>
-                  </div>
-                </div>
-              ))}
-              {alliesByQuality.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-4">No hay datos de calidad disponibles.</p>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -911,7 +742,7 @@ export default function GestorAliados() {
                 }}
                 className="p-1.5 hover:bg-slate-200 rounded-full transition-colors text-slate-400 hover:text-slate-700"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 

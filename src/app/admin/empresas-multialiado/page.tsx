@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, EmpresaMultialiado } from "@/utils/context/AppContext";
+import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
   Building2,
   Plus,
@@ -11,11 +12,14 @@ import {
   X,
   Check,
   Search,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 export default function EmpresasMultialiadoPage() {
   const {
     user,
+    profiles,
     empresasMultialiado,
     createEmpresa,
     updateEmpresa,
@@ -29,6 +33,16 @@ export default function EmpresasMultialiadoPage() {
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
+  // Expanded empresa rows (to reveal member leaders/allies)
+  const [expandedEmpresas, setExpandedEmpresas] = useState<Record<string, boolean>>({});
+  const toggleEmpresa = (id: string) => setExpandedEmpresas((prev) => ({ ...prev, [id]: !prev[id] }));
+  const getEmpresaMembers = (empresaId: string) => {
+    const members = (profiles || []).filter((p) => p.role === "aliado" && p.empresa_multialiado_id === empresaId);
+    return {
+      lideres: members.filter((m) => m.aliado_tipo === "lider"),
+      aliados: members.filter((m) => m.aliado_tipo !== "lider"),
+    };
+  };
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -140,24 +154,31 @@ export default function EmpresasMultialiadoPage() {
     e.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const sortE = useSortable<EmpresaMultialiado>(
+    filteredEmpresas,
+    {
+      nombre: (e) => e.nombre,
+      lideres: (e) => e.lideres_count || 0,
+      fecha: (e) => e.created_at || "",
+    },
+    "nombre",
+    "asc"
+  );
+  const sortOptionsEmpresas = [
+    { id: "nombre", label: "Nombre" },
+    { id: "lideres", label: "Líderes" },
+    { id: "fecha", label: "Fecha creación" },
+  ];
+
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-emerald-600 dark:text-emerald-500" />
-            Empresas Multialiado
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Administra las empresas que agrupan a tus líderes en la matriz de asignación de aliados.
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <button
           onClick={handleOpenCreateModal}
-          className="inline-flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-2xl shadow-md text-white bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-700 hover:to-teal-700 dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-600 dark:hover:to-teal-600 transition-all transform hover:-translate-y-0.5 active:scale-95 shadow-emerald-500/10"
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all hover:-translate-y-0.5 active:scale-95"
         >
-          <Plus className="h-4.5 w-4.5" />
+          <Plus className="h-4 w-4" />
           Crear Nueva Empresa
         </button>
       </div>
@@ -192,23 +213,23 @@ export default function EmpresasMultialiadoPage() {
       {/* Main Table Card */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
         {/* Search Header */}
-        <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Listado de Empresas</span>
-            <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">Monitorea las empresas multialiado registradas en el sistema.</span>
-          </div>
-          
-          <div className="relative w-full sm:w-64">
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-              <Search className="h-4 w-4" />
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar empresa por nombre..."
-              className="pl-9 pr-4 py-2 w-full bg-white dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors shadow-sm dark:text-slate-200"
-            />
+        <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Listado de Empresas</span>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="relative w-full sm:w-56">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                <Search className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar empresa..."
+                className="pl-9 pr-4 py-2 w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors shadow-sm dark:text-slate-200"
+              />
+            </div>
+            <SortControl options={sortOptionsEmpresas} sort={sortE} accent="emerald" />
           </div>
         </div>
 
@@ -225,26 +246,42 @@ export default function EmpresasMultialiadoPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
-                  <th className="px-6 py-4">Nombre</th>
-                  <th className="px-6 py-4 text-center">Líderes Asignados</th>
-                  <th className="px-6 py-4">Creada Por</th>
-                  <th className="px-6 py-4">Fecha de Creación</th>
-                  <th className="px-6 py-4 text-right">Acciones</th>
+                <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
+                  <SortHeader col="nombre" label="Nombre" sort={sortE} className="pl-5" />
+                  <SortHeader col="lideres" label="Líderes Asignados" sort={sortE} align="center" />
+                  <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Creada Por</th>
+                  <SortHeader col="fecha" label="Fecha de Creación" sort={sortE} />
+                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
-                {filteredEmpresas.map((empresa) => (
-                  <tr key={empresa.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">
-                        {empresa.nombre}
-                      </span>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                {sortE.sorted.map((empresa) => {
+                  const mem = getEmpresaMembers(empresa.id);
+                  const memberCount = mem.lideres.length + mem.aliados.length;
+                  const isOpen = !!expandedEmpresas[empresa.id];
+                  return (
+                  <React.Fragment key={empresa.id}>
+                  <tr className={`hover:bg-slate-50/40 dark:hover:bg-slate-850/20 transition-colors ${isOpen ? "bg-slate-50/60 dark:bg-slate-900/40" : ""}`}>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => toggleEmpresa(empresa.id)}
+                        className="flex items-center gap-2 group"
+                        title={memberCount > 0 ? "Ver líderes y aliados" : "Sin integrantes"}
+                      >
+                        <span className="text-slate-400 dark:text-slate-500">
+                          {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                          {empresa.nombre}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">· {memberCount}</span>
+                      </button>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-center">
                       <span className={`inline-flex items-center justify-center h-6 min-w-6 px-2 rounded-full text-xs font-bold ${
                         (empresa.lideres_count || 0) > 0
                           ? "bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800/40"
@@ -254,13 +291,13 @@ export default function EmpresasMultialiadoPage() {
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                         {empresa.created_by || "Sistema"}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-450">
                         {new Date(empresa.created_at).toLocaleDateString("es-MX", {
                           day: "numeric",
@@ -270,7 +307,7 @@ export default function EmpresasMultialiadoPage() {
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
+                    <td className="px-4 py-2.5 whitespace-nowrap text-right text-xs">
                       <div className="flex items-center justify-end gap-2">
                         {/* Edit Button */}
                         <button
@@ -301,7 +338,45 @@ export default function EmpresasMultialiadoPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  {isOpen && (
+                    <tr className="bg-slate-50/40 dark:bg-slate-950/30">
+                      <td colSpan={5} className="px-4 pb-3 pt-1">
+                        <div className="pl-6 space-y-2">
+                          {memberCount === 0 ? (
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 italic">Esta empresa aún no tiene integrantes asignados.</p>
+                          ) : (
+                            <>
+                              {mem.lideres.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Líderes</span>
+                                  {mem.lideres.map((l) => (
+                                    <span key={l.id} className="inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40">
+                                      <span className="h-4 w-4 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300 flex items-center justify-center text-[8px] font-bold">{l.full_name.charAt(0)}</span>
+                                      {l.full_name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {mem.aliados.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Aliados</span>
+                                  {mem.aliados.map((a) => (
+                                    <span key={a.id} className="inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      <span className="h-4 w-4 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-[8px] font-bold">{a.full_name.charAt(0)}</span>
+                                      {a.full_name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -312,7 +387,7 @@ export default function EmpresasMultialiadoPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transform transition-all animate-scale-up">
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-150 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest">
                 {modalMode === "create" ? "Crear Empresa" : "Editar Empresa"}
               </h3>

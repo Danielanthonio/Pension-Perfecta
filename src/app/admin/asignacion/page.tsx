@@ -1,19 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp } from "@/utils/context/AppContext";
+import { useApp, UserProfile } from "@/utils/context/AppContext";
+import { StatCard } from "@/components/ui/StatCard";
+import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
   Users,
   UserCheck,
   UserX,
   Search,
   CheckCircle,
-  XCircle,
-  Clock,
   Check,
-  X,
   Shield,
-  Briefcase,
   Save,
 } from "lucide-react";
 
@@ -206,6 +204,24 @@ export default function AsignacionAliados() {
       return a.account_manager_id === selectedAMFilter;
     });
 
+  const sortAsig = useSortable<UserProfile>(
+    filteredAllies,
+    {
+      nombre: (a) => a.full_name,
+      prospectos: (a) => getProspectCount(a.id),
+      estado: (a) => (a.account_manager_id ? 1 : 0),
+      registro: (a) => a.created_at || "",
+    },
+    "nombre",
+    "asc"
+  );
+  const sortOptionsAsig = [
+    { id: "nombre", label: "Nombre" },
+    { id: "prospectos", label: "Prospectos" },
+    { id: "estado", label: "Estado" },
+    { id: "registro", label: "Registro" },
+  ];
+
   // Stats
   const totalAllies = allies.length;
   const assignedCount = allies.filter((a) => {
@@ -220,121 +236,13 @@ export default function AsignacionAliados() {
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-850 pb-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Asignación de Aliados</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            {isAM 
-              ? "Gestiona tu cartera de aliados, desígnalos como líderes o asígnales un líder de grupo."
-              : "Asigna aliados comerciales a sus respectivos Account Managers y gestiona la estructura de liderazgo de grupos."}
-          </p>
-        </div>
-      </div>
-
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Mis Aliados</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-slate-800 dark:text-white">{totalAllies}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
-              Total asignado
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-amber-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Sin Supervisor</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-amber-600 dark:text-amber-500">{unassignedCount}</span>
-            <span className="text-[9px] bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">
-              En mesa Director
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-emerald-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Bajo mi supervisión</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-emerald-600 dark:text-emerald-500">{assignedCount}</span>
-            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-650 dark:text-emerald-450 px-2 py-0.5 rounded-full font-bold">
-              Bajo Gestión AM
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col justify-between h-28 relative overflow-hidden transition-colors">
-          <div className="absolute right-[-10px] top-[-10px] bg-indigo-500/5 h-16 w-16 rounded-full blur-lg" />
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">Líderes de Grupo</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-indigo-650 dark:text-indigo-400">{activeLeaders.length}</span>
-            <span className="text-[9px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">
-              Líderes Activos
-            </span>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Mis Aliados" value={totalAllies} sub="Total" tone="slate" icon={Users} />
+        <StatCard label="Sin Supervisor" value={unassignedCount} sub="En mesa director" tone="amber" icon={UserX} />
+        <StatCard label="Bajo Supervisión" value={assignedCount} sub="Bajo gestión AM" tone="emerald" icon={UserCheck} />
+        <StatCard label="Líderes de Grupo" value={activeLeaders.length} sub="Líderes activos" tone="indigo" icon={Shield} />
       </div>
-
-      {/* Cartera de Supervisores Section — only useful for Directors (distribution across AMs).
-          Hidden for AMs, where it would only render their own single redundant card. */}
-      {!isAM && (
-      <div className="space-y-4">
-        <div>
-          <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider block">Cartera de Supervisores</span>
-          <span className="text-xs font-bold text-slate-650 dark:text-slate-400 block mt-0.5">Distribución de aliados comerciales asignados por Account Manager.</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {totalAMs === 0 ? (
-            <div className="col-span-full text-center py-8 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl text-slate-450 text-xs">
-              No hay Account Managers a mostrar.
-            </div>
-          ) : (
-            visibleAMs.map((am) => {
-              // Calculate using current DB assigned state to avoid premature UI change on sidebar
-              const assignedAllies = profiles.filter((a) => a.role === "aliado" && a.account_manager_id === am.id);
-              const totalProspects = assignedAllies.reduce((sum, a) => sum + getProspectCount(a.id), 0);
-
-              return (
-                <div key={am.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl transition-colors shadow-sm flex flex-col justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-250/25 shrink-0">
-                      {am.full_name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">{am.full_name}</span>
-                      <span className="text-[9px] text-slate-400 font-semibold block uppercase truncate">
-                        {am.email}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Workload Stats */}
-                  <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-850">
-                    <div className="text-center p-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-150 dark:border-slate-850">
-                      <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Aliados</span>
-                      <span className="block text-sm font-black text-indigo-650 dark:text-indigo-400 mt-1">
-                        {assignedAllies.length}
-                      </span>
-                    </div>
-                    <div className="text-center p-2 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-150 dark:border-slate-850">
-                      <span className="block text-[8px] text-slate-450 dark:text-slate-500 font-extrabold uppercase">Clientes</span>
-                      <span className="block text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                        {totalProspects}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-      )}
 
       {/* Main Content Layout */}
       <div className="space-y-6">
@@ -344,34 +252,31 @@ export default function AsignacionAliados() {
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
             
             {/* Search and Filters Bar */}
-            <div className="p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-850 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-550 font-bold uppercase tracking-widest block">Matriz de Asignaciones</span>
-                  <span className="text-xs font-bold text-slate-650 dark:text-slate-400 mt-1 block">Asigna supervisores a cada aliado comercial. Los cambios requieren confirmación manual.</span>
-                </div>
-                
+            <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-850 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Matriz de Asignaciones</span>
+
                 <div className="relative w-full sm:w-64">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Search className="h-4 w-4" />
+                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                    <Search className="h-3.5 w-3.5" />
                   </span>
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Buscar por nombre, correo o celular..."
-                    className="pl-9 pr-4 py-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-600 transition-colors shadow-sm text-slate-800 dark:text-slate-100"
+                    className="pl-8 pr-3 py-1.5 w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs font-semibold outline-none focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-100"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 {/* Segmented Controller for Assignment State */}
-                <div className="bg-slate-200/55 dark:bg-slate-900 p-1 rounded-xl flex border border-slate-250/70 dark:border-slate-800 shadow-inner w-full sm:w-auto">
+                <div className="bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 w-full sm:w-auto">
                   <button
                     onClick={() => setAssignmentFilter("all")}
                     className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "all" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
+                      assignmentFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                     }`}
                   >
                     Todos ({totalAllies})
@@ -379,7 +284,7 @@ export default function AsignacionAliados() {
                   <button
                     onClick={() => setAssignmentFilter("unassigned")}
                     className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "unassigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
+                      assignmentFilter === "unassigned" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                     }`}
                   >
                     Sin Supervisor ({unassignedCount})
@@ -387,29 +292,32 @@ export default function AsignacionAliados() {
                   <button
                     onClick={() => setAssignmentFilter("assigned")}
                     className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "assigned" ? "bg-white dark:bg-slate-850 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-850"
+                      assignmentFilter === "assigned" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                     }`}
                   >
                     Supervisados ({assignedCount})
                   </button>
                 </div>
 
-                {/* Filter by Specific AM (Only useful for Directors) */}
-                {!isAM && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-400 dark:text-slate-550 font-bold text-[10px] uppercase">Account Manager:</span>
-                    <select
-                      value={selectedAMFilter}
-                      onChange={(e) => setSelectedAMFilter(e.target.value)}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
-                    >
-                      <option value="all">Todos los AM</option>
-                      {accountManagers.map((am) => (
-                        <option key={am.id} value={am.id}>{am.full_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {/* Filter by Specific AM + Sort */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {!isAM && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">Account Manager</span>
+                      <select
+                        value={selectedAMFilter}
+                        onChange={(e) => setSelectedAMFilter(e.target.value)}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
+                      >
+                        <option value="all">Todos los AM</option>
+                        {accountManagers.map((am) => (
+                          <option key={am.id} value={am.id}>{am.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <SortControl options={sortOptionsAsig} sort={sortAsig} accent="emerald" />
+                </div>
               </div>
             </div>
 
@@ -426,21 +334,19 @@ export default function AsignacionAliados() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-[10px] font-bold text-slate-550 uppercase tracking-widest text-left">
-                      <th className="px-5 py-4">Aliado Comercial</th>
-                      <th className="px-5 py-4 text-center">Prospectos</th>
-                      <th className="px-5 py-4">Supervisor AM</th>
-                      <th className="px-5 py-4 text-center">¿Pertenece a Empresa?</th>
-                      <th className="px-5 py-4">Empresa</th>
-                      <th className="px-5 py-4">Rol en Empresa</th>
-                      <th className="px-5 py-4">Asignar a Líder</th>
-                      <th className="px-5 py-4">Líder Asignado</th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-left">
+                      <SortHeader col="nombre" label="Aliado Comercial" sort={sortAsig} className="pl-5" />
+                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Supervisor AM</th>
+                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Empresa</th>
+                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Rol</th>
+                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Asignar a Líder</th>
+                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Líder Asignado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-150 dark:divide-slate-850">
-                    {filteredAllies.map((a) => {
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+                    {sortAsig.sorted.map((a) => {
                       const currentSelectedVal = a.account_manager_id || "";
                       const isAssignedNow = currentSelectedVal !== "";
                       const currentProspects = getProspectCount(a.id);
@@ -469,7 +375,7 @@ export default function AsignacionAliados() {
                       return (
                         <tr key={a.id} className="hover:bg-slate-50/45 dark:hover:bg-slate-850/10 transition-colors text-xs">
                           {/* 1. Ally Info */}
-                          <td className="px-5 py-4 whitespace-nowrap">
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black border ${
                                 a.aliado_tipo === "lider"
@@ -488,23 +394,14 @@ export default function AsignacionAliados() {
                                   )}
                                 </div>
                                 <span className="text-[10px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">
-                                  Registrado: {new Date(a.created_at).toLocaleDateString()}
+                                  Reg. {new Date(a.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} · <span className="font-semibold text-slate-500 dark:text-slate-400 tabular-nums">{currentProspects} prosp.</span>
                                 </span>
                               </div>
                             </div>
                           </td>
 
-                          {/* 2. Contact details removed for spacing */}
-
-                          {/* 3. Prospects count */}
-                          <td className="px-5 py-4 whitespace-nowrap text-center">
-                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-300 text-[10px] font-bold rounded-full">
-                              {currentProspects}
-                            </span>
-                          </td>
-
-                          {/* 4. Assign Account Manager */}
-                          <td className="px-5 py-4 whitespace-nowrap">
+                          {/* Assign Account Manager */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             {isAM ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-bold">
                                 👤 {accountManagers.find(m => m.id === currentSelectedVal)?.full_name || "Sin Supervisor"}
@@ -530,58 +427,33 @@ export default function AsignacionAliados() {
                             )}
                           </td>
 
-                          {/* 5. ¿Pertenece a Empresa? */}
-                          <td className="px-5 py-4 whitespace-nowrap text-center">
+                          {/* Empresa (incluye "Sin empresa") */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             <select
-                              value={currentHasCompany ? "si" : "no"}
+                              value={currentHasCompany ? currentEmpresaId : ""}
                               onChange={(e) => {
-                                const val = e.target.value === "si";
-                                setRowHasCompany({ ...rowHasCompany, [a.id]: val });
-                                if (!val) {
+                                const val = e.target.value;
+                                if (val === "") {
+                                  setRowHasCompany({ ...rowHasCompany, [a.id]: false });
                                   setGroupNames({ ...groupNames, [a.id]: "" });
                                   setRowTypes({ ...rowTypes, [a.id]: "aliado" });
+                                } else {
+                                  setRowHasCompany({ ...rowHasCompany, [a.id]: true });
+                                  setGroupNames({ ...groupNames, [a.id]: val });
                                 }
                               }}
                               disabled={isUpdating}
-                              className="font-bold rounded-xl px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 focus:border-blue-500 cursor-pointer"
+                              className="font-semibold rounded-lg px-2 py-1 border border-slate-200 dark:border-slate-800 outline-none bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-350 focus:border-blue-500 cursor-pointer"
                             >
-                              <option value="no">No</option>
-                              <option value="si">Sí</option>
+                              <option value="">Sin empresa</option>
+                              {empresasMultialiado.map((emp) => (
+                                <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                              ))}
                             </select>
                           </td>
 
-                          {/* 6. Empresa */}
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            {!currentHasCompany ? (
-                              <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
-                            ) : (
-                              <select
-                                value={currentEmpresaId}
-                                onChange={(e) => {
-                                  setGroupNames({ ...groupNames, [a.id]: e.target.value });
-                                }}
-                                disabled={isUpdating}
-                                className={`font-semibold rounded-xl px-2 py-1 border outline-none bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-350 focus:border-blue-500 cursor-pointer ${
-                                  !currentEmpresaId
-                                    ? "border-red-500"
-                                    : "border-slate-200 dark:border-slate-800"
-                                }`}
-                              >
-                                <option value="">Selecciona Empresa</option>
-                                {empresasMultialiado.map((emp) => (
-                                  <option key={emp.id} value={emp.id}>{emp.nombre}</option>
-                                ))}
-                              </select>
-                            )}
-                            {!hasTypeChanged && a.empresa_multialiado_id && (
-                              <span className="text-[9px] text-slate-400 dark:text-slate-500 block leading-tight px-1 mt-0.5">
-                                Actualmente: <strong className="text-blue-550 dark:text-blue-400">{a.lider_grupo}</strong>
-                              </span>
-                            )}
-                          </td>
-
-                          {/* 7. Rol en Empresa */}
-                          <td className="px-5 py-4 whitespace-nowrap">
+                          {/* Rol en Empresa */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             {!currentHasCompany ? (
                               <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
                             ) : (
@@ -600,7 +472,7 @@ export default function AsignacionAliados() {
                           </td>
 
                           {/* 8. Asignar a Líder */}
-                          <td className="px-5 py-4 whitespace-nowrap relative">
+                          <td className="px-3 py-2.5 whitespace-nowrap relative">
                             {(!currentHasCompany || currentTipo === "lider") ? (
                               <span className="text-[10px] text-slate-400 italic block py-1.5">No aplica</span>
                             ) : (
@@ -673,7 +545,7 @@ export default function AsignacionAliados() {
                           </td>
 
                           {/* 9. Líder Asignado & Save triggers */}
-                          <td className="px-5 py-4 whitespace-nowrap">
+                          <td className="px-3 py-2.5 whitespace-nowrap">
                             {isUpdating ? (
                               <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1 font-bold">
                                 <span className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />

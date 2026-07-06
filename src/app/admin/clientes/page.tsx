@@ -14,10 +14,10 @@ import {
   Users,
   Trash2,
   FolderKanban,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import Link from "next/link";
 
 function ClientesAdminContent() {
@@ -35,6 +35,7 @@ function ClientesAdminContent() {
   } = useApp();
 
   const isAM = user?.role === "account_manager";
+  const accent = isAM ? "blue" : "emerald";
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,10 +83,8 @@ function ClientesAdminContent() {
   const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
     const createdDateStr = p.created_at.substring(0, 10);
-
     if (startDate && createdDateStr < startDate) return false;
     if (endDate && createdDateStr > endDate) return false;
-
     return true;
   });
 
@@ -95,12 +94,8 @@ function ClientesAdminContent() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const getStageLabel = (status: Prospect["status"]) => {
-    const { stage, subStage } = getStageAndSubStage(status);
-    const stageObj = STAGES_LIST.find((s) => s.id === stage);
-    const stageLabel = stageObj ? stageObj.label : stage;
-    return subStage ? `${stageLabel} • ${subStage}` : stageLabel;
-  };
+  const stageIndex = (status: Prospect["status"]) =>
+    STAGES_LIST.findIndex((s) => s.id === getStageAndSubStage(status).stage);
 
   const getStageColor = (status: Prospect["status"]) => {
     const { stage } = getStageAndSubStage(status);
@@ -108,7 +103,7 @@ function ClientesAdminContent() {
       case "evaluacion_pendiente":
         return "bg-blue-50 dark:bg-blue-950/15 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/40";
       case "rechazado":
-        return "bg-red-50 dark:bg-red-950/20 text-red-650 dark:text-red-400 border-red-100 dark:border-red-800/40";
+        return "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/40";
       case "condicionado":
         return "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border-amber-100 dark:border-amber-800/40";
       case "aprobado":
@@ -166,6 +161,43 @@ function ClientesAdminContent() {
       return p.aliado_name === selectedAlly;
     });
 
+  // Sorting — active list and trash each get their own sort state/controls.
+  const sortA = useSortable<Prospect>(
+    filteredProspects,
+    {
+      fecha: (p) => p.created_at || "",
+      nombre: (p) => p.full_name,
+      aliado: (p) => p.aliado_name || "",
+      etapa: (p) => stageIndex(p.status),
+      expediente: (p) => p.documents.length,
+    },
+    "fecha",
+    "desc"
+  );
+  const sortT = useSortable<Prospect>(
+    filteredDeletedProspects,
+    {
+      eliminado: (p) => getProspectDeletedAt(p)?.getTime() ?? 0,
+      nombre: (p) => p.full_name,
+      aliado: (p) => p.aliado_name || "",
+    },
+    "eliminado",
+    "desc"
+  );
+
+  const sortOptionsActive = [
+    { id: "fecha", label: "Fecha registro" },
+    { id: "nombre", label: "Nombre" },
+    { id: "aliado", label: "Aliado" },
+    { id: "etapa", label: "Etapa" },
+    { id: "expediente", label: "Documentos" },
+  ];
+  const sortOptionsTrash = [
+    { id: "eliminado", label: "Fecha eliminado" },
+    { id: "nombre", label: "Nombre" },
+    { id: "aliado", label: "Aliado" },
+  ];
+
   const handleStageChange = async (id: string, newStage: Prospect["status"]) => {
     let comment = "";
     if (newStage === "rechazado") {
@@ -200,71 +232,57 @@ function ClientesAdminContent() {
     closeDeleteModal();
   };
 
+  const filterTabs: { id: typeof directorFilterType; label: string }[] = [
+    { id: "todos", label: "Todos" },
+    { id: "am", label: "Por AM" },
+    { id: "aliado", label: "Por Aliado" },
+    { id: "gestion_directa", label: "Gestión Directa" },
+  ];
+
   return (
     <>
-      <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
-        
+      <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+
         {/* Director Pipeline Assignment Filters */}
         {!isAM && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 flex-shrink-0 text-emerald-500" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/10">
+                <Users className="h-4 w-4" strokeWidth={2.2} />
+              </div>
               <div>
                 <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra la lista de clientes por supervisor, aliado comercial o tu gestión directa.</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra la lista por supervisor, aliado comercial o tu gestión directa.</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-              <div className="bg-slate-200/60 dark:bg-slate-950 p-1 rounded-xl flex border border-slate-200 dark:border-slate-850 text-xs font-bold">
-                <button
-                  onClick={() => setDirectorFilterType("todos")}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "todos" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => setDirectorFilterType("am")}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "am" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
-                  }`}
-                >
-                  Por AM
-                </button>
-                <button
-                  onClick={() => setDirectorFilterType("aliado")}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "aliado" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
-                  }`}
-                >
-                  Por Aliado
-                </button>
-                <button
-                  onClick={() => setDirectorFilterType("gestion_directa")}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-[10px] ${
-                    directorFilterType === "gestion_directa" ? "bg-white dark:bg-slate-850 text-slate-850 dark:text-white shadow-sm font-black" : "text-slate-500 hover:text-slate-850"
-                  }`}
-                >
-                  Gestión Directa
-                </button>
+            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+              <div className="bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800">
+                {filterTabs.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setDirectorFilterType(t.id)}
+                    className={`px-3 py-1.5 rounded-lg transition-all text-[10px] font-semibold ${
+                      directorFilterType === t.id
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
 
               {directorFilterType === "am" && (
                 <select
                   value={selectedAMId}
                   onChange={(e) => setSelectedAMId(e.target.value)}
-                  className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-350 focus:border-emerald-500"
+                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
                 >
                   <option value="all">Todos los AM...</option>
-                  {profiles
-                    .filter((p) => p.role === "account_manager")
-                    .map((am) => (
-                      <option key={am.id} value={am.id}>
-                        {am.full_name}
-                      </option>
-                    ))}
+                  {profiles.filter((p) => p.role === "account_manager").map((am) => (
+                    <option key={am.id} value={am.id}>{am.full_name}</option>
+                  ))}
                 </select>
               )}
 
@@ -272,79 +290,71 @@ function ClientesAdminContent() {
                 <select
                   value={selectedAllyId}
                   onChange={(e) => setSelectedAllyId(e.target.value)}
-                  className="bg-slate-55 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer dark:text-slate-350 focus:border-emerald-500"
+                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
                 >
                   <option value="all">Todos los aliados...</option>
-                  {profiles
-                    .filter((p) => p.role === "aliado")
-                    .map((ally) => (
-                      <option key={ally.id} value={ally.id}>
-                        {ally.full_name}
-                      </option>
-                    ))}
+                  {profiles.filter((p) => p.role === "aliado").map((ally) => (
+                    <option key={ally.id} value={ally.id}>{ally.full_name}</option>
+                  ))}
                 </select>
               )}
             </div>
           </div>
         )}
 
-        {/* Search Bar */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm p-4">
-          <div className="relative w-full">
-            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-              <Search className="h-4.5 w-4.5" />
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar prospecto por Nombre, NSS o CURP..."
-              className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
-                isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
-              }`}
-            />
-          </div>
-        </div>
-
-        {/* Segmented Controller Tab Selector */}
-        <div className="bg-slate-200/60 dark:bg-slate-900 p-1 rounded-2xl max-w-xs flex border border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab("activos")}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "activos"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            Casos Activos ({filteredProspects.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("papelera")}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              activeTab === "papelera"
-                ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-            }`}
-          >
-            Papelera ({filteredDeletedProspects.length})
-          </button>
-        </div>
-
         {/* Kanban List Table */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Listado Pipeline Operativo</span>
-            <span className={`text-[10px] font-bold flex items-center gap-1 ${isAM ? "text-blue-500" : "text-emerald-500"}`}>
-              <Sparkles className="h-3.5 w-3.5" />
-              Dictamina abriendo el Expediente
-            </span>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="px-3 py-2.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+            <div className="flex flex-1 items-center gap-2.5 min-w-0">
+              <div className="relative w-full max-w-[280px]">
+                <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                  <Search className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar Nombre, NSS o CURP..."
+                  className={`w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs font-semibold outline-none transition-all dark:text-slate-200 ${
+                    isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
+                  }`}
+                />
+              </div>
+              <div className="bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 shrink-0">
+                <button
+                  onClick={() => setActiveTab("activos")}
+                  className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                    activeTab === "activos"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Activos <span className="tabular-nums opacity-70">({filteredProspects.length})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("papelera")}
+                  className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                    activeTab === "papelera"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                  }`}
+                >
+                  Papelera <span className="tabular-nums opacity-70">({filteredDeletedProspects.length})</span>
+                </button>
+              </div>
+            </div>
+            <SortControl
+              options={activeTab === "papelera" ? sortOptionsTrash : sortOptionsActive}
+              sort={activeTab === "papelera" ? sortT : sortA}
+              accent={accent as any}
+            />
           </div>
 
           {activeTab === "papelera" ? (
             filteredDeletedProspects.length === 0 ? (
-              <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
-                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
-                  <Trash2 className="h-6 w-6" />
+              <div className="py-16 text-center space-y-3 bg-white dark:bg-slate-900">
+                <div className="h-11 w-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
+                  <Trash2 className="h-5 w-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">La papelera está vacía</h4>
@@ -352,56 +362,53 @@ function ClientesAdminContent() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
-                      <th className="px-5 py-3.5">Prospecto</th>
-                      <th className="px-4 py-3.5">Asignación</th>
-                      <th className="px-4 py-3.5">Eliminado · Vence</th>
-                      <th className="px-5 py-3.5 text-right">Acciones</th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
+                      <SortHeader col="nombre" label="Prospecto" sort={sortT} className="pl-5" />
+                      <SortHeader col="aliado" label="Asignación" sort={sortT} />
+                      <SortHeader col="eliminado" label="Eliminado · Vence" sort={sortT} />
+                      <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredDeletedProspects.map((p) => {
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                    {sortT.sorted.map((p) => {
                       const deletedAt = getProspectDeletedAt(p);
                       const remainingDays = deletedAt ? Math.max(0, Math.ceil((deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (1000 * 60 * 60 * 24))) : 7;
                       const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                       const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
                       const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group">
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 shrink-0">
+                        <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
+                          <td className="pl-5 pr-4 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold shrink-0">
                                 {p.full_name.charAt(0)}
                               </div>
                               <div className="min-w-0">
-                                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate max-w-[220px]">
-                                  {p.full_name}
-                                </span>
-                                <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-none">
-                                  <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">{p.nss}</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200 block leading-tight truncate max-w-[220px]">{p.full_name}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500 leading-none tabular-nums">
+                                  <span>{p.nss}</span>
                                   <span className="text-slate-300 dark:text-slate-700">·</span>
                                   <span>Tel {p.phone}</span>
                                 </div>
-                                <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
-                            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
+                          <td className="px-4 py-2.5">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
                           </td>
-                          <td className="px-4 py-3.5">
-                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                          <td className="px-4 py-2.5">
+                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">
                               {deletedAt ? deletedAt.toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "N/A"}
                             </span>
-                            <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold border ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/50" : "bg-amber-50 dark:bg-amber-950/15 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800/50"}`}>
+                            <span className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${remainingDays <= 2 ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400" : "bg-amber-50 dark:bg-amber-950/15 text-amber-700 dark:text-amber-400"}`}>
                               Vence en {remainingDays} {remainingDays === 1 ? "día" : "días"}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-right">
+                          <td className="px-5 py-2.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               <button
                                 onClick={async () => {
@@ -409,7 +416,7 @@ function ClientesAdminContent() {
                                     await restoreProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-emerald-55 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-200 dark:border-emerald-850 transition-colors"
+                                className="px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-lg transition-colors active:scale-95"
                               >
                                 Restaurar
                               </button>
@@ -419,9 +426,9 @@ function ClientesAdminContent() {
                                     await permanentlyDeleteProspect(p.id);
                                   }
                                 }}
-                                className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/15 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[10px] font-bold rounded-xl border border-rose-250 dark:border-rose-850 transition-colors"
+                                className="px-2.5 py-1.5 bg-rose-50 dark:bg-rose-950/15 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[10px] font-bold rounded-lg transition-colors active:scale-95"
                               >
-                                Eliminar Permanente
+                                Eliminar
                               </button>
                             </div>
                           </td>
@@ -434,9 +441,9 @@ function ClientesAdminContent() {
             )
           ) : (
             filteredProspects.length === 0 ? (
-              <div className="py-20 text-center space-y-3 bg-white dark:bg-slate-900">
-                <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
-                  <FolderKanban className="h-6 w-6" />
+              <div className="py-16 text-center space-y-3 bg-white dark:bg-slate-900">
+                <div className="h-11 w-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
+                  <FolderKanban className="h-5 w-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Sin prospectos en este estado</h4>
@@ -444,74 +451,73 @@ function ClientesAdminContent() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
-                      <th className="px-5 py-3.5">Prospecto</th>
-                      <th className="px-4 py-3.5">Asignación</th>
-                      <th className="px-4 py-3.5">Expediente</th>
-                      <th className="px-4 py-3.5">Etapa · Subetapa</th>
-                      <th className="px-5 py-3.5 text-right">Acciones</th>
+                    <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
+                      <SortHeader col="nombre" label="Prospecto" sort={sortA} className="pl-5" />
+                      <SortHeader col="aliado" label="Asignación" sort={sortA} />
+                      <SortHeader col="expediente" label="Expediente" sort={sortA} align="center" />
+                      <SortHeader col="etapa" label="Etapa · Subetapa" sort={sortA} />
+                      <SortHeader col="fecha" label="Registrado" sort={sortA} align="center" />
+                      <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredProspects.map((p) => {
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                    {sortA.sorted.map((p) => {
                       const hasAfore = p.documents.some((d) => d.file_type === "AFORE");
                       const hasImss = p.documents.some((d) => d.file_type === "IMSS");
                       const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                       const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
                       const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors group">
-                          {/* Prospecto: nombre + NSS/CURP + tel consolidados */}
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className={`h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 flex items-center justify-center text-xs font-bold border border-slate-200 dark:border-slate-750 shrink-0 transition-all ${
+                        <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
+                          {/* Prospecto */}
+                          <td className="pl-5 pr-4 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
                                 isAM
-                                  ? "group-hover:bg-blue-50/50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500 dark:group-hover:text-blue-400"
-                                  : "group-hover:bg-emerald-50/50 dark:group-hover:bg-emerald-950/20 group-hover:text-emerald-500 dark:group-hover:text-emerald-400"
+                                  ? "group-hover:bg-blue-50 dark:group-hover:bg-blue-950/20 group-hover:text-blue-500"
+                                  : "group-hover:bg-emerald-50 dark:group-hover:bg-emerald-950/20 group-hover:text-emerald-500"
                               }`}>
                                 {p.full_name.charAt(0)}
                               </div>
                               <div className="min-w-0">
                                 <Link
                                   href={`/prospectos/${p.id}`}
-                                  className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 block hover:underline leading-tight truncate max-w-[220px] ${
+                                  className={`font-bold text-slate-800 dark:text-slate-200 block hover:underline leading-tight truncate max-w-[220px] ${
                                     isAM ? "hover:text-blue-600 dark:hover:text-blue-400" : "hover:text-emerald-600 dark:hover:text-emerald-400"
                                   }`}
                                 >
                                   {p.full_name}
                                 </Link>
-                                <div className="flex items-center gap-1.5 mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-none">
-                                  <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">{p.nss}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-medium text-slate-400 dark:text-slate-500 leading-none tabular-nums">
+                                  <span>{p.nss}</span>
                                   <span className="text-slate-300 dark:text-slate-700">·</span>
                                   <span>Tel {p.phone}</span>
                                 </div>
-                                <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
+                                <span className="block text-[9px] font-medium uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
                           </td>
-                          {/* Asignación: aliado + líder */}
-                          <td className="px-4 py-3.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
-                            <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">
-                              Líder: {leaderNames}
-                            </span>
+                          {/* Asignación */}
+                          <td className="px-4 py-2.5">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
                           </td>
                           {/* Expediente */}
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${hasAfore ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${hasAfore ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${hasAfore ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />AFORE
                               </span>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${hasImss ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${hasImss ? "bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-850" : "bg-slate-50 dark:bg-slate-850/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 border-dashed"}`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${hasImss ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />IMSS
                               </span>
                             </div>
                           </td>
                           {/* Etapa · Subetapa */}
-                          <td className="px-4 py-3.5">
+                          <td className="px-4 py-2.5">
                             <div className="flex flex-col gap-1.5 w-[164px]">
                               <select
                                 value={getStageAndSubStage(p.status).stage}
@@ -521,7 +527,7 @@ function ClientesAdminContent() {
                                   const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
                                   await handleStageChange(p.id, newStatus as any);
                                 }}
-                                className={`py-1.5 px-2.5 border rounded-lg text-[10px] font-black outline-none transition-all cursor-pointer dark:bg-slate-900 ${
+                                className={`py-1.5 px-2.5 border rounded-lg text-[10px] font-bold outline-none transition-all cursor-pointer dark:bg-slate-900 ${
                                   isAM ? "focus:ring-1 focus:ring-blue-500" : "focus:ring-1 focus:ring-emerald-500"
                                 } ${getStageColor(p.status)}`}
                               >
@@ -536,7 +542,7 @@ function ClientesAdminContent() {
                                   const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
                                   await handleStageChange(p.id, newStatus as any);
                                 }}
-                                className={`py-1 px-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer ${
+                                className={`py-1 px-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-[10px] font-semibold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer ${
                                   isAM ? "focus:ring-1 focus:ring-blue-500" : "focus:ring-1 focus:ring-emerald-500"
                                 }`}
                               >
@@ -547,22 +553,30 @@ function ClientesAdminContent() {
                               </select>
                             </div>
                           </td>
+                          {/* Registrado */}
+                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
+                              {p.created_at
+                                ? new Date(p.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })
+                                : "—"}
+                            </span>
+                          </td>
                           {/* Acciones */}
-                          <td className="px-5 py-3.5">
+                          <td className="px-5 py-2.5">
                             <div className="flex items-center justify-end gap-2">
                               <Link
                                 href={`/prospectos/${p.id}`}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border transition-all active:scale-95 ${
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
                                   isAM
-                                    ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                                    : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20"
+                                    : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20"
                                 }`}
                               >
                                 Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                               </Link>
                               <button
                                 onClick={() => openDeleteModal(p)}
-                                className="inline-flex items-center justify-center h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-xl hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent hover:border-red-100 dark:hover:border-red-900/40"
+                                className="inline-flex items-center justify-center h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
                                 title="Eliminar prospecto"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -583,16 +597,16 @@ function ClientesAdminContent() {
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
             <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
-              <div className="h-11 w-11 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40 shadow-sm">
+              <div className="h-11 w-11 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 flex items-center justify-center border border-red-150 dark:border-red-800/40">
                 <Trash2 className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-white">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
                   {deleteStep === 1 ? "¿Eliminar este prospecto?" : "Confirmación Final"}
                 </h3>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
                   {deleteStep === 1
                     ? "Esta acción enviará al prospecto a la papelera por 7 días, visible para el director y aliados."
                     : "Escribe ELIMINAR para confirmar el envío a la papelera."}
@@ -600,14 +614,14 @@ function ClientesAdminContent() {
               </div>
             </div>
 
-            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-1.5">
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 flex items-center justify-center text-sm font-black">
+                <div className="h-9 w-9 rounded-lg bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 flex items-center justify-center text-sm font-bold">
                   {deleteTarget.full_name.charAt(0)}
                 </div>
                 <div>
-                  <span className="text-sm font-black text-slate-800 dark:text-slate-200 block">{deleteTarget.full_name}</span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">NSS: {deleteTarget.nss} • CURP: {deleteTarget.curp}</span>
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">{deleteTarget.full_name}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tabular-nums">NSS: {deleteTarget.nss} • CURP: {deleteTarget.curp}</span>
                 </div>
               </div>
             </div>
@@ -622,7 +636,7 @@ function ClientesAdminContent() {
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
                   placeholder="ELIMINAR"
-                  className="w-full bg-red-50/50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 focus:border-red-500 outline-none rounded-xl px-3.5 py-2.5 text-xs font-bold text-red-750 dark:text-red-400 transition-colors placeholder:text-red-300 tracking-widest text-center"
+                  className="w-full bg-red-50/50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 focus:border-red-500 outline-none rounded-xl px-3.5 py-2.5 text-xs font-bold text-red-700 dark:text-red-400 transition-colors placeholder:text-red-300 tracking-widest text-center"
                   autoFocus
                 />
               </div>
@@ -631,14 +645,14 @@ function ClientesAdminContent() {
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleteStep === 2 && deleteConfirmText !== "ELIMINAR" || deleting}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-red-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 {deleting ? "Eliminando..." : deleteStep === 1 ? "Sí, Mover a Papelera" : "Confirmar Envío"}
