@@ -29,6 +29,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
 
 function ClientesContent() {
   const {
@@ -204,25 +205,9 @@ function ClientesContent() {
   // "Cerrado perdido" no es un rechazo: es solo un estado del cliente. Va en su propia pestaña.
   const cerradosPerdidos = filteredActive.filter((p) => p.status === "cerrado_perdido");
 
-  // Estado -> hito del stepper (paralelo a activeSteps): la fecha del cambio a cada estado.
-  const STEP_STATUSES = [
-    "asesoria_agendada", // 0 · Agenda Asesoría (la registra el sistema al agendar)
-    "doc_proceso",       // 1 · Firma Carta Compromiso
-    "analisis_riesgo",   // 2 · Análisis de Riesgo
-    "firma_programada",  // 3 · Cerrada Ganada
-    "pagado_comision",   // 4 · Pagado / Cerrado
-  ];
-  // Fecha y hora en Ciudad de México, tal como quedó registrada al cambiar de estado.
-  const fmtStepDateTime = (t?: number) =>
-    t
-      ? new Date(t).toLocaleString("es-MX", {
-          timeZone: "America/Mexico_City",
-          day: "2-digit",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : null;
+  // Los hitos del pipeline y su formato de fecha viven en el componente compartido
+  // ProjectStepper (src/components/ui/projectStepper) para que aliado y dirección
+  // vean exactamente la misma línea de tiempo.
 
   // Cargar el historial de fechas de los proyectos activos visibles.
   const activeIdsKey = proyectosActivos.map((p) => p.id).sort().join(",");
@@ -263,31 +248,6 @@ function ClientesContent() {
       cancelled = true;
     };
   }, [activeIdsKey, isDemoMode]);
-
-  const getActiveStageIndex = (status: Prospect["status"]) => {
-    switch (status) {
-      case "asesoria_agendada":
-        return 0;
-      case "doc_proceso":
-        return 1;
-      case "analisis_riesgo":
-        return 2;
-      case "firma_programada":
-        return 3;
-      case "pagado_comision":
-        return 4;
-      default:
-        return 0;
-    }
-  };
-
-  const activeSteps = [
-    { label: "Agenda Asesoria", desc: "Asesoría agendada para presentar propuesta" },
-    { label: "Firma Carta Compromiso", desc: "Carta compromiso firmada por el cliente" },
-    { label: "Analisis de Riesgo", desc: "En análisis de riesgo operativo" },
-    { label: "Cerrada Ganada", desc: "Caso cerrado y ganado" },
-    { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
-  ];
 
   const handleOpenSchedule = (prospect: Prospect) => {
     setSelectedProspect(prospect);
@@ -695,56 +655,9 @@ function ClientesContent() {
                       </div>
                     </div>
 
-                    {/* Stepper Pipeline Progress Bar */}
+                    {/* Barra de progreso del pipeline (componente compartido) */}
                     <div className="space-y-4 pt-2">
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                          <div className="w-full border-t-2 border-slate-200 dark:border-slate-800" />
-                        </div>
-                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                          <div
-                            className="border-t-2 border-emerald-500 transition-all duration-500"
-                            style={{ width: `${(activeIndex / 4) * 100}%` }}
-                          />
-                        </div>
-
-                        <div className="relative flex justify-between w-full">
-                          {activeSteps.map((step, idx) => {
-                            const isCompleted = idx < activeIndex;
-                            const isActive = idx === activeIndex;
-                            return (
-                              <div key={idx} className="flex flex-col items-center group relative">
-                                <div
-                                  className={`h-7 w-7 rounded-full flex items-center justify-center transition-all border-2 text-[10px] font-bold ${
-                                    isCompleted
-                                      ? "bg-emerald-500 border-emerald-600 text-white shadow-sm shadow-emerald-500/20"
-                                      : isActive
-                                      ? "bg-blue-600 border-blue-700 text-white shadow-md ring-4 ring-blue-500/10 dark:ring-blue-500/5 scale-110"
-                                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
-                                  }`}
-                                >
-                                  {isCompleted ? <CheckCircle2 className="h-4 w-4 text-white" /> : idx + 1}
-                                </div>
-                                <span
-                                  className={`text-[9px] font-bold mt-2 text-center transition-colors uppercase tracking-wider hidden sm:block ${
-                                    isActive ? "text-blue-600 dark:text-blue-400" : isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
-                                  }`}
-                                >
-                                  {step.label}
-                                </span>
-                                {(() => {
-                                  const dt = fmtStepDateTime(statusDates[p.id]?.[STEP_STATUSES[idx]]);
-                                  return dt ? (
-                                    <span className="text-[8px] font-semibold text-slate-400 dark:text-slate-500 mt-1 text-center hidden sm:block tabular-nums whitespace-nowrap">
-                                      {dt}
-                                    </span>
-                                  ) : null;
-                                })()}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <ProjectStepper activeIndex={activeIndex} dates={statusDates[p.id]} />
                     </div>
 
                     {/* Congratulations Banner / Commission status */}

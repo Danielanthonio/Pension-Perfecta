@@ -15,9 +15,12 @@ import {
   Trash2,
   FolderKanban,
   ArrowRight,
+  ChevronDown,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
+import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
+import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 
 function ClientesAdminContent() {
@@ -32,6 +35,7 @@ function ClientesAdminContent() {
     isProspectDeleted,
     isProspectPurged,
     getProspectDeletedAt,
+    isDemoMode,
   } = useApp();
 
   const isAM = user?.role === "account_manager";
@@ -93,6 +97,35 @@ function ClientesAdminContent() {
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // Línea de tiempo del aliado por fila (misma que ve el aliado en Mis Clientes).
+  // Se carga bajo demanda al expandir para no traer todo el historial de golpe.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
+
+  const toggleTimeline = async (id: string) => {
+    const next = expandedId === id ? null : id;
+    setExpandedId(next);
+    if (!next || statusDates[next] || isDemoMode) return;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("prospect_status_history")
+        .select("status, changed_at")
+        .eq("prospect_id", next)
+        .order("changed_at", { ascending: true });
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => {
+        const t = new Date(r.changed_at).getTime();
+        if (map[r.status] === undefined || t < map[r.status]) map[r.status] = t;
+      });
+      setStatusDates((prev) => ({ ...prev, [next]: map }));
+    } catch {
+      // Tabla no migrada aún o error transitorio — se muestra sin fechas.
+      setStatusDates((prev) => ({ ...prev, [next]: {} }));
+    }
+  };
 
   const stageIndex = (status: Prospect["status"]) =>
     STAGES_LIST.findIndex((s) => s.id === getStageAndSubStage(status).stage);
@@ -470,8 +503,10 @@ function ClientesAdminContent() {
                       const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                       const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
                       const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
+                      const isExpanded = expandedId === p.id;
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
+                        <React.Fragment key={p.id}>
+                        <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
                           {/* Prospecto */}
                           <td className="pl-5 pr-4 py-2.5">
                             <div className="flex items-center gap-2.5">
@@ -564,6 +599,19 @@ function ClientesAdminContent() {
                           {/* Acciones */}
                           <td className="px-5 py-2.5">
                             <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => toggleTimeline(p.id)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border transition-all active:scale-95 ${
+                                  isExpanded
+                                    ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                                    : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-850"
+                                }`}
+                                title="Ver línea de tiempo del aliado"
+                                aria-expanded={isExpanded}
+                              >
+                                Línea de tiempo
+                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
                               <Link
                                 href={`/prospectos/${p.id}`}
                                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
@@ -584,6 +632,24 @@ function ClientesAdminContent() {
                             </div>
                           </td>
                         </tr>
+                        {isExpanded && (
+                          <tr className="bg-slate-50/50 dark:bg-slate-900/30">
+                            <td colSpan={6} className="px-6 pt-1 pb-6 border-b-0">
+                              <div className="max-w-3xl mx-auto">
+                                <div className="flex items-center gap-2 mb-5">
+                                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+                                    Línea de tiempo · {p.aliado_name || "Asesor Comercial"}
+                                  </span>
+                                  <span className="text-[9px] font-semibold text-slate-350 dark:text-slate-600">
+                                    · las fechas se registran solas al avanzar de etapa
+                                  </span>
+                                </div>
+                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
