@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { saveFile, getFile } from "@/utils/db";
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -204,6 +204,14 @@ interface AppContextType {
   triggerPushNotification: (message: string, type: "whatsapp" | "email", recipient: string) => void;
   getFileContent: (doc: DocumentItem) => Promise<string | null>;
 }
+
+// Cierre de sesión automático por inactividad. En el plan limitado de Hostinger,
+// cada sesión abierta mantiene un canal realtime de Supabase y datos cargados, así
+// que botar las sesiones inactivas reduce la carga. Cambia estos valores para
+// ajustar el tiempo de inactividad permitido y el aviso previo.
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos hasta cerrar sesión
+const IDLE_WARNING_MS = 30 * 1000; // muestra el aviso 30s antes de cerrar
+const IDLE_ACTIVITY_KEY = "pensionflow_last_activity"; // timestamp compartido entre pestañas
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -3965,6 +3973,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }}
     >
       {children}
+      <IdleLogout />
     </AppContext.Provider>
   );
 }
@@ -3975,6 +3984,98 @@ export function useApp() {
     throw new Error("useApp must be used within an AppContextProvider");
   }
   return context;
+}
+
+// Vigilante de inactividad. Se monta dentro del provider y solo actúa en sesiones
+// reales (no demo) con un usuario activo. Registra la última actividad en un
+// timestamp compartido por localStorage (cross-tab: moverse en cualquier pestaña
+// mantiene viva la sesión en todas). Cuando faltan IDLE_WARNING_MS para el cierre
+// muestra un aviso con cuenta regresiva; si el usuario no reacciona, cierra sesión
+// y los layouts de admin/dashboard redirigen a /login al quedar user=null.
+function IdleLogout() {
+  const { user, isDemoMode, logout } = useApp();
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const logoutRef = useRef(logout);
+  logoutRef.current = logout;
+
+  const stayConnected = () => {
+    try {
+      localStorage.setItem(IDLE_ACTIVITY_KEY, String(Date.now()));
+    } catch {}
+    setRemaining(null);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || isDemoMode || !user) {
+      setRemaining(null);
+      return;
+    }
+
+    let lastWrite = 0;
+    const markActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite < 5_000) return; // registra a lo sumo cada 5s
+      lastWrite = now;
+      try {
+        localStorage.setItem(IDLE_ACTIVITY_KEY, String(now));
+      } catch {}
+    };
+
+    // Marca actividad al montar para no cerrar la sesión de inmediato.
+    lastWrite = Date.now();
+    try {
+      localStorage.setItem(IDLE_ACTIVITY_KEY, String(lastWrite));
+    } catch {}
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    events.forEach((e) => window.addEventListener(e, markActivity, { passive: true }));
+
+    const tick = () => {
+      let last = 0;
+      try {
+        last = Number(localStorage.getItem(IDLE_ACTIVITY_KEY) || "0");
+      } catch {}
+      if (!last) return;
+      const idleFor = Date.now() - last;
+      if (idleFor >= IDLE_TIMEOUT_MS) {
+        setRemaining(null);
+        logoutRef.current();
+      } else if (idleFor >= IDLE_TIMEOUT_MS - IDLE_WARNING_MS) {
+        setRemaining(Math.max(1, Math.ceil((IDLE_TIMEOUT_MS - idleFor) / 1000)));
+      } else {
+        setRemaining(null);
+      }
+    };
+    const interval = window.setInterval(tick, 1_000);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, markActivity));
+      window.clearInterval(interval);
+    };
+  }, [isDemoMode, user]);
+
+  if (remaining === null) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-slate-700 dark:bg-slate-800">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-2xl dark:bg-amber-900/40">
+          ⏳
+        </div>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">¿Sigues ahí?</h3>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Tu sesión se cerrará por inactividad en{" "}
+          <span className="font-bold tabular-nums text-slate-900 dark:text-white">{remaining}s</span>.
+        </p>
+        <button
+          onClick={stayConnected}
+          className="mt-5 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+        >
+          Seguir conectado
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // Vigencia del cálculo: los cálculos valen hasta el corte del 15 o el de fin de mes.
