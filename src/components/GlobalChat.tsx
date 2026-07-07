@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { MessageSquare, X, Send, ChevronLeft, Link2, Users } from "lucide-react";
+import { MessageSquare, X, Send, ChevronLeft, Link2, Users, Search } from "lucide-react";
 import { useApp, isProspectDeleted, Prospect } from "@/utils/context/AppContext";
 import { createClient } from "@/utils/supabase/client";
 
@@ -33,8 +33,18 @@ const LS_KEY = "pp_dm";
 const SELECT_COLS =
   "id, sender_id, sender_name, sender_role, recipient_id, recipient_name, recipient_role, prospect_id, prospect_name, text, read, created_at";
 
-const roleHint = (role: string) =>
-  role === "director" ? "Dirección" : role === "account_manager" ? "Account Manager" : "Aliado";
+const roleHint = (role: string, aliadoTipo?: string) =>
+  role === "director"
+    ? "Dirección"
+    : role === "account_manager"
+    ? "Account Manager"
+    : aliadoTipo === "lider"
+    ? "Líder de grupo"
+    : "Aliado";
+
+// Normaliza para búsqueda tolerante a mayúsculas y acentos (nombres en español).
+const norm = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const roleAccent = (role: string) =>
   role === "director" ? "bg-teal-500" : role === "account_manager" ? "bg-blue-500" : "bg-emerald-500";
 
@@ -47,6 +57,7 @@ export default function GlobalChat() {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [input, setInput] = useState("");
   const [refProspectId, setRefProspectId] = useState<string>("");
+  const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Proyecto de la página actual (/prospectos/<id>) para pre-seleccionar la referencia.
@@ -68,9 +79,16 @@ export default function GlobalChat() {
     const seen = new Set<string>();
     return (messagingContacts || [])
       .filter((p) => p && !seen.has(p.id) && seen.add(p.id))
-      .map((p) => ({ id: p.id, name: p.full_name, role: p.role, hint: roleHint(p.role) }))
+      .map((p) => ({ id: p.id, name: p.full_name, role: p.role, hint: roleHint(p.role, p.aliado_tipo) }))
       .sort((a, b) => a.name.localeCompare(b.name, "es"));
   }, [messagingContacts]);
+
+  // Filtro del buscador: por nombre o rol, tolerante a mayúsculas y acentos.
+  const filteredContacts = useMemo<Contact[]>(() => {
+    const q = norm(search.trim());
+    if (!q) return contacts;
+    return contacts.filter((c) => norm(c.name).includes(q) || norm(c.hint).includes(q));
+  }, [contacts, search]);
 
   // ---- Carga de mensajes ---------------------------------------------------
   const loadFromLocal = useCallback(() => {
@@ -346,7 +364,32 @@ export default function GlobalChat() {
 
           {!activeContact ? (
             // ---- Lista de contactos ----
-            <div className="flex-1 overflow-y-auto no-scrollbar bg-slate-50/40 dark:bg-slate-950/20">
+            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/40 dark:bg-slate-950/20">
+              {/* Buscador: aparece cuando hay bastantes contactos (director/AM). */}
+              {contacts.length > 5 && (
+                <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-white dark:bg-slate-900">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar contacto…"
+                      className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl pl-8 pr-8 py-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+                        title="Limpiar"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex-1 overflow-y-auto no-scrollbar">
               {contacts.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-4 py-10 text-slate-400 dark:text-slate-500">
                   <div className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
@@ -355,9 +398,17 @@ export default function GlobalChat() {
                   <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sin contactos disponibles</p>
                   <p className="text-[10px] font-medium mt-1 leading-relaxed">Aún no tienes a nadie con quien conversar.</p>
                 </div>
+              ) : filteredContacts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center px-4 py-10 text-slate-400 dark:text-slate-500">
+                  <div className="h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                    <Search className="h-5 w-5" />
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sin resultados</p>
+                  <p className="text-[10px] font-medium mt-1 leading-relaxed">Nadie coincide con «{search.trim()}».</p>
+                </div>
               ) : (
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {contacts.map((c) => {
+                  {filteredContacts.map((c) => {
                     const last = lastByContact[c.id];
                     const unread = unreadByContact[c.id] || 0;
                     return (
@@ -389,6 +440,7 @@ export default function GlobalChat() {
                   })}
                 </ul>
               )}
+              </div>
             </div>
           ) : (
             // ---- Conversación ----

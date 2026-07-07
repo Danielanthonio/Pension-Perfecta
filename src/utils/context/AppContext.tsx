@@ -4011,9 +4011,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   // Contactos del chat general (mensajería directa). Se computa del `profiles` crudo (no del
   // filtrado `exposedProfiles`) para poder incluir a la dirección, con la que todos pueden
-  // hablar. Regla: aliado ↔ su AM + directores; AM ↔ sus aliados + directores; director ↔ todos.
-  // En producción, que un aliado/AM pueda "ver" a la dirección requiere la política RLS aditiva
-  // de la migración 20260706000001 (sin ella, el fetch de profiles no los devuelve).
+  // hablar. Regla:
+  //   · aliado ↔ su AM + dirección + su(s) líder(es) de grupo
+  //   · líder  ↔ su AM + dirección + su equipo asignado (aliados a su cargo)
+  //   · AM     ↔ sus aliados + dirección
+  //   · director ↔ todos
+  // La visibilidad de perfiles necesaria ya la dan las políticas RLS existentes: la aditiva de
+  // dirección (20260706000001) y la de líder↔aliados en ambos sentidos (20260630000000).
   const messagingContacts = React.useMemo(() => {
     if (!user) return [] as UserProfile[];
     const others = profiles.filter(p => p.id !== user.id && p.is_active !== false);
@@ -4022,7 +4026,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return others.filter(p => (p.role === "aliado" && p.account_manager_id === user.id) || p.role === "director");
     }
     if (user.role === "aliado") {
-      return others.filter(p => p.id === user.account_manager_id || p.role === "director");
+      // Unificado y simétrico: sirve tanto para un líder (equipo vía `p.lider_ids`) como para un
+      // aliado regular (sus líderes vía `user.lider_ids`). Cada quien ve solo lo que le aplica.
+      return others.filter(p =>
+        p.id === user.account_manager_id ||
+        p.role === "director" ||
+        // Mi(s) líder(es): perfiles cuyo id está en mis lider_ids.
+        (user.lider_ids?.includes(p.id) ?? false) ||
+        // Mi equipo: aliados que me tienen a mí como líder.
+        (p.role === "aliado" && (p.lider_ids?.includes(user.id) ?? false))
+      );
     }
     return [] as UserProfile[];
   }, [user, profiles]);
