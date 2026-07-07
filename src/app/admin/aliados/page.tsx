@@ -171,8 +171,6 @@ export default function GestorAliados() {
   const filteredProspectsGlobal = filterProspectsByDate(activeProspects);
   const totalProspectsSent = filteredProspectsGlobal.length;
   
-  const globalEvaluation = filteredProspectsGlobal.filter((p) => p.status === "evaluacion_pendiente").length;
-  
   const globalConditioned = filteredProspectsGlobal.filter((p) =>
     ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
   ).length;
@@ -190,6 +188,10 @@ export default function GestorAliados() {
   const globalFinanced = filteredProspectsGlobal.filter((p) => p.status === "pagado_comision").length;
   const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
   const globalLost = filteredProspectsGlobal.filter((p) => p.status === "cerrado_perdido").length;
+
+  // Evaluados = todos los que ya tienen dictamen (condicionado, aprobado, rechazado o financiado).
+  // Los "evaluacion_pendiente" aún NO han sido evaluados, por eso no cuentan aquí.
+  const globalEvaluation = globalConditioned + globalApproved + globalRejected + globalFinanced;
 
   // Global Averages
   const avgProspectsPerAlly = allies.length > 0 ? (totalProspectsSent / allies.length).toFixed(1) : "0.0";
