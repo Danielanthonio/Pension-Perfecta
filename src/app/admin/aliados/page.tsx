@@ -27,6 +27,12 @@ import {
   DollarSign,
 } from "lucide-react";
 
+// Definiciones del embudo — IDÉNTICAS a las del Dashboard (src/app/admin/page.tsx),
+// que es el único embudo que vale. No modificar sin actualizar allá también.
+const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
+const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
+const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"];
+
 export default function GestorAliados() {
   const { prospects, profiles, isProspectDeleted, isProspectPurged, empresasMultialiado } = useApp();
   const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
@@ -36,6 +42,15 @@ export default function GestorAliados() {
     if (!amId) return "Sin AM (Director)";
     const am = profiles.find((p) => p.id === amId);
     return am ? am.full_name : "Sin AM (Director)";
+  };
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(val);
   };
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,67 +91,66 @@ export default function GestorAliados() {
   };
 
   // Calculate metrics for a single ally
+  // Métricas por aliado — MISMAS definiciones que el embudo del Dashboard.
   const getAllyMetrics = (ally: UserProfile) => {
     const allyProspects = getAllyProspects(ally);
-    const total = allyProspects.length;
-
-    // Funnel Stage Count Definitions
-    const conditioned = allyProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
-    ).length;
-
-    const approved = allyProspects.filter((p) =>
-      [
-        "aprobado_listo",
-        "asesoria_agendada",
-        "doc_proceso",
-        "analisis_riesgo",
-        "firma_programada",
-      ].includes(p.status)
-    ).length;
-
+    const clientes = allyProspects.length;
+    // Embudo del dashboard: todos los clientes cuentan como evaluados (T. Eval = 100%).
+    const evaluados = clientes;
+    const aprobados = allyProspects.filter((p) => APPROVED_STAGE.includes(p.status)).length;
+    const condicionados = allyProspects.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
+    const rechazados = allyProspects.filter((p) => p.status === "rechazado").length;
     const financed = allyProspects.filter((p) => p.status === "pagado_comision").length;
-    const rejected = allyProspects.filter((p) => p.status === "rechazado").length;
     // "Cerrado perdido" es solo un estado del cliente, no un rechazo ni parte del funnel.
     const lost = allyProspects.filter((p) => p.status === "cerrado_perdido").length;
 
-    // Evaluados = todos los que ya tienen dictamen (condicionado, aprobado, rechazado o financiado).
-    // Los "evaluacion_pendiente" aún NO han sido evaluados, por eso no cuentan aquí.
-    const evaluation = conditioned + approved + rejected + financed;
+    // Montos ($) — financiamiento aprobado vs. otorgado, igual que el dashboard.
+    const finAprobados = allyProspects
+      .filter((p) => FINANCED_APPROVED.includes(p.status) && p.simulation)
+      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+    const finOtorgados = allyProspects
+      .filter((p) => p.status === "pagado_comision" && p.simulation)
+      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
-    // Conversion Rates — el cerrado perdido no cuenta en la base de conversión.
-    const rateBase = total - lost;
-    const conversionRate = rateBase > 0 ? Math.round((financed / rateBase) * 100) : 0;
-    const approvalRate = rateBase > 0 ? Math.round(((approved + financed) / rateBase) * 100) : 0;
+    // Tasas del embudo.
+    const tasaEvaluacion = clientes > 0 ? (evaluados / clientes) * 100 : 0;
+    const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
+    const tasaCierre = aprobados > 0 ? (financed / aprobados) * 100 : 0;
 
-    // Commissions: $15,000 per financed, and pending for approved
-    const comisionPagada = financed * 15000;
-    const comisionPendiente = approved * 15000;
-    const comisionTotal = comisionPagada + comisionPendiente;
-
-    // Lead quality metric
+    // Lead quality (se conserva) — proporción positiva sobre la base sin cerrados perdidos.
+    const rateBase = clientes - lost;
     let leadQuality: "Alta" | "Media" | "Baja" | "N/A" = "N/A";
     if (rateBase > 0) {
-      const positiveRate = (approved + financed) / rateBase;
+      const positiveRate = (aprobados + financed) / rateBase;
       if (positiveRate >= 0.6) leadQuality = "Alta";
       else if (positiveRate >= 0.25) leadQuality = "Media";
       else leadQuality = "Baja";
     }
 
+    // Comisiones (para el modal de detalle) y conversión (para ordenar el directorio).
+    const comisionPagada = financed * 15000;
+    const comisionPendiente = aprobados * 15000;
+    const comisionTotal = comisionPagada + comisionPendiente;
+    const conversionRate = rateBase > 0 ? Math.round((financed / rateBase) * 100) : 0;
+
     return {
-      total,
-      evaluation,
-      conditioned,
-      approved,
+      clientes,
+      evaluados,
+      aprobados,
+      condicionados,
+      rechazados,
       financed,
-      rejected,
       lost,
-      conversionRate,
-      approvalRate,
+      finAprobados,
+      finOtorgados,
+      tasaEvaluacion,
+      tasaAprobacion,
+      tasaCierre,
+      leadQuality,
       comisionPagada,
       comisionPendiente,
       comisionTotal,
-      leadQuality,
+      conversionRate,
     };
   };
 
@@ -152,7 +166,7 @@ export default function GestorAliados() {
     switch (rankBy) {
       case "comision": return m.comisionTotal;
       case "conversion": return m.conversionRate;
-      case "volumen": return m.total;
+      case "volumen": return m.clientes;
       case "ganados":
       default: return m.financed;
     }
@@ -173,27 +187,15 @@ export default function GestorAliados() {
   const filteredProspectsGlobal = filterProspectsByDate(activeProspects);
   const totalProspectsSent = filteredProspectsGlobal.length;
   
-  const globalConditioned = filteredProspectsGlobal.filter((p) =>
-    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
-  ).length;
-
-  const globalApproved = filteredProspectsGlobal.filter((p) =>
-    [
-      "aprobado_listo",
-      "asesoria_agendada",
-      "doc_proceso",
-      "analisis_riesgo",
-      "firma_programada",
-    ].includes(p.status)
-  ).length;
+  const globalConditioned = filteredProspectsGlobal.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
+  const globalApproved = filteredProspectsGlobal.filter((p) => APPROVED_STAGE.includes(p.status)).length;
 
   const globalFinanced = filteredProspectsGlobal.filter((p) => p.status === "pagado_comision").length;
   const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
   const globalLost = filteredProspectsGlobal.filter((p) => p.status === "cerrado_perdido").length;
 
-  // Evaluados = todos los que ya tienen dictamen (condicionado, aprobado, rechazado o financiado).
-  // Los "evaluacion_pendiente" aún NO han sido evaluados, por eso no cuentan aquí.
-  const globalEvaluation = globalConditioned + globalApproved + globalRejected + globalFinanced;
+  // Embudo del dashboard: todos los clientes cuentan como evaluados (T. Eval = 100%).
+  const globalEvaluation = totalProspectsSent;
 
   // Global Averages
   const avgProspectsPerAlly = allies.length > 0 ? (totalProspectsSent / allies.length).toFixed(1) : "0.0";
@@ -209,13 +211,13 @@ export default function GestorAliados() {
   // 1. By Productivity (total leads sent)
   const alliesByProductivity = [...allies]
     .map((a) => ({ ally: a, stats: getAllyMetrics(a) }))
-    .sort((a, b) => b.stats.total - a.stats.total)
+    .sort((a, b) => b.stats.clientes - a.stats.clientes)
     .slice(0, 3);
 
   // 2. By Quality (conversion rate)
   const alliesByQuality = [...allies]
     .map((a) => ({ ally: a, stats: getAllyMetrics(a) }))
-    .filter((a) => a.stats.total > 0)
+    .filter((a) => a.stats.clientes > 0)
     .sort((a, b) => b.stats.conversionRate - a.stats.conversionRate)
     .slice(0, 3);
 
@@ -396,14 +398,16 @@ export default function GestorAliados() {
                                 <th className="px-4 py-2.5">Account Manager</th>
                                 <th className="px-4 py-2.5 text-center">Estado</th>
                                 <th className="px-4 py-2.5 text-center">Proyectos</th>
-                                <th className="px-4 py-2.5 text-center">Evaluación</th>
+                                <th className="px-4 py-2.5 text-center">Eval.</th>
+                                <th className="px-4 py-2.5 text-center">Aprob.</th>
                                 <th className="px-4 py-2.5 text-center">Condic.</th>
-                                <th className="px-4 py-2.5 text-center">Aprobados</th>
-                                <th className="px-4 py-2.5 text-center">Financ.</th>
                                 <th className="px-4 py-2.5 text-center">Rechaz.</th>
-                                <th className="px-4 py-2.5 text-center">Conversión</th>
+                                <th className="px-4 py-2.5 text-right">Fin. Aprob.</th>
+                                <th className="px-4 py-2.5 text-right">Fin. Otorg.</th>
+                                <th className="px-4 py-2.5 text-center">T. Eval.</th>
+                                <th className="px-4 py-2.5 text-center">T. Aprob.</th>
+                                <th className="px-4 py-2.5 text-center">T. Cierre</th>
                                 <th className="px-4 py-2.5 text-center">Lead Quality</th>
-                                <th className="px-4 py-2.5 text-right">Comisión</th>
                                 <th className="px-4 py-2.5 relative"><span className="sr-only">Detalle</span></th>
                               </tr>
                             </thead>
@@ -434,13 +438,21 @@ export default function GestorAliados() {
                                         {isAllyActive ? "Activo" : "Inactivo"}
                                       </span>
                                     </td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{stats.total}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{stats.evaluation}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{stats.conditioned}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{stats.approved}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{stats.financed}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{stats.rejected}</td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{stats.conversionRate}%</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{stats.clientes}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{stats.evaluados}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{stats.aprobados}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{stats.condicionados}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{stats.rechazados}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(stats.finAprobados)}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.finOtorgados)}</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{stats.tasaEvaluacion.toFixed(0)}%</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{stats.tasaAprobacion.toFixed(0)}%</td>
+                                    <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                                        stats.tasaCierre >= 50 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" :
+                                        stats.tasaCierre > 0 ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                                      }`}>{stats.tasaCierre.toFixed(0)}%</span>
+                                    </td>
                                     <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                       <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                         stats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
@@ -450,7 +462,6 @@ export default function GestorAliados() {
                                         {stats.leadQuality}
                                       </span>
                                     </td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${stats.comisionTotal.toLocaleString()}</td>
                                     <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                       <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                         <Eye className="h-3.5 w-3.5" /> Detalle
@@ -515,14 +526,16 @@ export default function GestorAliados() {
                                   <th className="px-4 py-2.5">Account Manager</th>
                                   <th className="px-4 py-2.5 text-center">Estado</th>
                                   <th className="px-4 py-2.5 text-center">Proyectos</th>
-                                  <th className="px-4 py-2.5 text-center">Evaluación</th>
+                                  <th className="px-4 py-2.5 text-center">Eval.</th>
+                                  <th className="px-4 py-2.5 text-center">Aprob.</th>
                                   <th className="px-4 py-2.5 text-center">Condic.</th>
-                                  <th className="px-4 py-2.5 text-center">Aprobados</th>
-                                  <th className="px-4 py-2.5 text-center">Financ.</th>
                                   <th className="px-4 py-2.5 text-center">Rechaz.</th>
-                                  <th className="px-4 py-2.5 text-center">Conversión</th>
+                                  <th className="px-4 py-2.5 text-right">Fin. Aprob.</th>
+                                  <th className="px-4 py-2.5 text-right">Fin. Otorg.</th>
+                                  <th className="px-4 py-2.5 text-center">T. Eval.</th>
+                                  <th className="px-4 py-2.5 text-center">T. Aprob.</th>
+                                  <th className="px-4 py-2.5 text-center">T. Cierre</th>
                                   <th className="px-4 py-2.5 text-center">Lead Quality</th>
-                                  <th className="px-4 py-2.5 text-right">Comisión</th>
                                   <th className="px-4 py-2.5 relative"><span className="sr-only">Detalle</span></th>
                                 </tr>
                               </thead>
@@ -563,13 +576,21 @@ export default function GestorAliados() {
                                             {isLeaderActive ? "Activo" : "Inactivo"}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold">{leaderStats.total}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-500">{leaderStats.evaluation}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-amber-600">{leaderStats.conditioned}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-emerald-650">{leaderStats.approved}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-700">{leaderStats.financed}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-rose-500">{leaderStats.rejected}</td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-indigo-650">{leaderStats.conversionRate}%</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold">{leaderStats.clientes}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-slate-500 dark:text-slate-400">{leaderStats.evaluados}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-emerald-650">{leaderStats.aprobados}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-amber-600">{leaderStats.condicionados}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-rose-500">{leaderStats.rechazados}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(leaderStats.finAprobados)}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(leaderStats.finOtorgados)}</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-slate-500 dark:text-slate-400">{leaderStats.tasaEvaluacion.toFixed(0)}%</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center text-slate-500 dark:text-slate-400">{leaderStats.tasaAprobacion.toFixed(0)}%</td>
+                                        <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                                            leaderStats.tasaCierre >= 50 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" :
+                                            leaderStats.tasaCierre > 0 ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                                          }`}>{leaderStats.tasaCierre.toFixed(0)}%</span>
+                                        </td>
                                         <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                           <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                             leaderStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
@@ -579,7 +600,6 @@ export default function GestorAliados() {
                                             {leaderStats.leadQuality}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${leaderStats.comisionTotal.toLocaleString()}</td>
                                         <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                           <button onClick={() => setSelectedAlly(leader)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-150 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                             <Eye className="h-3.5 w-3.5" /> Detalle
@@ -615,13 +635,21 @@ export default function GestorAliados() {
                                                 {isAllyActive ? "Activo" : "Inactivo"}
                                               </span>
                                             </td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.clientes}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.evaluados}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.aprobados}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.condicionados}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rechazados}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(allyStats.finAprobados)}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(allyStats.finOtorgados)}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.tasaEvaluacion.toFixed(0)}%</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.tasaAprobacion.toFixed(0)}%</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                                                allyStats.tasaCierre >= 50 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" :
+                                                allyStats.tasaCierre > 0 ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                                              }`}>{allyStats.tasaCierre.toFixed(0)}%</span>
+                                            </td>
                                             <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                               <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                                 allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
@@ -631,7 +659,6 @@ export default function GestorAliados() {
                                                 {allyStats.leadQuality}
                                               </span>
                                             </td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
                                             <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                               <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                                 <Eye className="h-3.5 w-3.5" /> Detalle
@@ -648,7 +675,7 @@ export default function GestorAliados() {
                                 {alliesWithoutLeader.length > 0 && (
                                   <>
                                     <tr className="bg-slate-50/50 dark:bg-slate-900/50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                      <td colSpan={13} className="px-6 py-2.5 border-y border-slate-100 dark:border-slate-800">
+                                      <td colSpan={15} className="px-6 py-2.5 border-y border-slate-100 dark:border-slate-800">
                                         Aliados sin Líder Asignado
                                       </td>
                                     </tr>
@@ -679,13 +706,21 @@ export default function GestorAliados() {
                                               {isAllyActive ? "Activo" : "Inactivo"}
                                             </span>
                                           </td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.total}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-indigo-500">{allyStats.evaluation}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.conditioned}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.approved}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-indigo-700">{allyStats.financed}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rejected}</td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-bold text-indigo-650">{allyStats.conversionRate}%</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-extrabold text-slate-700 dark:text-slate-300">{allyStats.clientes}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.evaluados}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-emerald-650">{allyStats.aprobados}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-amber-600">{allyStats.condicionados}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-rose-500">{allyStats.rechazados}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(allyStats.finAprobados)}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(allyStats.finOtorgados)}</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.tasaEvaluacion.toFixed(0)}%</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center font-semibold text-slate-500 dark:text-slate-400">{allyStats.tasaAprobacion.toFixed(0)}%</td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                                              allyStats.tasaCierre >= 50 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" :
+                                              allyStats.tasaCierre > 0 ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                                            }`}>{allyStats.tasaCierre.toFixed(0)}%</span>
+                                          </td>
                                           <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                             <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                               allyStats.leadQuality === "Alta" ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
@@ -695,7 +730,6 @@ export default function GestorAliados() {
                                               {allyStats.leadQuality}
                                             </span>
                                           </td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-right font-black text-emerald-600">${allyStats.comisionTotal.toLocaleString()}</td>
                                           <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                             <button onClick={() => setSelectedAlly(ally)} className="inline-flex items-center gap-0.5 px-2.5 py-1.5 border border-indigo-100 hover:border-indigo-200 text-[10px] font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl transition-all active:scale-95 transform">
                                               <Eye className="h-3.5 w-3.5" /> Detalle
@@ -757,7 +791,7 @@ export default function GestorAliados() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl">
                   <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Clientes Enviados</span>
-                  <span className="block text-xl font-black text-slate-800 mt-1">{getAllyMetrics(selectedAlly).total}</span>
+                  <span className="block text-xl font-black text-slate-800 mt-1">{getAllyMetrics(selectedAlly).clientes}</span>
                 </div>
                 <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl">
                   <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-wider">Tasa Conversión</span>
