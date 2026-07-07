@@ -25,6 +25,53 @@ export interface UserProfile {
   lider_aliado_rels?: { id: string; lider_id: string }[];
   lider_aliado_rel_id?: string | null;
   empresa_multialiado_id?: string | null;
+  curp?: string | null;
+  ciudad?: string | null;
+  pais?: string | null;
+  avatar_url?: string | null;
+}
+
+// Campos que el usuario puede editar de su propio perfil (email y rol son fijos).
+export interface ProfileEditableFields {
+  full_name?: string;
+  phone?: string;
+  curp?: string | null;
+  ciudad?: string | null;
+  pais?: string | null;
+  avatar_url?: string | null;
+}
+
+// Estado de completado del perfil. NO limita la operación; solo motiva a completar
+// los datos y alimenta los recordatorios in-app. Al 100% el perfil es "verificado".
+export interface ProfileCompletion {
+  percent: number; // 0..100
+  done: number;
+  total: number;
+  items: { key: string; label: string; done: boolean }[];
+  missing: { key: string; label: string }[];
+  verified: boolean;
+}
+
+const PROFILE_COMPLETION_FIELDS: { key: keyof UserProfile; label: string }[] = [
+  { key: "full_name", label: "Nombre completo" },
+  { key: "phone", label: "Teléfono" },
+  { key: "curp", label: "CURP" },
+  { key: "ciudad", label: "Ciudad" },
+  { key: "pais", label: "País" },
+  { key: "avatar_url", label: "Foto de perfil" },
+];
+
+export function getProfileCompletion(profile: UserProfile | null): ProfileCompletion {
+  const total = PROFILE_COMPLETION_FIELDS.length;
+  const items = PROFILE_COMPLETION_FIELDS.map(({ key, label }) => {
+    const value = profile ? profile[key] : undefined;
+    const done = typeof value === "string" && value.trim() !== "";
+    return { key: String(key), label, done };
+  });
+  const missing = items.filter((i) => !i.done).map(({ key, label }) => ({ key, label }));
+  const done = total - missing.length;
+  const percent = Math.round((done / total) * 100);
+  return { percent, done, total, items, missing, verified: missing.length === 0 };
 }
 
 export interface EmpresaMultialiado {
@@ -146,7 +193,8 @@ interface AppContextType {
   login: (email: string, role: UserRole, password?: string) => Promise<UserRole | null>;
   sendPasswordReset: (email: string) => Promise<void>;
   updateUserPassword: (newPassword: string) => Promise<void>;
-  updateUserProfile: (fullName: string, phone: string) => Promise<void>;
+  updateUserProfile: (updates: ProfileEditableFields) => Promise<void>;
+  uploadAvatar: (file: File) => Promise<string>;
   uploadDocument: (prospectId: string, fileType: "AFORE" | "IMSS" | "OTROS", fileName: string, fileDataUrl: string) => Promise<DocumentItem>;
   deleteDocument: (prospectId: string, docId: string) => Promise<void>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
@@ -505,6 +553,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       aliado_tipo: dbProfile.aliado_tipo || "aliado",
       lider_grupo: dbProfile.lider_grupo || null,
       empresa_multialiado_id: dbProfile.empresa_multialiado_id || null,
+      curp: dbProfile.curp || null,
+      ciudad: dbProfile.ciudad || null,
+      pais: dbProfile.pais || null,
+      avatar_url: dbProfile.avatar_url || null,
     };
   };
 
@@ -1272,22 +1324,28 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const updateUserProfile = async (fullName: string, phone: string): Promise<void> => {
+  const updateUserProfile = async (updates: ProfileEditableFields): Promise<void> => {
     if (!user) return;
-    
-    const updatedUser = { ...user, full_name: fullName, phone };
+
+    // Solo aplicamos los campos provistos (undefined = no tocar).
+    const clean: Partial<UserProfile> = {};
+    (Object.keys(updates) as (keyof ProfileEditableFields)[]).forEach((k) => {
+      if (updates[k] !== undefined) (clean as any)[k] = updates[k];
+    });
+
+    const updatedUser = { ...user, ...clean };
     setUser(updatedUser);
     saveToStorage("pensionflow_user", updatedUser);
-    
+
     // Update in profiles list as well
-    const updatedProfiles = profiles.map((p) => p.id === user.id ? { ...p, full_name: fullName, phone } : p);
+    const updatedProfiles = profiles.map((p) => (p.id === user.id ? { ...p, ...clean } : p));
     setProfiles(updatedProfiles);
     saveToStorage("pensionflow_profiles", updatedProfiles);
-    
+
     if (!isDemoMode && !isProvisionalSession && supabase) {
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: fullName, phone })
+        .update(clean)
         .eq("id", user.id);
       if (error) {
         console.error("Error updating profile in database:", error);
@@ -1295,6 +1353,83 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
     }
   };
+
+  // Sube la foto de perfil comprimida a Supabase Storage (bucket 'avatars') y
+  // guarda la URL pública en el perfil. En demo/provisional (sin Supabase real)
+  // usa la data-URL comprimida localmente. Devuelve la URL final para preview.
+  const uploadAvatar = async (file: File): Promise<string> => {
+    if (!user) throw new Error("No hay usuario activo.");
+    const { compressImage } = await import("@/utils/image");
+    const { blob, dataUrl } = await compressImage(file);
+
+    // Sin Supabase real: guardamos la data-URL comprimida (liviana) localmente.
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      await updateUserProfile({ avatar_url: dataUrl });
+      return dataUrl;
+    }
+
+    const path = `${user.id}/avatar.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "3600" });
+    if (uploadError) {
+      console.error("Error subiendo avatar a Storage:", uploadError);
+      throw uploadError;
+    }
+
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    // Bust de caché: la ruta es estable (upsert), así que versionamos por query.
+    const publicUrl = `${pub.publicUrl}?v=${Date.now()}`;
+    await updateUserProfile({ avatar_url: publicUrl });
+    return publicUrl;
+  };
+
+  // Recordatorio in-app para completar el perfil. Si el perfil está incompleto,
+  // inserta UNA notificación por día (guardada por fecha en localStorage para no
+  // duplicar en cada recarga). No bloquea nada; solo alimenta la campana. El nudge
+  // persistente del header es el recordatorio siempre visible.
+  useEffect(() => {
+    if (isDemoMode || isProvisionalSession || !supabase || !user) return;
+    const completion = getProfileCompletion(user);
+    if (completion.verified) return;
+
+    const KEY = "pensionflow_profile_nudge_date";
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      if (localStorage.getItem(KEY) === today) return;
+      localStorage.setItem(KEY, today); // marcar antes del await evita duplicados
+    } catch {
+      return;
+    }
+
+    (async () => {
+      try {
+        const message = `Tu perfil está al ${completion.percent}%. Completa ${completion.missing
+          .map((m) => m.label)
+          .join(", ")} para verificarlo.`;
+        const { data, error } = await supabase
+          .from("notifications")
+          .insert({
+            user_id: user.id,
+            title: "Completa tu perfil",
+            message,
+            type: "warning",
+            read: false,
+          })
+          .select()
+          .single();
+        if (!error && data) {
+          setNotifications((prev) => [
+            { id: data.id, title: data.title, message: data.message, type: data.type, read: false, created_at: data.created_at },
+            ...prev,
+          ]);
+        }
+      } catch (e) {
+        console.warn("No se pudo crear el recordatorio de perfil:", e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isDemoMode, isProvisionalSession, supabase]);
 
   const uploadDocument = async (
     prospectId: string,
@@ -3936,6 +4071,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         sendPasswordReset,
         updateUserPassword,
         updateUserProfile,
+        uploadAvatar,
         uploadDocument,
         deleteDocument,
         logout,
