@@ -81,8 +81,6 @@ export default function GestorAliados() {
     const total = allyProspects.length;
 
     // Funnel Stage Count Definitions
-    const evaluation = allyProspects.filter((p) => p.status === "evaluacion_pendiente").length;
-    
     const conditioned = allyProspects.filter((p) =>
       ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
     ).length;
@@ -101,6 +99,10 @@ export default function GestorAliados() {
     const rejected = allyProspects.filter((p) => p.status === "rechazado").length;
     // "Cerrado perdido" es solo un estado del cliente, no un rechazo ni parte del funnel.
     const lost = allyProspects.filter((p) => p.status === "cerrado_perdido").length;
+
+    // Evaluados = todos los que ya tienen dictamen (condicionado, aprobado, rechazado o financiado).
+    // Los "evaluacion_pendiente" aún NO han sido evaluados, por eso no cuentan aquí.
+    const evaluation = conditioned + approved + rejected + financed;
 
     // Conversion Rates — el cerrado perdido no cuenta en la base de conversión.
     const rateBase = total - lost;
@@ -393,7 +395,7 @@ export default function GestorAliados() {
                                 <th className="px-4 py-2.5">Aliado</th>
                                 <th className="px-4 py-2.5">Account Manager</th>
                                 <th className="px-4 py-2.5 text-center">Estado</th>
-                                <th className="px-4 py-2.5 text-center">Enviados</th>
+                                <th className="px-4 py-2.5 text-center">Proyectos</th>
                                 <th className="px-4 py-2.5 text-center">Evaluación</th>
                                 <th className="px-4 py-2.5 text-center">Condic.</th>
                                 <th className="px-4 py-2.5 text-center">Aprobados</th>
@@ -512,7 +514,7 @@ export default function GestorAliados() {
                                   <th className="px-4 py-2.5">Aliado / Rol</th>
                                   <th className="px-4 py-2.5">Account Manager</th>
                                   <th className="px-4 py-2.5 text-center">Estado</th>
-                                  <th className="px-4 py-2.5 text-center">Enviados</th>
+                                  <th className="px-4 py-2.5 text-center">Proyectos</th>
                                   <th className="px-4 py-2.5 text-center">Evaluación</th>
                                   <th className="px-4 py-2.5 text-center">Condic.</th>
                                   <th className="px-4 py-2.5 text-center">Aprobados</th>
