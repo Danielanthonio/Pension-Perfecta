@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { useApp } from "@/utils/context/AppContext";
+import React, { useState, useEffect, useRef } from "react";
+import { useApp, getProfileCompletion } from "@/utils/context/AppContext";
 import {
   User,
   Mail,
@@ -10,12 +10,15 @@ import {
   HelpCircle,
   Sun,
   Moon,
-  Sparkles,
   CheckCircle,
   X,
   Send,
   MessageSquare,
-  Lock,
+  Camera,
+  MapPin,
+  Fingerprint,
+  BadgeCheck,
+  Loader2,
 } from "lucide-react";
 
 interface UserSettingsModalProps {
@@ -24,15 +27,23 @@ interface UserSettingsModalProps {
 }
 
 export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
-  const { user, updateUserProfile, triggerPushNotification, profiles } = useApp();
+  const { user, updateUserProfile, uploadAvatar, triggerPushNotification, profiles } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"personal" | "subscription" | "display" | "help">("personal");
+  const [activeTab, setActiveTab] = useState<"personal" | "profile" | "display" | "help">("personal");
 
   // Form states
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [curp, setCurp] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [pais, setPais] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+
+  // Avatar states
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
 
   // Settings states
   const [language, setLanguage] = useState("es");
@@ -48,6 +59,9 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
     if (user) {
       setFullName(user.full_name);
       setPhone(user.phone || "");
+      setCurp(user.curp || "");
+      setCiudad(user.ciudad || "");
+      setPais(user.pais || "México");
     }
   }, [user, isOpen]);
 
@@ -98,6 +112,13 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
     ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
     : "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400";
 
+  // Estado de completado del perfil (motivación, no limita nada).
+  const completion = getProfileCompletion(user);
+  const accentHex = isAM ? "#2563eb" : isDirector ? "#059669" : "#4f46e5";
+
+  const curpTrimmed = curp.trim().toUpperCase();
+  const curpLooksValid = curpTrimmed === "" || /^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curpTrimmed);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !phone.trim()) {
@@ -107,7 +128,14 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
     setIsUpdating(true);
     setUpdateSuccess(false);
     try {
-      await updateUserProfile(fullName, phone);
+      // CURP/ciudad/país son opcionales: no bloquean el guardado (solo suman al %).
+      await updateUserProfile({
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        curp: curpTrimmed || null,
+        ciudad: ciudad.trim() || null,
+        pais: pais.trim() || null,
+      });
       setUpdateSuccess(true);
       setTimeout(() => setUpdateSuccess(false), 3000);
     } catch (err) {
@@ -115,6 +143,22 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
       alert("Error al actualizar los datos personales.");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    setAvatarError("");
+    setAvatarUploading(true);
+    try {
+      await uploadAvatar(file);
+    } catch (err: any) {
+      console.error(err);
+      setAvatarError(err?.message || "No se pudo subir la foto.");
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -169,7 +213,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
             <nav className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
               {[
                 { id: "personal", label: "Datos Personales", icon: User },
-                { id: "subscription", label: "Suscripción", icon: Sparkles },
+                { id: "profile", label: "Mi Perfil", icon: BadgeCheck },
                 { id: "display", label: "Pantalla e Idioma", icon: Globe },
                 { id: "help", label: "Ayuda y Soporte", icon: HelpCircle },
               ].map((tab) => {
@@ -195,8 +239,13 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
           <div className="hidden md:block">
             <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center gap-2">
-              <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${avatarBg}`}>
-                {user.full_name.charAt(0)}
+              <div className={`h-7 w-7 rounded-lg overflow-hidden flex items-center justify-center text-[10px] font-black shrink-0 ${avatarBg}`}>
+                {user.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatar_url} alt={user.full_name} className="h-full w-full object-cover" />
+                ) : (
+                  user.full_name.charAt(0)
+                )}
               </div>
               <div className="min-w-0">
                 <span className="block text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate">{user.full_name}</span>
@@ -212,7 +261,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
           <div className="p-6 pb-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-850 shrink-0">
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
               {activeTab === "personal" && "Edición de perfil"}
-              {activeTab === "subscription" && "Detalles de membresía"}
+              {activeTab === "profile" && "Estado del perfil"}
               {activeTab === "display" && "Preferencias de interfaz"}
               {activeTab === "help" && "Canal de soporte B2B"}
             </span>
@@ -230,6 +279,37 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
             {/* 1. Personal Data Tab */}
             {activeTab === "personal" && (
               <form onSubmit={handleUpdateProfile} className="space-y-4">
+                {/* Foto de perfil */}
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    <div className={`h-20 w-20 rounded-2xl overflow-hidden flex items-center justify-center text-2xl font-black ${avatarBg}`}>
+                      {user.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={user.avatar_url} alt={user.full_name} className="h-full w-full object-cover" />
+                      ) : (
+                        user.full_name.charAt(0)
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={avatarUploading}
+                      className={`absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-xl ${primaryBg} text-white flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 transition-all active:scale-95 disabled:opacity-70`}
+                      aria-label="Cambiar foto de perfil"
+                    >
+                      {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white">Foto de perfil</h4>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5 leading-relaxed">
+                      Se comprime automáticamente para cargar rápido. JPG o PNG.
+                    </p>
+                    {avatarError && <p className="text-[11px] text-rose-500 font-bold mt-1">{avatarError}</p>}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
@@ -256,6 +336,62 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                         type="text"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
+                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    CURP
+                  </label>
+                  <div className="relative">
+                    <Fingerprint className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={curp}
+                      onChange={(e) => setCurp(e.target.value.toUpperCase())}
+                      maxLength={18}
+                      placeholder="18 caracteres — ej. GOVN680820HDFLNS02"
+                      className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors uppercase tracking-wide`}
+                    />
+                  </div>
+                  {!curpLooksValid && (
+                    <p className="text-[10px] text-amber-500 dark:text-amber-400 font-bold mt-1">
+                      El formato de la CURP no parece correcto, pero puedes guardarlo igual.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                      Ciudad
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={ciudad}
+                        onChange={(e) => setCiudad(e.target.value)}
+                        placeholder="Ej. Guadalajara"
+                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                      País
+                    </label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={pais}
+                        onChange={(e) => setPais(e.target.value)}
+                        placeholder="México"
                         className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
                       />
                     </div>
@@ -339,51 +475,91 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               </form>
             )}
 
-            {/* 2. Subscription Tab */}
-            {activeTab === "subscription" && (
-              <div className="space-y-4">
-                <div className="bg-gradient-to-br from-amber-500/10 to-yellow-600/10 border border-amber-500/20 rounded-3xl p-6 relative overflow-hidden">
-                  <div className="absolute top-[-20px] right-[-20px] h-32 w-32 bg-amber-500/5 rounded-full blur-2xl" />
-                  
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <span className="text-[8px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Plan Actual</span>
-                      <h4 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
-                        Acceso de Cortesía <Sparkles className="h-5 w-5 text-amber-500 fill-amber-500/20" />
-                      </h4>
+            {/* 2. My Profile (completion) Tab */}
+            {activeTab === "profile" && (
+              <div className="space-y-5">
+                {/* Hero: anillo de progreso + estado */}
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-3xl">
+                  <div className="relative h-28 w-28 shrink-0">
+                    <svg className="h-28 w-28 -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="44" fill="none" strokeWidth="7" className="stroke-slate-200 dark:stroke-slate-800" />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="44"
+                        fill="none"
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        stroke={completion.verified ? "#059669" : accentHex}
+                        strokeDasharray={2 * Math.PI * 44}
+                        strokeDashoffset={2 * Math.PI * 44 * (1 - completion.percent / 100)}
+                        style={{ transition: "stroke-dashoffset .6s ease" }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center p-3.5">
+                      <div className={`h-full w-full rounded-full overflow-hidden flex items-center justify-center text-2xl font-black ${avatarBg}`}>
+                        {user.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={user.avatar_url} alt={user.full_name} className="h-full w-full object-cover" />
+                        ) : (
+                          user.full_name.charAt(0)
+                        )}
+                      </div>
                     </div>
-                    <span className="px-3 py-1 bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/30 rounded-full text-[10px] font-black uppercase tracking-wider">
-                      Gratuito e Ilimitado
-                    </span>
                   </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-4 leading-relaxed font-semibold">
-                    Tu cuenta cuenta con una **licencia de cortesía corporativa**. Disfrutas de acceso completo sin costo a todos los cálculos financieros, visor de expedientes B2B, simulador interactivo Ley 73 y base de datos integrada en Supabase.
-                  </p>
-
-                  <div className="mt-5 grid grid-cols-2 gap-3.5 border-t border-slate-200/50 dark:border-slate-850 pt-5">
-                    <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 uppercase font-bold">Estado de Cuenta</span>
-                      <span className="block text-xs font-black text-slate-800 dark:text-slate-200 mt-0.5">Activo (Sin vencimiento)</span>
+                  <div className="text-center sm:text-left min-w-0">
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <span className="text-3xl font-black text-slate-800 dark:text-white tabular-nums">{completion.percent}%</span>
+                      {completion.verified && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          <BadgeCheck className="h-3.5 w-3.5" /> Verificado
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 uppercase font-bold">Costo del Plan</span>
-                      <span className="block text-xs font-black text-amber-600 dark:text-amber-400 mt-0.5">$0 MXN / Cortesía</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-2xl flex items-center gap-3">
-                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${avatarBg}`}>
-                    <Lock className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-700 dark:text-slate-350">Licencia Segura</h5>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      Cualquier cambio de suscripción futuro será notificado a través de tu administrador de operaciones.
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1.5 leading-relaxed max-w-xs">
+                      {completion.verified
+                        ? "¡Tu perfil está completo y verificado! Gracias por mantener tus datos al día."
+                        : `Completa tu perfil para verificarlo. Te ${completion.missing.length === 1 ? "falta" : "faltan"} ${completion.missing.length} ${completion.missing.length === 1 ? "dato" : "datos"}. No es obligatorio, pero nos ayuda a tener tu información al día.`}
                     </p>
                   </div>
                 </div>
+
+                {/* Checklist de datos */}
+                <div className="space-y-2">
+                  <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                    Checklist de datos
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {completion.items.map((item) => (
+                      <div
+                        key={item.key}
+                        className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-colors ${
+                          item.done
+                            ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-900/40 text-slate-700 dark:text-slate-300"
+                            : "bg-slate-50 dark:bg-slate-950 border-slate-150 dark:border-slate-850 text-slate-400 dark:text-slate-500"
+                        }`}
+                      >
+                        {item.done ? (
+                          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+                        ) : (
+                          <div className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-700" />
+                        )}
+                        {item.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CTA a completar */}
+                {!completion.verified && (
+                  <button
+                    onClick={() => setActiveTab("personal")}
+                    className={`w-full py-2.5 ${primaryBg} text-white font-extrabold rounded-xl text-xs transition-all active:scale-95 flex items-center justify-center gap-2`}
+                  >
+                    <User className="h-3.5 w-3.5" /> Completar datos faltantes
+                  </button>
+                )}
               </div>
             )}
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useApp, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
+import { useApp, STAGES_LIST, SUB_STAGES_BY_STAGE, getProfileCompletion } from "@/utils/context/AppContext";
 import {
   FolderKanban,
   Users,
@@ -547,6 +547,33 @@ export default function AdminLayout({
               )}
             </button>
 
+            {/* Nudge: completar perfil (recordatorio persistente, no bloqueante) */}
+            {user && !getProfileCompletion(user).verified && (
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="hidden md:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-amber-300/50 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors active:scale-95"
+                title="Completa tu perfil para verificarlo"
+              >
+                <svg className="h-5 w-5 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15" fill="none" strokeWidth="4" className="stroke-amber-200 dark:stroke-amber-900/60" />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    className="stroke-amber-500"
+                    strokeDasharray={2 * Math.PI * 15}
+                    strokeDashoffset={2 * Math.PI * 15 * (1 - getProfileCompletion(user).percent / 100)}
+                  />
+                </svg>
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                  Completa tu perfil · {getProfileCompletion(user).percent}%
+                </span>
+              </button>
+            )}
+
             {/* User Profile Widget */}
             {user && (
               <div
@@ -564,8 +591,13 @@ export default function AdminLayout({
                     <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   </div>
                 </div>
-                <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-500 border-emerald-400/20">
-                  {user.full_name.charAt(0)}
+                <div className="h-10 w-10 rounded-full border flex items-center justify-center text-white text-sm font-black shadow-sm bg-emerald-500 border-emerald-400/20 overflow-hidden">
+                  {user.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatar_url} alt={user.full_name} className="h-full w-full object-cover" />
+                  ) : (
+                    user.full_name.charAt(0)
+                  )}
                 </div>
               </div>
             )}
