@@ -33,8 +33,10 @@ export default function GestionAccountManagers() {
     const groupProspects = prospects.filter((p) => allyIds.includes(p.aliado_id));
     const totalCount = groupProspects.length;
 
+    // "Aprobado" = misma etapa que Gestión Clientes (getStageAndSubStage → "aprobado"): dictamen
+    // de aprobación + pipeline de cierre posterior. Un proyecto ahí YA fue aprobado.
     const aprobados = groupProspects.filter((p) =>
-      ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
+      ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
     ).length;
 
     const condicionados = groupProspects.filter((p) =>
@@ -47,8 +49,8 @@ export default function GestionAccountManagers() {
     const otorgados = groupProspects.filter((p) => p.status === "pagado_comision").length;
 
     // "Evaluados" = proyectos que ya tienen un dictamen/respuesta (aprobado, condicionado,
-    // rechazado u otorgado). Los estados previos al dictamen (evaluacion_pendiente,
-    // analisis_riesgo, doc_proceso) todavía NO cuentan como evaluados.
+    // rechazado u otorgado). El único estado previo al dictamen que se excluye es
+    // evaluacion_pendiente.
     const enEvaluacion = aprobados + condicionados + rechazados + otorgados;
 
     const approvedStatuses = [

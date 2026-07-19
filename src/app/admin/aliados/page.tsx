@@ -29,11 +29,14 @@ import {
 
 // Definiciones del embudo — IDÉNTICAS a las del Dashboard (src/app/admin/page.tsx),
 // que es el único embudo que vale. No modificar sin actualizar allá también.
-const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
+// "Aprobado" = misma etapa que usa Gestión Clientes (getStageAndSubStage → stage "aprobado"):
+// dictamen de aprobación + pipeline de cierre posterior (Agenda Asesoría, Firma Carta Compromiso,
+// Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Ya fueron aprobados.
+const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"];
 const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
 const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
 // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
-// Excluye los estados previos al dictamen: evaluacion_pendiente, doc_proceso y analisis_riesgo.
+// El único estado previo al dictamen que se excluye es evaluacion_pendiente.
 const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
 
 export default function GestorAliados() {

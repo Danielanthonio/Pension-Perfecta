@@ -212,8 +212,10 @@ function DashboardContent() {
       // base "Clientes", para que la tabla cuadre con el embudo.
       const active = prospectsList.filter((p) => p.status !== "cerrado_perdido");
       const totalClientes = active.length;
+      // "Aprobado" = misma etapa que Gestión Clientes (getStageAndSubStage → "aprobado"): dictamen
+      // de aprobación + pipeline de cierre posterior. Un proyecto ahí YA fue aprobado.
       const aprobados = active.filter((p) =>
-        ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
+        ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
       ).length;
       const condicionados = active.filter((p) =>
         ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
@@ -221,8 +223,7 @@ function DashboardContent() {
       const rechazados = active.filter((p) => p.status === "rechazado").length;
       const otorgados = active.filter((p) => p.status === "pagado_comision").length;
       // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u
-      // otorgado). No cuenta los estados previos al dictamen (evaluacion_pendiente, doc_proceso,
-      // analisis_riesgo).
+      // otorgado). El único estado previo al dictamen que se excluye es evaluacion_pendiente.
       const evaluados = aprobados + condicionados + rechazados + otorgados;
 
       const approvedStatuses = [
