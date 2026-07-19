@@ -9,6 +9,7 @@ import {
 import SalesFunnel from "@/components/SalesFunnel";
 import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sorting";
 import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { AliadoPicker, prospectMatchesSelection, GESTION_DIRECTA_ID } from "@/components/ui/AliadoPicker";
 import {
   Users,
   Filter,
@@ -45,10 +46,9 @@ function PipelineManagerContent() {
   const startDate = searchParams.get("desde") || "";
   const endDate = searchParams.get("hasta") || "";
 
-  // Director filtering states
-  const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
-  const [selectedAMId, setSelectedAMId] = useState<string>("all");
-  const [selectedAllyId, setSelectedAllyId] = useState<string>("all");
+  // Filtro de asignación (director): multi-selección de aliados y/o account managers.
+  // Vacío = Todos. Ver AliadoPicker / prospectMatchesSelection.
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   // Filtro por modalidad de aprobación (Todos / M40 / M10): recalcula todos los KPIs.
   const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
 
@@ -71,29 +71,8 @@ function PipelineManagerContent() {
 
   const baseFilteredProspects = useMemo(() => {
     if (user?.role !== "director") return prospects;
-
-    if (directorFilterType === "todos") {
-      return prospects;
-    }
-    if (directorFilterType === "am") {
-      if (selectedAMId === "all") return prospects;
-      const assignedAllyIds = profiles
-        .filter((p) => p.role === "aliado" && p.account_manager_id === selectedAMId)
-        .map((p) => p.id);
-      return prospects.filter((p) => assignedAllyIds.includes(p.aliado_id));
-    }
-    if (directorFilterType === "aliado") {
-      if (selectedAllyId === "all") return prospects;
-      return prospects.filter((p) => p.aliado_id === selectedAllyId);
-    }
-    if (directorFilterType === "gestion_directa") {
-      const unassignedAllyIds = profiles
-        .filter((p) => p.role === "aliado" && !p.account_manager_id)
-        .map((p) => p.id);
-      return prospects.filter((p) => unassignedAllyIds.includes(p.aliado_id));
-    }
-    return prospects;
-  }, [prospects, user, directorFilterType, selectedAMId, selectedAllyId, profiles]);
+    return prospects.filter((p) => prospectMatchesSelection(p, selectedEntities, profiles));
+  }, [prospects, user, selectedEntities, profiles]);
 
   const activeProspects = baseFilteredProspects.filter(
     (p) =>
@@ -128,34 +107,14 @@ function PipelineManagerContent() {
   // State for expanded rows in hierarchical view
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
-  // Auto-expand hierarchy when filters change
+  // El AM ve su propia fila expandida por defecto. El director trabaja con la jerarquía
+  // colapsada (sin selección) o con la vista comparativa plana (con selección), así que no
+  // requiere auto-expandir.
   useEffect(() => {
     if (isAM && user) {
       setExpandedRows({ [`am-${user.id}`]: true });
-      return;
     }
-
-    if (directorFilterType === "am" && selectedAMId !== "all") {
-      setExpandedRows({ [`am-${selectedAMId}`]: true });
-    } else if (directorFilterType === "gestion_directa") {
-      setExpandedRows({ "am-direct": true });
-    } else if (directorFilterType === "aliado" && selectedAllyId !== "all") {
-      const selectedAlly = profiles.find((p) => p.id === selectedAllyId);
-      if (selectedAlly) {
-        const amId = selectedAlly.account_manager_id || "direct";
-        const amRowId = `am-${amId}`;
-        const newExpanded: Record<string, boolean> = { [amRowId]: true };
-
-        if (!selectedAlly.empresa_multialiado_id) {
-          newExpanded[`${amRowId}-independientes`] = true;
-        } else {
-          newExpanded[`${amRowId}-empresas`] = true;
-          newExpanded[`${amRowId}-empresas-${selectedAlly.empresa_multialiado_id}`] = true;
-        }
-        setExpandedRows(newExpanded);
-      }
-    }
-  }, [directorFilterType, selectedAMId, selectedAllyId, profiles, isAM, user]);
+  }, [isAM, user]);
 
   interface RowStats {
     clientes: number;
@@ -245,38 +204,59 @@ function PipelineManagerContent() {
         )
       );
 
+    // Vista comparativa plana: el director eligió 1 o más aliados/AMs → una fila por
+    // selección (sin jerarquía), lado a lado con sus KPIs. Ver AliadoPicker.
+    if (!isAM && selectedEntities.length > 0) {
+      type FlatEntry = { key: string; name: string; subLabel: string; type: "am" | "ally"; alliesCount?: number; stats: RowStats };
+      const flat: FlatEntry[] = [];
+      selectedEntities.forEach((id) => {
+        if (id === GESTION_DIRECTA_ID) {
+          const directAllyIds = profiles.filter((p) => p.role === "aliado" && !p.account_manager_id).map((a) => a.id);
+          const ps = filteredByDate.filter((p) => directAllyIds.includes(p.aliado_id));
+          flat.push({ key: `cmp-${id}`, name: "Gestión Directa (Sin AM)", subLabel: "Aliados sin account manager", type: "am", alliesCount: directAllyIds.length, stats: getStats(ps) });
+          return;
+        }
+        const prof = profiles.find((p) => p.id === id);
+        if (!prof) return;
+        if (prof.role === "account_manager") {
+          const amAllyIds = profiles.filter((p) => p.role === "aliado" && p.account_manager_id === prof.id).map((a) => a.id);
+          const ps = filteredByDate.filter((p) => amAllyIds.includes(p.aliado_id));
+          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Account Manager", type: "am", alliesCount: amAllyIds.length, stats: getStats(ps) });
+        } else {
+          const ps = filteredByDate.filter((p) => p.aliado_id === prof.id);
+          const amName = prof.account_manager_id ? (profiles.find((a) => a.id === prof.account_manager_id)?.full_name || "AM") : "Gestión Directa";
+          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: `Aliado · ${amName}`, type: "ally", stats: getStats(ps) });
+        }
+      });
+      flat.sort((a, b) => cmp(sortVal(a.stats, a.alliesCount || 0, a.name), sortVal(b.stats, b.alliesCount || 0, b.name)));
+      flat.forEach((e) => {
+        rows.push({
+          id: e.key,
+          level: 1,
+          name: e.name,
+          subLabel: e.subLabel,
+          type: e.type,
+          alliesCount: e.alliesCount,
+          ...e.stats,
+          hasChildren: false,
+          isExpanded: false,
+        });
+      });
+      return rows;
+    }
+
     let selectedAMs: { id: string | null; name: string }[] = [];
     if (isAM) {
       if (user) {
         selectedAMs = [{ id: user.id, name: user.full_name }];
       }
     } else {
-      if (directorFilterType === "am" && selectedAMId !== "all") {
-        const amProf = profiles.find((p) => p.id === selectedAMId);
-        if (amProf) {
-          selectedAMs = [{ id: amProf.id, name: amProf.full_name }];
-        }
-      } else if (directorFilterType === "gestion_directa") {
-        selectedAMs = [{ id: null, name: "Gestión Directa (Sin AM)" }];
-      } else if (directorFilterType === "aliado" && selectedAllyId !== "all") {
-        const selectedAlly = profiles.find((p) => p.id === selectedAllyId);
-        if (selectedAlly) {
-          if (selectedAlly.account_manager_id) {
-            const managingAM = profiles.find((p) => p.id === selectedAlly.account_manager_id);
-            if (managingAM) {
-              selectedAMs = [{ id: managingAM.id, name: managingAM.full_name }];
-            }
-          } else {
-            selectedAMs = [{ id: null, name: "Gestión Directa (Sin AM)" }];
-          }
-        }
-      } else {
-        selectedAMs = amsList.map((am) => ({ id: am.id, name: am.full_name }));
-        const unassignedAllies = profiles.filter((p) => p.role === "aliado" && p.is_active && !p.account_manager_id);
-        const unassignedProspects = filteredByDate.filter((p) => unassignedAllies.some((a) => a.id === p.aliado_id));
-        if (unassignedAllies.length > 0 || unassignedProspects.length > 0) {
-          selectedAMs.push({ id: null, name: "Gestión Directa (Sin AM)" });
-        }
+      // Director sin selección → Todos los AM + Gestión Directa.
+      selectedAMs = amsList.map((am) => ({ id: am.id, name: am.full_name }));
+      const unassignedAllies = profiles.filter((p) => p.role === "aliado" && p.is_active && !p.account_manager_id);
+      const unassignedProspects = filteredByDate.filter((p) => unassignedAllies.some((a) => a.id === p.aliado_id));
+      if (unassignedAllies.length > 0 || unassignedProspects.length > 0) {
+        selectedAMs.push({ id: null, name: "Gestión Directa (Sin AM)" });
       }
     }
 
@@ -489,7 +469,7 @@ function PipelineManagerContent() {
     });
 
     return rows;
-  }, [amsList, profiles, filteredByDate, empresasMultialiado, expandedRows, user, isAM, directorFilterType, selectedAMId, selectedAllyId, sortKey, sortDir]);
+  }, [amsList, profiles, filteredByDate, empresasMultialiado, expandedRows, user, isAM, selectedEntities, sortKey, sortDir]);
 
   const toggleRow = (rowId: string) => {
     setExpandedRows((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
@@ -517,13 +497,6 @@ function PipelineManagerContent() {
     { id: "name", label: "Nombre (A-Z)" },
   ];
 
-  const filterTabs: { id: typeof directorFilterType; label: string }[] = [
-    { id: "todos", label: "Todos" },
-    { id: "am", label: "Por AM" },
-    { id: "aliado", label: "Por Aliado" },
-    { id: "gestion_directa", label: "Gestión Directa" },
-  ];
-
   return (
     <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
 
@@ -536,53 +509,16 @@ function PipelineManagerContent() {
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra el embudo y el comparativo por supervisor, aliado o gestión directa.</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Selecciona uno o varios aliados y/o account managers para comparar sus gestiones lado a lado.</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            <div className="bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 text-xs">
-              {filterTabs.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setDirectorFilterType(t.id)}
-                  className={`px-3 py-1.5 rounded-lg transition-all text-[10px] font-semibold ${
-                    directorFilterType === t.id
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {directorFilterType === "am" && (
-              <select
-                value={selectedAMId}
-                onChange={(e) => setSelectedAMId(e.target.value)}
-                className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
-              >
-                <option value="all">Todos los AM...</option>
-                {profiles.filter((p) => p.role === "account_manager").map((am) => (
-                  <option key={am.id} value={am.id}>{am.full_name}</option>
-                ))}
-              </select>
-            )}
-
-            {directorFilterType === "aliado" && (
-              <select
-                value={selectedAllyId}
-                onChange={(e) => setSelectedAllyId(e.target.value)}
-                className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
-              >
-                <option value="all">Todos los aliados...</option>
-                {profiles.filter((p) => p.role === "aliado").map((ally) => (
-                  <option key={ally.id} value={ally.id}>{ally.full_name}</option>
-                ))}
-              </select>
-            )}
-          </div>
+          <AliadoPicker
+            profiles={profiles}
+            selected={selectedEntities}
+            onChange={setSelectedEntities}
+            accent="emerald"
+          />
         </div>
       )}
 

@@ -22,6 +22,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
 import { createClient } from "@/utils/supabase/client";
@@ -55,38 +56,16 @@ function ClientesAdminContent() {
   const subStageFilter = searchParams.get("subetapa") || "all";
   const selectedAlly = searchParams.get("aliado") || "all";
 
-  // Director filtering states
-  const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
-  const [selectedAMId, setSelectedAMId] = useState<string>("all");
-  const [selectedAllyId, setSelectedAllyId] = useState<string>("all");
+  // Filtro de asignación (director): multi-selección de aliados y/o account managers.
+  // Vacío = Todos. Ver AliadoPicker / prospectMatchesSelection.
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
   const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
 
   const baseFilteredProspects = React.useMemo(() => {
     if (user?.role !== "director") return prospects;
-
-    if (directorFilterType === "todos") {
-      return prospects;
-    }
-    if (directorFilterType === "am") {
-      if (selectedAMId === "all") return prospects;
-      const assignedAllyIds = profiles
-        .filter((p) => p.role === "aliado" && p.account_manager_id === selectedAMId)
-        .map((p) => p.id);
-      return prospects.filter((p) => assignedAllyIds.includes(p.aliado_id));
-    }
-    if (directorFilterType === "aliado") {
-      if (selectedAllyId === "all") return prospects;
-      return prospects.filter((p) => p.aliado_id === selectedAllyId);
-    }
-    if (directorFilterType === "gestion_directa") {
-      const unassignedAllyIds = profiles
-        .filter((p) => p.role === "aliado" && !p.account_manager_id)
-        .map((p) => p.id);
-      return prospects.filter((p) => unassignedAllyIds.includes(p.aliado_id));
-    }
-    return prospects;
-  }, [prospects, user, directorFilterType, selectedAMId, selectedAllyId, profiles]);
+    return prospects.filter((p) => prospectMatchesSelection(p, selectedEntities, profiles));
+  }, [prospects, user, selectedEntities, profiles]);
 
   const activeProspects = baseFilteredProspects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
   const deletedProspects = baseFilteredProspects.filter((p) => isProspectDeleted(p));
@@ -319,13 +298,6 @@ function ClientesAdminContent() {
     closeDeleteModal();
   };
 
-  const filterTabs: { id: typeof directorFilterType; label: string }[] = [
-    { id: "todos", label: "Todos" },
-    { id: "am", label: "Por AM" },
-    { id: "aliado", label: "Por Aliado" },
-    { id: "gestion_directa", label: "Gestión Directa" },
-  ];
-
   return (
     <>
       <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
@@ -358,53 +330,16 @@ function ClientesAdminContent() {
               </div>
               <div>
                 <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Filtra la lista por supervisor, aliado comercial o tu gestión directa.</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Selecciona uno o varios aliados y/o account managers para comparar sus gestiones.</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-              <div className="bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800">
-                {filterTabs.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setDirectorFilterType(t.id)}
-                    className={`px-3 py-1.5 rounded-lg transition-all text-[10px] font-semibold ${
-                      directorFilterType === t.id
-                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {directorFilterType === "am" && (
-                <select
-                  value={selectedAMId}
-                  onChange={(e) => setSelectedAMId(e.target.value)}
-                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
-                >
-                  <option value="all">Todos los AM...</option>
-                  {profiles.filter((p) => p.role === "account_manager").map((am) => (
-                    <option key={am.id} value={am.id}>{am.full_name}</option>
-                  ))}
-                </select>
-              )}
-
-              {directorFilterType === "aliado" && (
-                <select
-                  value={selectedAllyId}
-                  onChange={(e) => setSelectedAllyId(e.target.value)}
-                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none transition-colors cursor-pointer text-slate-700 dark:text-slate-300 focus:border-emerald-500"
-                >
-                  <option value="all">Todos los aliados...</option>
-                  {profiles.filter((p) => p.role === "aliado").map((ally) => (
-                    <option key={ally.id} value={ally.id}>{ally.full_name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+            <AliadoPicker
+              profiles={profiles}
+              selected={selectedEntities}
+              onChange={setSelectedEntities}
+              accent="emerald"
+            />
           </div>
         )}
 
