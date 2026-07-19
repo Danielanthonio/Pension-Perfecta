@@ -226,7 +226,7 @@ function DashboardContent() {
         ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
       ).length;
       const condicionados = active.filter((p) =>
-        ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
+        ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
       ).length;
       const rechazados = active.filter((p) => p.status === "rechazado").length;
       const otorgados = active.filter((p) => p.status === "pagado_comision").length;

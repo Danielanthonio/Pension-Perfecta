@@ -286,6 +286,10 @@ export default function ProspectoDetalle() {
   // Condition modal states
   const [showConditionModal, setShowConditionModal] = useState<boolean>(false);
   const [selectedConditionOption, setSelectedConditionOption] = useState<Prospect["status"] | null>(null);
+  // Fecha de nueva evaluación cuando se condiciona como "Agenda futura".
+  const [reevalDate, setReevalDate] = useState<string>("");
+  // Nota del motivo exacto del condicionamiento (visible para el aliado).
+  const [conditionNote, setConditionNote] = useState<string>("");
 
   // New modal states
   const [showPendingModal, setShowPendingModal] = useState<boolean>(false);
@@ -1853,11 +1857,21 @@ export default function ProspectoDetalle() {
       return;
     }
 
+    const reviewerLabel = user?.role === "account_manager" ? "Account Manager" : "Director";
+    // Nombre de la sección/subetapa condicionada (centralizado en getStageAndSubStage).
+    const sectionLabel = getStageAndSubStage(selectedConditionOption).subStage || "Condicionado";
+    const note = conditionNote.trim();
+
     if (selectedConditionOption === "aportacion") {
       if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
         alert("Por favor verifica los números del simulador. Tu Pensión Perfecta debe superar a la actual, y el financiamiento debe ser mayor a cero para condicionar por aportación.");
         return;
       }
+      // La nota del motivo se antepone a los comentarios del simulador para que el
+      // aliado la vea junto al dictamen financiero. Ambos van a notes_director.
+      const finalComments = note
+        ? (comments?.trim() ? `${sectionLabel}: ${note}\n\n${comments.trim()}` : `${sectionLabel}: ${note}`)
+        : comments;
       await saveSimulation(prospect.id, {
         semanas,
         pensionActual,
@@ -1866,15 +1880,31 @@ export default function ProspectoDetalle() {
         costoGestion,
         aforePensionarse,
         creditoNomina,
-        comments,
+        comments: finalComments,
       });
+    } else if (selectedConditionOption === "agenda_futura") {
+      if (!reevalDate) {
+        alert("Por favor selecciona la fecha de la nueva evaluación para agendar el expediente.");
+        return;
+      }
+      const fechaLabel = new Date(`${reevalDate}T00:00:00`).toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const base = `Agenda futura: nueva evaluación programada para el ${fechaLabel}`;
+      const comment = note ? `${base}. Motivo: ${note}` : `${base} por el ${reviewerLabel}`;
+      await updateProspectStatus(prospect.id, selectedConditionOption, comment, reevalDate);
     } else {
-      const reviewerLabel = user?.role === "account_manager" ? "Account Manager" : "Director";
-      await updateProspectStatus(prospect.id, selectedConditionOption, `Expediente condicionado por el ${reviewerLabel}`);
+      // Motivo exacto visible para el aliado: "{Sección}: {nota}".
+      const comment = note ? `${sectionLabel}: ${note}` : `${sectionLabel} — condicionado por el ${reviewerLabel}`;
+      await updateProspectStatus(prospect.id, selectedConditionOption, comment);
     }
 
     setShowConditionModal(false);
     setSelectedConditionOption(null);
+    setReevalDate("");
+    setConditionNote("");
     router.push(backPath);
   };
 
@@ -2980,6 +3010,8 @@ export default function ProspectoDetalle() {
               onClick={() => {
                 setShowConditionModal(false);
                 setSelectedConditionOption(null);
+                setReevalDate("");
+                setConditionNote("");
               }}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
             >
@@ -3023,42 +3055,90 @@ export default function ProspectoDetalle() {
                   iconColor: "text-rose-500",
                   icon: AlertCircle,
                 },
+                {
+                  id: "agenda_futura",
+                  label: "Agenda Futura",
+                  desc: "Posponer para una nueva evaluación en fecha futura",
+                  iconColor: "text-indigo-500",
+                  icon: Calendar,
+                },
               ].map((opt) => {
                 const isSelected = selectedConditionOption === opt.id;
                 const IconComp = opt.icon;
                 return (
-                  <div
-                    key={opt.id}
-                    onClick={() => setSelectedConditionOption(opt.id as any)}
-                    className={`border p-4.5 rounded-[22px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
-                      isSelected
-                        ? "bg-amber-50/50 border-amber-500 ring-1 ring-amber-500/20 shadow-sm"
-                        : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`h-11 w-11 rounded-full border border-slate-100 flex items-center justify-center bg-white shadow-sm shrink-0 ${opt.iconColor}`}>
-                        <IconComp className="h-5 w-5 stroke-[2]" />
+                  <div key={opt.id}>
+                    <div
+                      onClick={() => setSelectedConditionOption(opt.id as any)}
+                      className={`border p-4.5 rounded-[22px] flex items-center justify-between cursor-pointer transition-all duration-200 ${
+                        isSelected
+                          ? "bg-amber-50/50 border-amber-500 ring-1 ring-amber-500/20 shadow-sm"
+                          : "bg-white border-slate-200 hover:border-slate-350 hover:bg-slate-50/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`h-11 w-11 rounded-full border border-slate-100 flex items-center justify-center bg-white shadow-sm shrink-0 ${opt.iconColor}`}>
+                          <IconComp className="h-5 w-5 stroke-[2]" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-none">{opt.desc}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-xs font-black text-slate-800 leading-tight">{opt.label}</h4>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-none">{opt.desc}</p>
+
+                      <div className="flex items-center">
+                        <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
+                          isSelected ? "border-amber-500 bg-white" : "border-slate-300"
+                        }`}>
+                          {isSelected && (
+                            <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-fade-in" />
+                          )}
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center">
-                      <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-all ${
-                        isSelected ? "border-amber-500 bg-white" : "border-slate-300"
-                      }`}>
-                        {isSelected && (
-                          <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-fade-in" />
-                        )}
+
+                    {opt.id === "agenda_futura" && isSelected && (
+                      <div className="mt-2 ml-2 pl-4 border-l-2 border-amber-200 animate-fade-in">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                          Fecha de nueva evaluación
+                        </label>
+                        <input
+                          type="date"
+                          value={reevalDate}
+                          min={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => setReevalDate(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 font-semibold mt-1.5 leading-tight">
+                          El expediente quedará agendado para reevaluarse en esta fecha.
+                        </p>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            {/* Nota del motivo exacto — se muestra al elegir una sección y queda
+                visible para el aliado como comentario del Director. */}
+            {selectedConditionOption && (
+              <div className="animate-fade-in">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nota para el aliado
+                  <span className="ml-1.5 normal-case text-amber-600 font-black">· {getStageAndSubStage(selectedConditionOption).subStage}</span>
+                </label>
+                <textarea
+                  value={conditionNote}
+                  onChange={(e) => setConditionNote(e.target.value)}
+                  rows={3}
+                  placeholder="Describe el motivo exacto (ej. El documento de semanas es muy antiguo, el estado de cuenta Afore no es legible...)"
+                  className="w-full px-3.5 py-3 bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-slate-700 placeholder:text-slate-350 placeholder:font-medium outline-none focus:border-amber-500 transition-all resize-none leading-relaxed"
+                />
+                <p className="text-[10px] text-slate-400 font-semibold mt-1.5 leading-tight">
+                  Esta nota será visible para el aliado como el motivo del condicionamiento.
+                </p>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

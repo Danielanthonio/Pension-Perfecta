@@ -133,7 +133,7 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   ).length;
 
   const condicionadosCount = displayProspects.filter((p) =>
-    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
+    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
   ).length;
 
   const rechazadosCount = displayProspects.filter((p) =>

@@ -40,7 +40,7 @@ export default function GestionAccountManagers() {
     ).length;
 
     const condicionados = groupProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
+      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
     ).length;
 
     // "Cerrado perdido" es solo un estado del cliente, no un rechazo.

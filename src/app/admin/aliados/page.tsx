@@ -34,7 +34,7 @@ import {
 // dictamen de aprobación + pipeline de cierre posterior (Agenda Asesoría, Firma Carta Compromiso,
 // Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Ya fueron aprobados.
 const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"];
-const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
+const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"];
 const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
 // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
 // El único estado previo al dictamen que se excluye es evaluacion_pendiente.
@@ -860,7 +860,7 @@ export default function GestorAliados() {
                                 className={`px-2 py-0.5 rounded-full text-[8px] font-black border ${
                                   p.status === "pagado_comision"
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-150"
-                                    : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+                                    : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura"].includes(p.status)
                                     ? "bg-amber-50 text-amber-700 border-amber-150"
                                     : p.status === "cerrado_perdido"
                                     ? "bg-slate-100 text-slate-500 border-slate-200"
@@ -873,7 +873,7 @@ export default function GestorAliados() {
                                   ? "Financiado"
                                   : p.status === "evaluacion_pendiente"
                                   ? "Evaluación"
-                                  : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+                                  : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura"].includes(p.status)
                                   ? "Condicionado"
                                   : p.status === "cerrado_perdido"
                                   ? "Cerrado Perdido"

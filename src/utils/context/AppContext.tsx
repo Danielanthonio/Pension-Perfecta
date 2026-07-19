@@ -138,13 +138,17 @@ export interface Prospect {
     | "cerrado_perdido"
     | "falta_semanas"
     | "falta_afore_cuenta"
-    | "posible_simulacion";
+    | "posible_simulacion"
+    | "agenda_futura";
   notes_aliado?: string;
   notes_director?: string;
   empresa_multialiado_id?: string | null;
   // Modalidad de aprobación (40 / 10) que definen el Director o el Account Manager.
   // El aliado la ve en su portal y solo se le abre la agenda de esa modalidad.
   modalidad?: "40" | "10" | null;
+  // Fecha de nueva evaluación agendada cuando el expediente se condiciona como
+  // "Agenda futura" (subetapa de Condicionado). Nullable mientras no aplique.
+  reeval_date?: string | null;
   simulation?: Simulation;
   sim_emitted_at?: string | null;
   documents: DocumentItem[];
@@ -245,7 +249,7 @@ interface AppContextType {
   isProspectDeleted: (p: Prospect) => boolean;
   isProspectPurged: (p: Prospect) => boolean;
   getProspectDeletedAt: (p: Prospect) => Date | null;
-  updateProspectStatus: (id: string, newStatus: Prospect["status"], comments?: string) => Promise<void>;
+  updateProspectStatus: (id: string, newStatus: Prospect["status"], comments?: string, reevalDate?: string | null) => Promise<void>;
   updateProspectModalidad: (id: string, modalidad: "40" | "10") => Promise<void>;
   saveSimulation: (
     id: string,
@@ -699,6 +703,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       notes_director: dbProspect.notes_director || "",
       empresa_multialiado_id: dbProspect.empresa_multialiado_id || null,
       modalidad: dbProspect.modalidad || null,
+      reeval_date: dbProspect.reeval_date || null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,
@@ -2603,7 +2608,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const updateProspectStatus = async (
     id: string,
     newStatus: Prospect["status"],
-    comments?: string
+    comments?: string,
+    reevalDate?: string | null
   ) => {
     if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
@@ -2613,6 +2619,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             ...p,
             status: newStatus,
             notes_director: notesDir,
+            ...(reevalDate !== undefined ? { reeval_date: reevalDate } : {}),
             updated_at: new Date().toISOString(),
           };
         }
@@ -2670,12 +2677,22 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       try {
         const updateData: any = { status: newStatus };
         if (comments) updateData.notes_director = comments;
+        if (reevalDate !== undefined) updateData.reeval_date = reevalDate;
 
         const { error } = await supabase.from("prospects").update(updateData).eq("id", id);
         if (error) throw error;
 
         setProspects((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: newStatus, notes_director: comments || p.notes_director } : p))
+          prev.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status: newStatus,
+                  notes_director: comments || p.notes_director,
+                  ...(reevalDate !== undefined ? { reeval_date: reevalDate } : {}),
+                }
+              : p
+          )
         );
 
         const target = prospects.find((p) => p.id === id);
@@ -4414,7 +4431,7 @@ export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   // siguen mapeando en getStageAndSubStage para datos ya existentes.
   evaluacion_pendiente: [],
   rechazado: ["No aplica"],
-  condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral"],
+  condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral", "Agenda futura"],
   aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato", "Cerrada Ganada"],
   otorgado: ["Pagado / Cerrado"],
   cerrado_perdido: ["No acepta propuesta"]
@@ -4440,6 +4457,8 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
       return { stage: "condicionado", subStage: "Falta estado cuenta afore" };
     case "posible_simulacion":
       return { stage: "condicionado", subStage: "Posible simulación laboral" };
+    case "agenda_futura":
+      return { stage: "condicionado", subStage: "Agenda futura" };
     case "asesoria_agendada":
       return { stage: "aprobado", subStage: "Agenda Asesoria" };
     case "doc_proceso":
@@ -4476,6 +4495,7 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     if (subStage === "Falta detallado de semanas") return "falta_semanas";
     if (subStage === "Falta estado cuenta afore") return "falta_afore_cuenta";
     if (subStage === "Posible simulación laboral") return "posible_simulacion";
+    if (subStage === "Agenda futura") return "agenda_futura";
     return "aportacion";
   }
   if (stage === "aprobado") {
