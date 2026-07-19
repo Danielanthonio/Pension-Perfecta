@@ -31,6 +31,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
+import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 
 function ClientesContent() {
   const {
@@ -44,6 +45,7 @@ function ClientesContent() {
     isProspectDeleted,
     isProspectPurged,
     getProspectDeletedAt,
+    appSettings,
     isDemoMode,
   } = useApp();
 
@@ -65,6 +67,8 @@ function ClientesContent() {
 
   // Page local states
   const [searchTerm, setSearchTerm] = useState("");
+  // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
+  const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
   const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "rechazados" | "cerrados" | "papelera">("evaluacion");
 
   // States for Scheduling Modal
@@ -165,6 +169,11 @@ function ClientesContent() {
       return false;
     }
 
+    // Modalidad filter (Todos / M40 / M10)
+    if (modalidadFilter !== "all" && p.modalidad !== modalidadFilter) {
+      return false;
+    }
+
     return true;
   });
 
@@ -262,6 +271,22 @@ function ClientesContent() {
     setSchedulingStep("datetime");
   };
 
+  // El Director/AM define la modalidad al aprobar; el aliado solo abre esa agenda.
+  // Si aún no está definida (casos previos), se le deja elegir (modal 40/10).
+  const handleOpenAgenda = (prospect: Prospect) => {
+    const modalidad = prospect.modalidad;
+    if (modalidad) {
+      const url = modalidad === "40" ? appSettings.meeting_link_m40 : appSettings.meeting_link_m10;
+      if (!url || !url.trim()) {
+        alert(`El director aún no ha configurado el link de Modalidad ${modalidad}. Solicítalo a Dirección.`);
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setModalityOpen(true);
+  };
+
   const handleConfirmSchedule = async () => {
     if (!selectedProspect || !selectedDate || !selectedTime) return;
     await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
@@ -298,6 +323,15 @@ function ClientesContent() {
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
         {getSubStageLabel(p.status)}
       </span>
+      {p.modalidad && (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${
+          p.modalidad === "40"
+            ? "bg-blue-50 text-blue-700 border-blue-150 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50"
+            : "bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+        }`}>
+          Modalidad {p.modalidad}
+        </span>
+      )}
     </div>
   );
 
@@ -507,7 +541,7 @@ function ClientesContent() {
                                 <span className="block text-xs font-black text-emerald-700 dark:text-emerald-300 tabular-nums">
                                   ${p.simulation.totalCredito.toLocaleString()}
                                 </span>
-                                <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">M40 + Gestión</span>
+                                <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">{p.modalidad ? `M${p.modalidad} + Gestión` : "Financiamiento + Gestión"}</span>
                               </div>
                             ) : (
                               <span className="text-slate-400 italic text-[11px]">N/A</span>
@@ -524,9 +558,9 @@ function ClientesContent() {
                                 <FileText className="h-4 w-4" />
                               </Link>
                               <button
-                                onClick={() => setModalityOpen(true)}
+                                onClick={() => handleOpenAgenda(p)}
                                 className="p-1.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 text-white rounded-xl shadow border border-emerald-450 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
-                                title="Agendar Asesoría (Modalidad 40 / 10)"
+                                title={p.modalidad ? `Agendar Asesoría (Modalidad ${p.modalidad})` : "Agendar Asesoría"}
                               >
                                 <Calendar className="h-4 w-4" />
                               </button>

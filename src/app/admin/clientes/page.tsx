@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
+import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
@@ -57,6 +58,8 @@ function ClientesAdminContent() {
   const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
   const [selectedAMId, setSelectedAMId] = useState<string>("all");
   const [selectedAllyId, setSelectedAllyId] = useState<string>("all");
+  // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
+  const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
 
   const baseFilteredProspects = React.useMemo(() => {
     if (user?.role !== "director") return prospects;
@@ -217,7 +220,8 @@ function ClientesAdminContent() {
     .filter((p) => {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
-    });
+    })
+    .filter((p) => modalidadFilter === "all" || p.modalidad === modalidadFilter);
 
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;

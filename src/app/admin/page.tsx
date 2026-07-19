@@ -8,8 +8,10 @@ import {
 } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sorting";
+import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 import {
   Users,
+  Filter,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
@@ -47,6 +49,8 @@ function PipelineManagerContent() {
   const [directorFilterType, setDirectorFilterType] = useState<"todos" | "am" | "aliado" | "gestion_directa">("todos");
   const [selectedAMId, setSelectedAMId] = useState<string>("all");
   const [selectedAllyId, setSelectedAllyId] = useState<string>("all");
+  // Filtro por modalidad de aprobación (Todos / M40 / M10): recalcula todos los KPIs.
+  const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
 
   // Sort state for the comparative table (top-level entities + leaves).
   const [sortKey, setSortKey] = useState("clientes");
@@ -91,7 +95,12 @@ function PipelineManagerContent() {
     return prospects;
   }, [prospects, user, directorFilterType, selectedAMId, selectedAllyId, profiles]);
 
-  const activeProspects = baseFilteredProspects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  const activeProspects = baseFilteredProspects.filter(
+    (p) =>
+      !isProspectDeleted(p) &&
+      !isProspectPurged(p) &&
+      (modalidadFilter === "all" || p.modalidad === modalidadFilter)
+  );
 
   const filteredByDate = activeProspects.filter((p) => {
     if (!p.created_at) return true;
@@ -576,6 +585,20 @@ function PipelineManagerContent() {
           </div>
         </div>
       )}
+
+      {/* Filtro por modalidad de aprobación — recalcula todos los KPIs (Director y AM) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-indigo-500/10">
+            <Filter className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Modalidad de aprobación</h4>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Recalcula el embudo y los indicadores por modalidad (M40 / M10).</p>
+          </div>
+        </div>
+        <ModalidadFilter value={modalidadFilter} onChange={setModalidadFilter} />
+      </div>
 
       {/* Sales Funnel Section */}
       <SalesFunnel prospects={filteredByDate} />

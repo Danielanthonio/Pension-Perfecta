@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useApp, Prospect, UserProfile } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
+import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 import {
   Users,
   TrendingUp,
@@ -41,7 +42,14 @@ const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "
 
 export default function GestorAliados() {
   const { prospects, profiles, isProspectDeleted, isProspectPurged, empresasMultialiado } = useApp();
-  const activeProspects = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+  // Filtro por modalidad de aprobación (Todos / M40 / M10): recalcula todas las métricas.
+  const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
+  const activeProspects = prospects.filter(
+    (p) =>
+      !isProspectDeleted(p) &&
+      !isProspectPurged(p) &&
+      (modalidadFilter === "all" || p.modalidad === modalidadFilter)
+  );
 
   // Helper to get Account Manager name
   const getAMName = (amId?: string | null) => {
@@ -234,8 +242,12 @@ export default function GestorAliados() {
 
   return (
     <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
-      {/* Slim date filter row */}
+      {/* Slim date + modalidad filter row */}
       <div className="flex flex-wrap items-center justify-end gap-2.5">
+        <div className="flex items-center gap-2 mr-auto">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modalidad</span>
+          <ModalidadFilter value={modalidadFilter} onChange={setModalidadFilter} />
+        </div>
         <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-sm text-xs text-slate-600 dark:text-slate-300">
           <Calendar className="h-3.5 w-3.5 text-slate-400" />
           <input

@@ -3,10 +3,11 @@
 import React, { useState, useEffect, Suspense, useMemo } from "react";
 import { useApp, getStageAndSubStage, Prospect } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
-import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX, Sparkles, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX, Sparkles, ChevronRight, ChevronDown, Filter } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 
 function DashboardContent() {
   const { prospects, isProspectDeleted, isProspectPurged, user: contextUser, profiles, isDemoMode } = useApp();
@@ -15,6 +16,8 @@ function DashboardContent() {
 
   const [assignedLeaderIds, setAssignedLeaderIds] = useState<string[]>([]);
   const [dbLeaders, setDbLeaders] = useState<any[]>([]);
+  // Filtro por modalidad de aprobación (Todos / M40 / M10): recalcula los KPIs del aliado.
+  const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
 
   useEffect(() => {
     if (user?.id && !isDemoMode) {
@@ -86,6 +89,11 @@ function DashboardContent() {
 
     // Sub-stage filter
     if (subStageFilter !== "all" && subStage !== subStageFilter) {
+      return false;
+    }
+
+    // Modalidad filter (Todos / M40 / M10)
+    if (modalidadFilter !== "all" && p.modalidad !== modalidadFilter) {
       return false;
     }
 
@@ -555,6 +563,20 @@ function DashboardContent() {
           </div>
         </div>
       )}
+
+      {/* Filtro por modalidad de aprobación — recalcula los indicadores */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-indigo-500/10">
+            <Filter className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-white">Modalidad de aprobación</h4>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Recalcula el embudo y los indicadores por modalidad (M40 / M10).</p>
+          </div>
+        </div>
+        <ModalidadFilter value={modalidadFilter} onChange={setModalidadFilter} />
+      </div>
 
       {/* Sales Funnel and Rates */}
       <SalesFunnel prospects={filteredProspects} assignedAllies={liderAliadosData?.aliados_asignados} />

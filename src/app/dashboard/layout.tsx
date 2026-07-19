@@ -86,6 +86,7 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
   const [localEndDate, setLocalEndDate] = useState("");
   const [localStageFilter, setLocalStageFilter] = useState("all");
   const [localSubStageFilter, setLocalSubStageFilter] = useState("all");
+  const [localModalidadFilter, setLocalModalidadFilter] = useState("all");
 
   // Sync filters from URL search params
   useEffect(() => {
@@ -93,6 +94,7 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
     setLocalEndDate(searchParams.get("hasta") || "");
     setLocalStageFilter(searchParams.get("etapa") || "all");
     setLocalSubStageFilter(searchParams.get("subetapa") || "all");
+    setLocalModalidadFilter(searchParams.get("modalidad") || "all");
   }, [searchParams]);
 
   const handleApplyFilters = () => {
@@ -109,6 +111,9 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
     if (localSubStageFilter !== "all") params.set("subetapa", localSubStageFilter);
     else params.delete("subetapa");
 
+    if (localModalidadFilter !== "all") params.set("modalidad", localModalidadFilter);
+    else params.delete("modalidad");
+
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -117,12 +122,14 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
     setLocalEndDate("");
     setLocalStageFilter("all");
     setLocalSubStageFilter("all");
+    setLocalModalidadFilter("all");
 
     const params = new URLSearchParams(searchParams.toString());
     params.delete("desde");
     params.delete("hasta");
     params.delete("etapa");
     params.delete("subetapa");
+    params.delete("modalidad");
 
     router.push(`${pathname}?${params.toString()}`);
   };
@@ -210,6 +217,21 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
               ))}
             </select>
           </div>
+          {/* Modalidad de aprobación — solo en la lista de clientes */}
+          {isClientes && (
+            <div>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Modalidad</label>
+              <select
+                value={localModalidadFilter}
+                onChange={(e) => setLocalModalidadFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer"
+              >
+                <option value="all">Todas las Modalidades</option>
+                <option value="40" className="bg-slate-900 text-slate-200">Modalidad 40</option>
+                <option value="10" className="bg-slate-900 text-slate-200">Modalidad 10</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Filter Buttons */}
