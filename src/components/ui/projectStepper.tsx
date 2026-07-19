@@ -11,14 +11,16 @@ export const STEP_STATUSES = [
   "asesoria_agendada", // 0 · Agenda Asesoría
   "doc_proceso",       // 1 · Firma Carta Compromiso
   "analisis_riesgo",   // 2 · Análisis de Riesgo
-  "firma_programada",  // 3 · Cerrada Ganada
-  "pagado_comision",   // 4 · Pagado / Cerrado
+  "firma_contrato",    // 3 · Firma de Contrato
+  "firma_programada",  // 4 · Cerrada Ganada
+  "pagado_comision",   // 5 · Pagado / Cerrado
 ] as const;
 
 export const STEP_DEFS: { label: string; desc: string }[] = [
   { label: "Agenda Asesoría", desc: "Asesoría agendada para presentar propuesta" },
   { label: "Firma Carta Compromiso", desc: "Carta compromiso firmada por el cliente" },
   { label: "Análisis de Riesgo", desc: "En análisis de riesgo operativo" },
+  { label: "Firma de Contrato", desc: "Contrato de financiamiento firmado" },
   { label: "Cerrada Ganada", desc: "Caso cerrado y ganado" },
   { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
 ];
@@ -40,10 +42,12 @@ export function getActiveStageIndex(status: string): number {
       return 1;
     case "analisis_riesgo":
       return 2;
-    case "firma_programada":
+    case "firma_contrato":
       return 3;
-    case "pagado_comision":
+    case "firma_programada":
       return 4;
+    case "pagado_comision":
+      return 5;
     default:
       return 0;
   }
@@ -79,7 +83,7 @@ export function ProjectStepper({ activeIndex, dates, className = "" }: ProjectSt
       <div className="absolute inset-0 flex items-center" aria-hidden="true">
         <div
           className="border-t-2 border-emerald-500 transition-all duration-500"
-          style={{ width: `${(activeIndex / 4) * 100}%` }}
+          style={{ width: `${(activeIndex / (STEP_DEFS.length - 1)) * 100}%` }}
         />
       </div>
 

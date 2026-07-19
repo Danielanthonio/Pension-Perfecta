@@ -207,16 +207,19 @@ function DashboardContent() {
     const rows: EfficiencyTableRow[] = [];
 
     const getStats = (prospectsList: Prospect[]) => {
-      const totalClientes = prospectsList.length;
-      const aprobados = prospectsList.filter((p) =>
+      // "Cerrado perdido" es SOLO un estado del cliente: no forma parte del embudo/pipeline,
+      // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
+      // base "Clientes", para que la tabla cuadre con el embudo.
+      const active = prospectsList.filter((p) => p.status !== "cerrado_perdido");
+      const totalClientes = active.length;
+      const aprobados = active.filter((p) =>
         ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
       ).length;
-      const condicionados = prospectsList.filter((p) =>
+      const condicionados = active.filter((p) =>
         ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
       ).length;
-      // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
-      const rechazados = prospectsList.filter((p) => p.status === "rechazado").length;
-      const otorgados = prospectsList.filter((p) => p.status === "pagado_comision").length;
+      const rechazados = active.filter((p) => p.status === "rechazado").length;
+      const otorgados = active.filter((p) => p.status === "pagado_comision").length;
       // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u
       // otorgado). No cuenta los estados previos al dictamen (evaluacion_pendiente, doc_proceso,
       // analisis_riesgo).
@@ -228,20 +231,21 @@ function DashboardContent() {
         "asesoria_agendada",
         "doc_proceso",
         "analisis_riesgo",
+        "firma_contrato",
         "firma_programada",
         "pagado_comision",
       ];
-      const finAprobados = prospectsList
+      const finAprobados = active
         .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
-      const finOtorgados = prospectsList
+      const finOtorgados = active
         .filter((p) => p.status === "pagado_comision" && p.simulation)
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
       const tasaEvaluacion = totalClientes > 0 ? (evaluados / totalClientes) * 100 : 0;
       const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
-      const tasaCierre = aprobados > 0 ? (prospectsList.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
+      const tasaCierre = aprobados > 0 ? (active.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
 
       return {
         clientes: totalClientes,
@@ -586,7 +590,7 @@ function DashboardContent() {
                   <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[9px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                     <th className="px-6 py-4">Account Manager / Entidad</th>
                     <th className="px-4 py-4 text-center">Aliados</th>
-                    <th className="px-4 py-4 text-center">Clientes</th>
+                    <th className="px-4 py-4 text-center">Proyectos</th>
                     <th className="px-4 py-4 text-center">Evaluados</th>
                     <th className="px-4 py-4 text-center">Aprobados</th>
                     <th className="px-4 py-4 text-center">Condicionados</th>

@@ -128,6 +128,7 @@ export interface Prospect {
     | "asesoria_agendada"
     | "doc_proceso"
     | "analisis_riesgo"
+    | "firma_contrato"
     | "firma_programada"
     | "pagado_comision"
     | "aportacion"
@@ -2634,6 +2635,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           notifTitle = "¡Comisión Liberada! 💰✨";
           notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
           toastMsg = `🎉 ¡Felicidades! Se ha liberado y transferido la comisión correspondiente al caso de ${target.full_name}. Ya puedes revisarla en tus estados financieros.`;
+        } else if (newStatus === "firma_contrato") {
+          notifTitle = "Firma de Contrato ✍️";
+          notifMsg = `El contrato de financiamiento de ${target.full_name} pasó a firma.`;
         } else if (newStatus === "firma_programada") {
           notifTitle = "Firma Programada ✍️";
           notifMsg = `La firma del financiamiento para ${target.full_name} ha sido programada.`;
@@ -2687,6 +2691,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             notifTitle = "¡Comisión Liberada! 💰✨";
             notifMsg = `Se liberó la comisión para ti por el proyecto de ${target.full_name}.`;
             toastMsg = `🎉 ¡Felicidades! Se ha liberado y transferido la comisión correspondiente al caso de ${target.full_name}. Ya puedes revisarla en tus estados financieros.`;
+          } else if (newStatus === "firma_contrato") {
+            notifTitle = "Firma de Contrato ✍️";
+            notifMsg = `El contrato de financiamiento de ${target.full_name} pasó a firma.`;
           } else if (newStatus === "firma_programada") {
             notifTitle = "Firma Programada ✍️";
             notifMsg = `La firma del financiamiento para ${target.full_name} ha sido programada.`;
@@ -4381,7 +4388,7 @@ export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: [],
   rechazado: ["No aplica"],
   condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral"],
-  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada"],
+  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato", "Cerrada Ganada"],
   otorgado: ["Pagado / Cerrado"],
   cerrado_perdido: ["No acepta propuesta"]
 };
@@ -4412,6 +4419,8 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
       return { stage: "aprobado", subStage: "Firma Carta Compromiso" };
     case "analisis_riesgo":
       return { stage: "aprobado", subStage: "Analisis de Riesgo" };
+    case "firma_contrato":
+      return { stage: "aprobado", subStage: "Firma de Contrato" };
     case "firma_programada":
       return { stage: "aprobado", subStage: "Cerrada Ganada" };
     case "pagado_comision":
@@ -4446,6 +4455,7 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     if (subStage === "Agenda Asesoria") return "asesoria_agendada";
     if (subStage === "Firma Carta Compromiso") return "doc_proceso";
     if (subStage === "Analisis de Riesgo") return "analisis_riesgo";
+    if (subStage === "Firma de Contrato") return "firma_contrato";
     if (subStage === "Cerrada Ganada") return "firma_programada";
     return "aprobado_listo";
   }

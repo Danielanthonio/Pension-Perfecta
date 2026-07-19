@@ -31,7 +31,7 @@ import {
 // que es el único embudo que vale. No modificar sin actualizar allá también.
 const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
 const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
-const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"];
+const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
 // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
 // Excluye los estados previos al dictamen: evaluacion_pendiente, doc_proceso y analisis_riesgo.
 const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
@@ -875,6 +875,7 @@ export default function GestorAliados() {
                                     "asesoria_agendada",
                                     "doc_proceso",
                                     "analisis_riesgo",
+                                    "firma_contrato",
                                     "firma_programada",
                                     "aportacion",
                                   ].includes(p.status) ? (

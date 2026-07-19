@@ -197,6 +197,7 @@ function ClientesContent() {
   const activeStatuses = [
     "doc_proceso",
     "analisis_riesgo",
+    "firma_contrato",
     "firma_programada",
     "pagado_comision",
   ];

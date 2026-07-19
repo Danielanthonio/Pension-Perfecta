@@ -53,7 +53,7 @@ export default function GestionAccountManagers() {
 
     const approvedStatuses = [
       "aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso",
-      "analisis_riesgo", "firma_programada", "pagado_comision",
+      "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision",
     ];
     const finAprobados = groupProspects
       .filter((p) => approvedStatuses.includes(p.status) && p.simulation)

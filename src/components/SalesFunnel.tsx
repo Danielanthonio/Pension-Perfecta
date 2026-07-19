@@ -152,6 +152,7 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     "asesoria_agendada",
     "doc_proceso",
     "analisis_riesgo",
+    "firma_contrato",
     "firma_programada",
     "pagado_comision",
   ];

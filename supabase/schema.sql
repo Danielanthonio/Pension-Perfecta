@@ -57,6 +57,7 @@ CREATE TABLE prospects (
       'asesoria_agendada',
       'doc_proceso',
       'analisis_riesgo',
+      'firma_contrato',
       'firma_programada',
       'pagado_comision',
       'aportacion',

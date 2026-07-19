@@ -19,7 +19,7 @@ import { Suspense } from "react";
 // Status buckets shared by the comparative table and the KPI strip.
 const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
 const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
-const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"];
+const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
 // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
 // Excluye los estados previos al dictamen: evaluacion_pendiente, doc_proceso y analisis_riesgo.
 const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
@@ -175,24 +175,28 @@ function PipelineManagerContent() {
     const rows: EfficiencyTableRow[] = [];
 
     const getStats = (prospectsList: Prospect[]): RowStats => {
-      const totalClientes = prospectsList.length;
-      const evaluados = prospectsList.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
-      const aprobados = prospectsList.filter((p) => APPROVED_STAGE.includes(p.status)).length;
-      const condicionados = prospectsList.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
-      // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
-      const rechazados = prospectsList.filter((p) => p.status === "rechazado").length;
+      // "Cerrado perdido" es SOLO un estado del cliente: no forma parte del embudo/pipeline,
+      // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
+      // base "Clientes". De lo contrario la tabla no cuadra con el embudo (un AM podría mostrar
+      // más clientes que el total de proyectos del embudo).
+      const active = prospectsList.filter((p) => p.status !== "cerrado_perdido");
+      const totalClientes = active.length;
+      const evaluados = active.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
+      const aprobados = active.filter((p) => APPROVED_STAGE.includes(p.status)).length;
+      const condicionados = active.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
+      const rechazados = active.filter((p) => p.status === "rechazado").length;
 
-      const finAprobados = prospectsList
+      const finAprobados = active
         .filter((p) => FINANCED_APPROVED.includes(p.status) && p.simulation)
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
-      const finOtorgados = prospectsList
+      const finOtorgados = active
         .filter((p) => p.status === "pagado_comision" && p.simulation)
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
       const tasaEvaluacion = totalClientes > 0 ? (evaluados / totalClientes) * 100 : 0;
       const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
-      const tasaCierre = aprobados > 0 ? (prospectsList.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
+      const tasaCierre = aprobados > 0 ? (active.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
 
       return { clientes: totalClientes, evaluados, aprobados, condicionados, rechazados, finAprobados, finOtorgados, tasaEvaluacion, tasaAprobacion, tasaCierre };
     };
@@ -489,7 +493,7 @@ function PipelineManagerContent() {
 
   const accent = isAM ? "blue" : "emerald";
   const sortOptions = [
-    { id: "clientes", label: "Clientes" },
+    { id: "clientes", label: "Proyectos" },
     { id: "aprobados", label: "Aprobados" },
     { id: "condicionados", label: "Condicionados" },
     { id: "rechazados", label: "Rechazados" },
@@ -601,7 +605,7 @@ function PipelineManagerContent() {
                 <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
                   <SortHeader col="name" label="Account Manager / Entidad" sort={sort} align="left" className="pl-4" />
                   <SortHeader col="aliados" label="Aliados" sort={sort} align="center" />
-                  <SortHeader col="clientes" label="Clientes" sort={sort} align="center" />
+                  <SortHeader col="clientes" label="Proyectos" sort={sort} align="center" />
                   <SortHeader col="evaluados" label="Eval." sort={sort} align="center" />
                   <SortHeader col="aprobados" label="Aprob." sort={sort} align="center" />
                   <SortHeader col="condicionados" label="Condic." sort={sort} align="center" />

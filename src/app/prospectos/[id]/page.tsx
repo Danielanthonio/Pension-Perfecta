@@ -580,6 +580,7 @@ export default function ProspectoDetalle() {
       { status: "asesoria_agendada", label: "Agenda del proyecto" },
       { status: "doc_proceso", label: "Firma carta de compromiso" },
       { status: "analisis_riesgo", label: "Análisis de riesgo" },
+      { status: "firma_contrato", label: "Firma de contrato" },
       { status: "firma_programada", label: "Cerrada ganada" },
       { status: "pagado_comision", label: "Pagada / cerrada" },
     ];
@@ -3028,6 +3029,13 @@ export default function ProspectoDetalle() {
                   desc: "En análisis de riesgo operativo",
                   iconColor: "text-cyan-500",
                   icon: ShieldCheck,
+                },
+                {
+                  id: "firma_contrato",
+                  label: "Firma de Contrato",
+                  desc: "Contrato de financiamiento firmado",
+                  iconColor: "text-violet-500",
+                  icon: FileSignature,
                 },
                 {
                   id: "firma_programada",
