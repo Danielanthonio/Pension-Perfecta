@@ -41,7 +41,7 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex } from "@/components/ui/projectStepper";
-import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
+import { TipoFinanciamientoBadge, getTipoFinanciamientoMeta, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -268,7 +268,7 @@ export default function ProspectoDetalle() {
   };
 
   // Document preview state
-  const [selectedDocType, setSelectedDocType] = useState<"AFORE" | "IMSS" | null>(null);
+  const [selectedDocType, setSelectedDocType] = useState<"AFORE" | "IMSS" | "RESOLUCION" | "INE" | null>(null);
   const [selectedDocName, setSelectedDocName] = useState<string>("");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [docFullscreen, setDocFullscreen] = useState(false);
@@ -302,7 +302,7 @@ export default function ProspectoDetalle() {
   const [selectedApprovalModalidad, setSelectedApprovalModalidad] = useState<"40" | "10" | null>(null);
 
   // Ally file upload states
-  const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | null>(null);
+  const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE" | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const canDeleteDoc = user?.role === "director" || user?.role === "account_manager" || (prospect && prospect.aliado_id === user?.id);
@@ -338,15 +338,18 @@ export default function ProspectoDetalle() {
     }
   };
 
-  const handleDocumentUpload = async (type: "AFORE" | "IMSS" | "OTROS", e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (type: "AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!prospect) return;
 
-    if (type === "AFORE") {
-      const hasImss = prospect.documents?.some((d) => d.file_type === "IMSS");
-      if (!hasImss) {
-        alert("Atención: Primero debes subir el Certificado de Semanas Cotizadas (IMSS) antes de poder subir el expediente de AFORE.");
+    // El segundo documento del expediente (INE / AFORE) exige que el primero
+    // (Resolución / IMSS) ya esté cargado, según el tipo de financiamiento.
+    const [firstSlot, supportSlot] = getExpedienteDocSlots(prospect.tipo_financiamiento);
+    if (type === supportSlot.fileType) {
+      const hasFirst = prospect.documents?.some((d) => d.file_type === firstSlot.fileType);
+      if (!hasFirst) {
+        alert(`Atención: Primero debes subir ${firstSlot.title} antes de poder subir ${supportSlot.title}.`);
         e.target.value = "";
         return;
       }
@@ -933,7 +936,7 @@ export default function ProspectoDetalle() {
 
   if (user?.role === "aliado") {
     // Determine document states
-    const getDocStatus = (type: "AFORE" | "IMSS" | "OTROS") => {
+    const getDocStatus = (type: "AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE") => {
       const doc = prospect.documents.find((d) => d.file_type === type);
       if (!doc) return "pendiente";
 
@@ -1173,6 +1176,26 @@ export default function ProspectoDetalle() {
           </div>
         </div>
 
+        {/* Banner prominente del tipo de financiamiento — deja claro al recibir el
+            expediente si es Crédito de nómina o Modalidad 40/10. */}
+        {prospect.tipo_financiamiento && (() => {
+          const tipoMeta = getTipoFinanciamientoMeta(prospect.tipo_financiamiento);
+          if (!tipoMeta) return null;
+          const TipoIcon = tipoMeta.Icon;
+          return (
+            <div className={`rounded-2xl border px-5 py-3.5 flex items-center gap-3.5 shadow-sm ${tipoMeta.badge}`}>
+              <span className="h-10 w-10 rounded-xl bg-white/60 dark:bg-black/20 flex items-center justify-center shrink-0">
+                <TipoIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <span className="block text-[9px] font-black uppercase tracking-widest opacity-80">Tipo de financiamiento</span>
+                <span className="block text-sm font-black leading-tight">{tipoMeta.label}</span>
+                <span className="block text-[10px] font-semibold opacity-90 mt-0.5 leading-normal">{tipoMeta.description}</span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Central Grid Split: Column 1 (60% Documents & visualizer) vs Column 2 (40% Feedback & Timeline) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
           
@@ -1187,20 +1210,14 @@ export default function ProspectoDetalle() {
               </div>
 
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {(["IMSS", "AFORE"] as const).map((type) => {
+                {getExpedienteDocSlots(prospect.tipo_financiamiento).map((slot) => {
+                  const type = slot.fileType;
                   const status = getDocStatus(type);
                   const doc = prospect.documents.find((d) => d.file_type === type);
                   const isUploading = uploadingType === type;
 
-                  let label = "";
-                  let description = "";
-                  if (type === "IMSS") {
-                    label = "Reporte de Semanas IMSS";
-                    description = "Reporte certificado de semanas cotizadas emitido por el IMSS.";
-                  } else {
-                    label = "Estado de Cuenta AFORE";
-                    description = "Último estado de cuenta o captura digital legible de Afore.";
-                  }
+                  const label = slot.title;
+                  const description = slot.description;
 
                   return (
                     <div key={type} className="py-4.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2300,7 +2317,7 @@ export default function ProspectoDetalle() {
                       <div className="flex items-center gap-2">
                         <FileText className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
                         <span className="text-[9px] font-black uppercase tracking-wider">
-                          Expediente {doc.file_type}
+                          Expediente {getDocTypeLabel(doc.file_type)}
                         </span>
                       </div>
                       <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>

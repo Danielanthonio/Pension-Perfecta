@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { saveFile, getFile } from "@/utils/db";
+import { getExpedienteDocSlots, getTipoFinanciamientoLabel } from "@/components/ui/tipoFinanciamiento";
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
@@ -89,7 +90,7 @@ export interface DocumentItem {
   prospect_id: string;
   file_name: string;
   file_url: string;
-  file_type: "AFORE" | "IMSS" | "OTROS";
+  file_type: "AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE";
   storage_path?: string;
   uploaded_at: string;
   drive_file_id?: string;
@@ -221,7 +222,7 @@ interface AppContextType {
   updateUserPassword: (newPassword: string) => Promise<void>;
   updateUserProfile: (updates: ProfileEditableFields) => Promise<void>;
   uploadAvatar: (file: File) => Promise<string>;
-  uploadDocument: (prospectId: string, fileType: "AFORE" | "IMSS" | "OTROS", fileName: string, fileDataUrl: string) => Promise<DocumentItem>;
+  uploadDocument: (prospectId: string, fileType: "AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE", fileName: string, fileDataUrl: string) => Promise<DocumentItem>;
   deleteDocument: (prospectId: string, docId: string) => Promise<void>;
   registerAliado: (fullName: string, email: string, phone: string, password: string, code: string) => Promise<boolean>;
   initializeDirector: (fullName: string, email: string, phone: string, password: string) => Promise<boolean>;
@@ -1494,7 +1495,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
   const uploadDocument = async (
     prospectId: string,
-    fileType: "AFORE" | "IMSS" | "OTROS",
+    fileType: "AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE",
     fileName: string,
     fileDataUrl: string
   ): Promise<DocumentItem> => {
@@ -1975,6 +1976,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ): Promise<Prospect> => {
+    // Tipos de documento del expediente según el tipo de financiamiento.
+    // `ocrSlot` = documento con OCR (imssFile); `secondSlot` = documento de apoyo (aforeFile).
+    const [ocrSlot, secondSlot] = getExpedienteDocSlots(prospectData.tipo_financiamiento);
+    const tipoLabel = getTipoFinanciamientoLabel(prospectData.tipo_financiamiento);
+
     let driveFolderId = "";
     let driveFolderUrl = "";
     try {
@@ -2037,7 +2043,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           prospect_id: newId,
           file_name: aforeName,
           file_url: driveFile.url,
-          file_type: "AFORE",
+          file_type: secondSlot.fileType,
           uploaded_at: new Date().toISOString(),
           drive_file_id: driveFile.id,
           drive_file_url: driveFile.url,
@@ -2054,7 +2060,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           prospect_id: newId,
           file_name: imssName,
           file_url: driveFile.url,
-          file_type: "IMSS",
+          file_type: ocrSlot.fileType,
           uploaded_at: new Date().toISOString(),
           drive_file_id: driveFile.id,
           drive_file_url: driveFile.url,
@@ -2087,7 +2093,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const newNotif: NotificationItem = {
         id: `notif-${Math.random().toString(36).substr(2, 9)}`,
         title: "Nuevo Prospecto Capturado",
-        message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} para evaluación Ley 73.`,
+        message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} (${tipoLabel}) para evaluación Ley 73.`,
         type: "info",
         read: false,
         created_at: new Date().toISOString(),
@@ -2096,7 +2102,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
 
       triggerPushNotification(
-        `🔔 Nuevo prospecto: ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
+        `🔔 Nuevo prospecto (${tipoLabel}): ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
         "whatsapp",
         "Eduardo Director"
       );
@@ -2185,7 +2191,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               prospect_id: dbProspect.id,
               file_name: aforeName,
               file_url: driveFile.url,
-              file_type: "AFORE",
+              file_type: secondSlot.fileType,
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
@@ -2209,7 +2215,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               prospect_id: dbProspect.id,
               file_name: imssName,
               file_url: driveFile.url,
-              file_type: "IMSS",
+              file_type: ocrSlot.fileType,
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
@@ -2234,14 +2240,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           await supabase.from("notifications").insert({
             user_id: dir.id,
             title: "Nuevo Prospecto Capturado",
-            message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} para evaluación Ley 73.`,
+            message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} (${tipoLabel}) para evaluación Ley 73.`,
             type: "info",
             read: false,
           });
         }
 
         triggerPushNotification(
-          `🔔 Nuevo prospecto: ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
+          `🔔 Nuevo prospecto (${tipoLabel}): ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
           "whatsapp",
           "Eduardo Director"
         );

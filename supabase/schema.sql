@@ -96,7 +96,7 @@ CREATE TABLE documents (
   prospect_id uuid REFERENCES prospects(id) ON DELETE CASCADE,
   file_name text,
   file_url text,
-  file_type text CHECK (file_type IN ('AFORE', 'IMSS', 'OTROS')),
+  file_type text CHECK (file_type IN ('AFORE', 'IMSS', 'OTROS', 'RESOLUCION', 'INE')),
   storage_path text, -- Ruta en Supabase Storage
   uploaded_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );

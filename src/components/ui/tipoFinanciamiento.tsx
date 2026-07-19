@@ -59,6 +59,87 @@ export function getTipoFinanciamientoLabel(
 }
 
 /**
+ * Un "slot" del expediente del prospecto. El expediente siempre tiene dos
+ * documentos en dos slots: el primero (`runsOcr`) es del que el OCR lee CURP/NSS
+ * y el segundo es de soporte. Qué documentos son depende del tipo de
+ * financiamiento:
+ *   - Crédito de nómina → Resolución de Pensión (OCR) + INE
+ *   - Modalidad 40/10   → Reporte de Semanas IMSS (OCR) + Estado de Cuenta AFORE
+ */
+export interface ExpedienteDocSlot {
+  /** Valor que se guarda en `documents.file_type`. */
+  fileType: "IMSS" | "AFORE" | "RESOLUCION" | "INE";
+  /** Título completo (formulario / vista del director). */
+  title: string;
+  /** Etiqueta corta para listas/badges. */
+  shortLabel: string;
+  /** Descripción de apoyo. */
+  description: string;
+  /** true en el slot del que el OCR extrae los datos del cliente. */
+  runsOcr: boolean;
+}
+
+const EXPEDIENTE_SLOTS: Record<TipoFinanciamiento, [ExpedienteDocSlot, ExpedienteDocSlot]> = {
+  credito_nomina: [
+    {
+      fileType: "RESOLUCION",
+      title: "Resolución de Pensión",
+      shortLabel: "Resolución",
+      description: "Resolución de pensión del cliente. El OCR lee la CURP y el NSS de este documento.",
+      runsOcr: true,
+    },
+    {
+      fileType: "INE",
+      title: "Identificación Oficial (INE)",
+      shortLabel: "INE",
+      description: "Credencial para votar (INE) del cliente, legible por ambos lados.",
+      runsOcr: false,
+    },
+  ],
+  modalidad_40_10: [
+    {
+      fileType: "IMSS",
+      title: "Reporte de Semanas IMSS",
+      shortLabel: "IMSS",
+      description: "Reporte certificado de semanas cotizadas emitido por el IMSS.",
+      runsOcr: true,
+    },
+    {
+      fileType: "AFORE",
+      title: "Estado de Cuenta AFORE",
+      shortLabel: "AFORE",
+      description: "Último estado de cuenta o captura digital legible de Afore.",
+      runsOcr: false,
+    },
+  ],
+};
+
+/**
+ * Slots del expediente para un tipo de financiamiento. Cuando no hay tipo
+ * definido (prospectos previos a esta función) se usan los de Modalidad 40/10
+ * (IMSS + AFORE), que es el comportamiento histórico.
+ */
+export function getExpedienteDocSlots(
+  value: TipoFinanciamiento | null | undefined
+): [ExpedienteDocSlot, ExpedienteDocSlot] {
+  return EXPEDIENTE_SLOTS[value ?? "modalidad_40_10"] ?? EXPEDIENTE_SLOTS.modalidad_40_10;
+}
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  IMSS: "IMSS",
+  AFORE: "AFORE",
+  RESOLUCION: "Resolución",
+  INE: "INE",
+  OTROS: "Otros",
+};
+
+/** Etiqueta legible de un `documents.file_type` (para sidebar/listas). */
+export function getDocTypeLabel(fileType: string | null | undefined): string {
+  if (!fileType) return "Documento";
+  return DOC_TYPE_LABELS[fileType] ?? fileType;
+}
+
+/**
  * Badge compacto para listas/tablas. Cuando no hay tipo definido muestra un
  * estado neutro "Sin definir" (prospectos previos a esta función).
  */

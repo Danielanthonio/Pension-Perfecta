@@ -22,6 +22,7 @@ import {
 import {
   TIPO_FINANCIAMIENTO_OPTIONS,
   getTipoFinanciamientoMeta,
+  getExpedienteDocSlots,
   type TipoFinanciamiento,
 } from "@/components/ui/tipoFinanciamiento";
 
@@ -112,25 +113,33 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
         }
         
         const { fullName: extractedName, nss: extractedNss, curp: extractedCurp, semanas: extractedSemanas } = resData.data;
-        
+
         if (extractedName) setFullName(extractedName);
         if (extractedNss) setNss(extractedNss);
         if (extractedCurp) setCurp(extractedCurp);
-        if (extractedSemanas) {
-          setSemanas(extractedSemanas);
+
+        // La Resolución de Pensión (Crédito de nómina) no tiene semanas ni datos
+        // de cálculo Ley 73: solo se leen nombre/NSS/CURP. En Modalidad 40/10 sí
+        // se autollena el diagnóstico a partir del reporte IMSS.
+        if (tipoFinanciamiento !== "credito_nomina") {
+          if (extractedSemanas) {
+            setSemanas(extractedSemanas);
+          } else {
+            setSemanas("1300");
+          }
+
+          // Auto-fill Ley 73 calculation metrics matching default values
+          setPensionActual("12000");
+          setPensionProyectada("35000");
+          setFinanciamientoM40("400000");
+          setCostoCobertura("55000");
+          setAforePensionarse("380000");
+          setCreditoNomina("0");
+          setObservaciones("Expediente extraído con éxito por OCR.");
         } else {
-          setSemanas("1300");
+          setObservaciones("Datos del cliente extraídos de la Resolución de Pensión por OCR.");
         }
-        
-        // Auto-fill Ley 73 calculation metrics matching default values
-        setPensionActual("12000");
-        setPensionProyectada("35000");
-        setFinanciamientoM40("400000");
-        setCostoCobertura("55000");
-        setAforePensionarse("380000");
-        setCreditoNomina("0");
-        setObservaciones("Expediente extraído con éxito por OCR.");
-        
+
         setHighlightFields(true);
         setOcrSuccessMsg(`Extracción OCR Exitosa: Se detectó al cliente ${extractedName || "nuevo"}.`);
         setTimeout(() => setHighlightFields(false), 3500);
@@ -167,15 +176,19 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
     const randomCurp = `${initials}750815HDFNNS09`;
     setCurp(randomCurp);
 
-    setSemanas("1250");
-    setPensionActual("10500");
-    setPensionProyectada("31000");
-    setFinanciamientoM40("380000");
-    setCostoCobertura("50000");
-    setAforePensionarse("350000");
-    setCreditoNomina("0");
-    setObservaciones("Expediente simulado basado en el nombre del archivo.");
-    
+    if (tipoFinanciamiento !== "credito_nomina") {
+      setSemanas("1250");
+      setPensionActual("10500");
+      setPensionProyectada("31000");
+      setFinanciamientoM40("380000");
+      setCostoCobertura("50000");
+      setAforePensionarse("350000");
+      setCreditoNomina("0");
+      setObservaciones("Expediente simulado basado en el nombre del archivo.");
+    } else {
+      setObservaciones("Datos simulados de la Resolución de Pensión basados en el nombre del archivo.");
+    }
+
     setHighlightFields(true);
     setOcrSuccessMsg(`Extracción Simulada: Nombre del archivo parseado como "${nameCandidate}".`);
     setTimeout(() => setHighlightFields(false), 3500);
@@ -229,7 +242,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
     if (!file) return;
 
     if (type === "afore" && !imssFileName) {
-      alert("Atención: Primero debes subir el Certificado de Semanas Cotizadas (IMSS) antes de poder subir el expediente de AFORE.");
+      alert(`Atención: Primero debes subir ${ocrSlot.title} antes de poder subir ${secondSlot.title}.`);
       e.target.value = "";
       return;
     }
@@ -315,7 +328,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
       if (isCurpDuplicate) {
         setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
       } else if (!hasDocuments) {
-        setErrorMsg("Es obligatorio subir tanto el Reporte de Semanas IMSS como el Estado de Cuenta de AFORE para enviar a evaluación.");
+        setErrorMsg(`Es obligatorio subir tanto ${ocrSlot.title} como ${secondSlot.title} para enviar a evaluación.`);
       } else {
         setErrorMsg("Por favor corrige los datos del prospecto antes de continuar.");
       }
@@ -366,6 +379,9 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   };
 
   const selectedTipoMeta = getTipoFinanciamientoMeta(tipoFinanciamiento);
+  // Slots del expediente según el tipo de financiamiento. `ocrSlot` es el primer
+  // documento (del que el OCR lee CURP/NSS); `secondSlot` es el de apoyo.
+  const [ocrSlot, secondSlot] = getExpedienteDocSlots(tipoFinanciamiento);
 
   return (
     <>
@@ -829,7 +845,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
 
             <div className="p-6 space-y-5">
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium block leading-normal">
-                Sube reportes PDF o imágenes legibles. Es **obligatorio** subir primero el Reporte de Semanas IMSS para iniciar.
+                Sube documentos PDF o imágenes legibles. Es **obligatorio** subir primero {ocrSlot.title} para iniciar.
               </span>
 
               {/* Google Drive Status Header */}
@@ -845,7 +861,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
 
               {/* Dropzone 1: IMSS */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">1. Reporte Semanas IMSS *</label>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">1. {ocrSlot.title} *</label>
                 <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group">
                   <input
                     type="file"
@@ -884,16 +900,16 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
                   ) : (
                     <>
                       <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 group-hover:scale-105 transition-all" />
-                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir Semanas IMSS</span>
-                      <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">Reporte digital oficial</span>
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir {ocrSlot.title}</span>
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">PDF o imagen (.jpg, .png)</span>
                     </>
                   )}
                 </div>
               </div>
 
-              {/* Dropzone 2: Afore */}
+              {/* Dropzone 2: documento de apoyo */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">2. Estado de Cuenta AFORE *</label>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">2. {secondSlot.title} *</label>
                 {imssOcrStatus === "completed" ? (
                   <div className="relative border border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden group animate-fade-in">
                     <input
@@ -933,7 +949,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
                     ) : (
                       <>
                         <Cloud className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 group-hover:scale-105 transition-all" />
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir AFORE</span>
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Subir {secondSlot.title}</span>
                         <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">PDF o imagen (.jpg, .png)</span>
                       </>
                     )}
@@ -943,8 +959,8 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-400 dark:text-slate-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">Cargar AFORE (Bloqueado)</span>
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-1">Primero sube y procesa las semanas IMSS</span>
+                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">Cargar {secondSlot.shortLabel} (Bloqueado)</span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-1">Primero sube y procesa {ocrSlot.title}</span>
                   </div>
                 )}
               </div>
@@ -958,7 +974,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
         <div className="flex items-center gap-2">
           {!hasDocuments ? (
             <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-950/20 px-3 py-1.5 rounded-full border border-red-150 dark:border-red-900/30 flex items-center gap-1.5">
-              <AlertCircle className="h-4 w-4" /> Sube IMSS y AFORE para desbloquear
+              <AlertCircle className="h-4 w-4" /> Sube {ocrSlot.shortLabel} y {secondSlot.shortLabel} para desbloquear
             </span>
           ) : formIsValid ? (
             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-full border border-emerald-150 dark:border-emerald-900/30 flex items-center gap-1.5">
