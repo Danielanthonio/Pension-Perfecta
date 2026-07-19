@@ -2348,9 +2348,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         allProspects = prospects;
       }
 
-      const callerLideres = new Set(user.lider_ids || []);
-      if (callerLideres.size === 0) return null;
-
       for (const p of allProspects) {
         if (p.aliado_id === user.id) continue;
         if (p.empresa_multialiado_id !== user.empresa_multialiado_id) continue;
@@ -2360,12 +2357,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const nssMatch = !!cleanNss && p.nss === cleanNss;
         if (!curpMatch && !nssMatch) continue;
 
-        // El dueño del expediente debe compartir al menos un líder con quien captura.
         const owner = profiles.find((prof) => prof.id === p.aliado_id);
-        const ownerLideres = owner?.lider_ids || [];
-        const sharesLider = ownerLideres.some((id) => callerLideres.has(id));
-        if (!sharesLider) continue;
-
         return {
           aliadoName: p.aliado_name || owner?.full_name || "otro aliado",
           fullName: p.full_name,

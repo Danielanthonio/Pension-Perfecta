@@ -264,7 +264,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   // conocemos. Sirve para nombrarlo tanto en el bloqueo por CURP como en el aviso.
   const duplicateOwnerName = teamDuplicate?.aliadoName || null;
   const curpDuplicateMessage = duplicateOwnerName
-    ? `Este cliente ya fue registrado por tu compañero de equipo ${duplicateOwnerName} (mismo líder), con la misma CURP.\nNo es posible continuar con un registro duplicado.\nCoordínate con tu equipo antes de avanzar.`
+    ? `Este cliente ya fue registrado por ${duplicateOwnerName}, un aliado de tu empresa, con la misma CURP.\nNo es posible continuar con un registro duplicado.\nCoordínate con tu equipo antes de avanzar.`
     : "Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.";
 
   const simulateFileUpload = (type: "afore" | "imss", e: React.ChangeEvent<HTMLInputElement>) => {
@@ -540,10 +540,10 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
           <Users className="h-5 w-5 flex-shrink-0 mt-0.5" />
           <div className="leading-normal">
             <span className="block font-black uppercase tracking-wider text-[11px] mb-0.5">
-              Cliente duplicado en tu equipo
+              Cliente duplicado en tu empresa
             </span>
             <span className="block">
-              <strong>{teamDuplicate.aliadoName}</strong>, un aliado con tu mismo líder, ya tiene registrado a{" "}
+              <strong>{teamDuplicate.aliadoName}</strong>, un aliado de tu empresa, ya tiene registrado a{" "}
               <strong>{teamDuplicate.fullName || "este cliente"}</strong>
               {teamDuplicate.matchedBy === "nss"
                 ? " con el mismo NSS"
