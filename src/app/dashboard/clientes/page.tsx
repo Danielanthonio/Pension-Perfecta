@@ -32,6 +32,7 @@ import { createClient } from "@/utils/supabase/client";
 import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 
 function ClientesContent() {
   const {
@@ -304,6 +305,9 @@ function ClientesContent() {
         <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block leading-tight truncate max-w-[210px]">{p.full_name}</span>
         <span className="block font-mono tabular-nums text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-none">{p.nss}</span>
         <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[210px]">{p.curp}</span>
+        {p.tipo_financiamiento && (
+          <TipoFinanciamientoBadge value={p.tipo_financiamiento} className="mt-1.5" />
+        )}
       </div>
     </div>
   );

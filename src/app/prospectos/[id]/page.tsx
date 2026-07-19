@@ -41,6 +41,7 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex } from "@/components/ui/projectStepper";
+import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -1097,6 +1098,9 @@ export default function ProspectoDetalle() {
                 <span>Ejecutivo: <span className="font-extrabold text-indigo-650">{prospect.aliado_name || "Asesor B2B"}</span></span>
                 <span>•</span>
                 <span>Actualizado: <span className="font-extrabold text-slate-600">{new Date(prospect.updated_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></span>
+                {prospect.tipo_financiamiento && (
+                  <TipoFinanciamientoBadge value={prospect.tipo_financiamiento} />
+                )}
                 {prospect.modalidad && (
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                     prospect.modalidad === "40"

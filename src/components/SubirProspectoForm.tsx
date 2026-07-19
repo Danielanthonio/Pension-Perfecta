@@ -17,7 +17,13 @@ import {
   Phone,
   FileText,
   FileSpreadsheet,
+  Pencil,
 } from "lucide-react";
+import {
+  TIPO_FINANCIAMIENTO_OPTIONS,
+  getTipoFinanciamientoMeta,
+  type TipoFinanciamiento,
+} from "@/components/ui/tipoFinanciamiento";
 
 interface SubirProspectoFormProps {
   /** Ruta a la que se regresa/redirige tras guardar o cancelar. */
@@ -28,6 +34,11 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   const router = useRouter();
   const { addProspect, user, checkCurpExists } = useApp();
   const isDirector = user?.role === "director";
+
+  // Tipo de financiamiento — lo elige el aliado en una ventana bloqueante al
+  // abrir la captura. Se mantiene abierta hasta que se selecciona una opción.
+  const [tipoFinanciamiento, setTipoFinanciamiento] = useState<TipoFinanciamiento | null>(null);
+  const [showTipoModal, setShowTipoModal] = useState(true);
 
   // Form Fields
   const [fullName, setFullName] = useState("");
@@ -211,7 +222,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   const hasDocuments = aforeFileName !== "" && imssFileName !== "";
   const uploadsInProgress = aforeUploading || imssUploading;
   const filesReady = aforeFileDataUrl !== "" && imssFileDataUrl !== "";
-  const formIsValid = nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
+  const formIsValid = tipoFinanciamiento !== null && nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
 
   const simulateFileUpload = (type: "afore" | "imss", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -322,6 +333,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
           curp: curp.toUpperCase(),
           phone,
           email,
+          tipo_financiamiento: tipoFinanciamiento,
           notes_aliado: notesAliado || observaciones,
           simulation: isDirector ? {
             semanas: Number(semanas) || 0,
@@ -353,13 +365,97 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
     }
   };
 
+  const selectedTipoMeta = getTipoFinanciamientoMeta(tipoFinanciamiento);
+
   return (
+    <>
+      {/* Ventana bloqueante: elegir el tipo de financiamiento antes de capturar */}
+      {showTipoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+              <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-widest">Nuevo Expediente</span>
+              <h2 className="text-lg font-black text-slate-800 dark:text-white tracking-tight mt-0.5">Tipo de financiamiento</h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 leading-normal">
+                Selecciona con qué producto ingresa este prospecto. Podrás verlo el Director y el Account Manager en el pipeline.
+              </p>
+            </div>
+            <div className="p-6 space-y-3">
+              {TIPO_FINANCIAMIENTO_OPTIONS.map((opt) => {
+                const isSelected = tipoFinanciamiento === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTipoFinanciamiento(opt.value)}
+                    className={`w-full flex items-center gap-3.5 p-4 rounded-2xl border-2 text-left transition-all active:scale-[0.99] ${
+                      isSelected
+                        ? `${opt.accent} ring-2 ring-offset-0 shadow-sm`
+                        : "border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <span className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 border ${opt.badge}`}>
+                      <opt.Icon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black text-slate-800 dark:text-white">{opt.label}</span>
+                      <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">{opt.description}</span>
+                    </span>
+                    <span className={`h-5 w-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
+                      isSelected ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"
+                    }`}>
+                      {isSelected && <CheckCircle className="h-4 w-4 text-white" />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-6 pt-0 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => router.push(backHref)}
+                className="px-5 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-250 dark:border-slate-700 text-slate-600 dark:text-slate-350 text-xs font-bold rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!tipoFinanciamiento}
+                onClick={() => setShowTipoModal(false)}
+                className="inline-flex items-center px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/10 border border-emerald-450 dark:border-emerald-900 transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     <div className="max-w-[1700px] mx-auto space-y-6 pb-16 animate-fade-in text-slate-800 dark:text-slate-100">
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+      <div className="flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
           <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold uppercase tracking-widest">Nuevo Expediente</span>
           <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mt-0.5">Captura de Prospecto Ley 73</h1>
         </div>
+        {selectedTipoMeta && (
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="text-right hidden sm:block">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo de financiamiento</span>
+            </div>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black border ${selectedTipoMeta.badge}`}>
+              <selectedTipoMeta.Icon className="h-4 w-4" />
+              {selectedTipoMeta.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowTipoModal(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-850 transition-colors"
+              title="Cambiar tipo de financiamiento"
+            >
+              <Pencil className="h-3 w-3" /> Cambiar
+            </button>
+          </div>
+        )}
       </div>
 
       {errorMsg && (
@@ -893,5 +989,6 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
         </div>
       </div>
     </div>
+    </>
   );
 }

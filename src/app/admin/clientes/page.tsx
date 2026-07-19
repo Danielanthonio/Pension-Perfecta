@@ -22,6 +22,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
@@ -251,6 +252,7 @@ function ClientesAdminContent() {
     {
       fecha: (p) => p.created_at || "",
       nombre: (p) => p.full_name,
+      tipo: (p) => p.tipo_financiamiento || "",
       aliado: (p) => p.aliado_name || "",
       etapa: (p) => stageIndex(p.status),
       expediente: (p) => p.documents.length,
@@ -272,6 +274,7 @@ function ClientesAdminContent() {
   const sortOptionsActive = [
     { id: "fecha", label: "Fecha registro" },
     { id: "nombre", label: "Nombre" },
+    { id: "tipo", label: "Tipo de financiamiento" },
     { id: "aliado", label: "Aliado" },
     { id: "etapa", label: "Etapa" },
     { id: "expediente", label: "Documentos" },
@@ -559,6 +562,7 @@ function ClientesAdminContent() {
                   <thead>
                     <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
                       <SortHeader col="nombre" label="Prospecto" sort={sortA} className="pl-5" />
+                      <SortHeader col="tipo" label="Tipo de financiamiento" sort={sortA} />
                       <SortHeader col="aliado" label="Asignación" sort={sortA} />
                       <SortHeader col="expediente" label="Expediente" sort={sortA} align="center" />
                       <SortHeader col="etapa" label="Etapa · Subetapa" sort={sortA} />
@@ -607,6 +611,10 @@ function ClientesAdminContent() {
                                 <span className="block text-[9px] font-medium uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
+                          </td>
+                          {/* Tipo de financiamiento */}
+                          <td className="px-4 py-2.5">
+                            <TipoFinanciamientoBadge value={p.tipo_financiamiento} />
                           </td>
                           {/* Asignación */}
                           <td className="px-4 py-2.5">
@@ -718,7 +726,7 @@ function ClientesAdminContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={6} className="px-6 pt-1 pb-6 border-b-0">
+                            <td colSpan={7} className="px-6 pt-1 pb-6 border-b-0">
                               <div className="max-w-3xl mx-auto">
                                 <div className="flex items-center gap-2 mb-5">
                                   <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">

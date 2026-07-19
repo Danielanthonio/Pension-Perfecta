@@ -146,6 +146,10 @@ export interface Prospect {
   // Modalidad de aprobación (40 / 10) que definen el Director o el Account Manager.
   // El aliado la ve en su portal y solo se le abre la agenda de esa modalidad.
   modalidad?: "40" | "10" | null;
+  // Tipo de financiamiento con el que el ALIADO captura el prospecto
+  // ('credito_nomina' | 'modalidad_40_10'). Independiente de `modalidad`; sirve
+  // para diferenciar el origen del expediente ante el Director y el Account Manager.
+  tipo_financiamiento?: "credito_nomina" | "modalidad_40_10" | null;
   // Fecha de nueva evaluación agendada cuando el expediente se condiciona como
   // "Agenda futura" (subetapa de Condicionado). Nullable mientras no aplique.
   reeval_date?: string | null;
@@ -703,6 +707,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       notes_director: dbProspect.notes_director || "",
       empresa_multialiado_id: dbProspect.empresa_multialiado_id || null,
       modalidad: dbProspect.modalidad || null,
+      tipo_financiamiento: dbProspect.tipo_financiamiento || null,
       reeval_date: dbProspect.reeval_date || null,
       simulation: hasSimulation ? {
         semanas,
@@ -2144,6 +2149,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             phone: prospectData.phone,
             email: prospectData.email,
             notes_aliado: prospectData.notes_aliado,
+            tipo_financiamiento: prospectData.tipo_financiamiento || null,
             status: "evaluacion_pendiente",
             drive_folder_id: driveFolderId,
             drive_folder_url: driveFolderUrl,
