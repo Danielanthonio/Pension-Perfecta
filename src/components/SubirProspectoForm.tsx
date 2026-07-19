@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "@/utils/context/AppContext";
+import { useApp, type TeamDuplicate } from "@/utils/context/AppContext";
 import {
   Plus,
   Cloud,
@@ -18,6 +18,7 @@ import {
   FileText,
   FileSpreadsheet,
   Pencil,
+  Users,
 } from "lucide-react";
 import {
   TIPO_FINANCIAMIENTO_OPTIONS,
@@ -33,7 +34,7 @@ interface SubirProspectoFormProps {
 
 export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirProspectoFormProps) {
   const router = useRouter();
-  const { addProspect, user, checkCurpExists } = useApp();
+  const { addProspect, user, checkCurpExists, checkTeamDuplicate } = useApp();
   const isDirector = user?.role === "director";
 
   // Tipo de financiamiento — lo elige el aliado en una ventana bloqueante al
@@ -52,6 +53,11 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   // Duplicate Check States
   const [isCurpDuplicate, setIsCurpDuplicate] = useState(false);
   const [checkingCurp, setCheckingCurp] = useState(false);
+
+  // Alerta de cliente duplicado entre aliados del mismo equipo (PAL-003).
+  // Es una ADVERTENCIA (no bloquea): avisa que un compañero con el mismo líder ya
+  // trabaja al cliente, para coordinarse y no duplicar el expediente.
+  const [teamDuplicate, setTeamDuplicate] = useState<TeamDuplicate | null>(null);
 
   // Ley 73 Calculation Fields
   const [semanas, setSemanas] = useState<string>("");
@@ -195,7 +201,8 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
     setTimeout(() => setOcrSuccessMsg(""), 7000);
   };
 
-  // Validate CURP uniqueness in real-time
+  // Validate CURP uniqueness in real-time. El mensaje (que nombra al compañero de
+  // equipo cuando aplica) se deriva y se muestra en un banner dedicado más abajo.
   useEffect(() => {
     let active = true;
     if (user?.empresa_multialiado_id && curp.length === 18 && /^[A-Z0-9]{18}$/i.test(curp)) {
@@ -204,26 +211,42 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
         if (active) {
           setIsCurpDuplicate(exists);
           setCheckingCurp(false);
-          if (exists) {
-            setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
-          } else {
-            setErrorMsg((prev) => 
-              prev.includes("Este cliente ya se encuentra registrado con la misma CURP") ? "" : prev
-            );
-          }
         }
       });
     } else {
       setIsCurpDuplicate(false);
       setCheckingCurp(false);
-      setErrorMsg((prev) => 
-        prev.includes("Este cliente ya se encuentra registrado con la misma CURP") ? "" : prev
-      );
     }
     return () => {
       active = false;
     };
   }, [curp, checkCurpExists, user]);
+
+  // Alerta de cliente duplicado entre aliados del mismo equipo (PAL-003).
+  // Se dispara cuando la CURP (18) o el NSS (11) están completos y el aliado
+  // pertenece a una empresa multialiado. No bloquea el envío: solo advierte.
+  useEffect(() => {
+    let active = true;
+    const curpReady = curp.length === 18 && /^[A-Z0-9]{18}$/i.test(curp);
+    const nssReady = nss.length === 11 && /^\d{11}$/.test(nss);
+
+    if (user?.empresa_multialiado_id && (curpReady || nssReady)) {
+      const handle = setTimeout(() => {
+        checkTeamDuplicate(curpReady ? curp : "", nssReady ? nss : "").then((match) => {
+          if (active) setTeamDuplicate(match);
+        });
+      }, 350);
+      return () => {
+        active = false;
+        clearTimeout(handle);
+      };
+    }
+
+    setTeamDuplicate(null);
+    return () => {
+      active = false;
+    };
+  }, [curp, nss, checkTeamDuplicate, user]);
 
   // Real-time Validations
   const nssValid = nss.length === 11 && /^\d+$/.test(nss);
@@ -236,6 +259,13 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   const uploadsInProgress = aforeUploading || imssUploading;
   const filesReady = aforeFileDataUrl !== "" && imssFileDataUrl !== "";
   const formIsValid = tipoFinanciamiento !== null && nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
+
+  // Compañero de equipo (mismo líder + empresa) que ya registró al cliente, si lo
+  // conocemos. Sirve para nombrarlo tanto en el bloqueo por CURP como en el aviso.
+  const duplicateOwnerName = teamDuplicate?.aliadoName || null;
+  const curpDuplicateMessage = duplicateOwnerName
+    ? `Este cliente ya fue registrado por tu compañero de equipo ${duplicateOwnerName} (mismo líder), con la misma CURP.\nNo es posible continuar con un registro duplicado.\nCoordínate con tu equipo antes de avanzar.`
+    : "Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.";
 
   const simulateFileUpload = (type: "afore" | "imss", e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -312,25 +342,31 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   const handleSave = async () => {
     setFormSubmitted(true);
 
-    if (user?.empresa_multialiado_id && curpValid) {
+    if (user?.empresa_multialiado_id && (curpValid || nssValid)) {
       setSaving(true);
-      const exists = await checkCurpExists(curp);
-      if (exists) {
-        setIsCurpDuplicate(true);
-        setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
-        setSaving(false);
-        return;
+      // Refrescar quién del equipo ya tiene al cliente para nombrarlo en el aviso.
+      const teamMatch = await checkTeamDuplicate(curpValid ? curp : "", nssValid ? nss : "");
+      setTeamDuplicate(teamMatch);
+      if (curpValid) {
+        const exists = await checkCurpExists(curp);
+        if (exists) {
+          setIsCurpDuplicate(true);
+          setSaving(false);
+          return;
+        }
       }
       setSaving(false);
     }
 
     if (!formIsValid) {
-      if (isCurpDuplicate) {
-        setErrorMsg("Este cliente ya se encuentra registrado con la misma CURP.\nNo es posible continuar con un registro duplicado.\nPor favor revisa la información antes de avanzar.");
-      } else if (!hasDocuments) {
-        setErrorMsg(`Es obligatorio subir tanto ${ocrSlot.title} como ${secondSlot.title} para enviar a evaluación.`);
-      } else {
-        setErrorMsg("Por favor corrige los datos del prospecto antes de continuar.");
+      // El bloqueo por CURP duplicada tiene su propio banner (que nombra al
+      // compañero); aquí solo cubrimos los demás errores.
+      if (!isCurpDuplicate) {
+        setErrorMsg(
+          !hasDocuments
+            ? `Es obligatorio subir tanto ${ocrSlot.title} como ${secondSlot.title} para enviar a evaluación.`
+            : "Por favor corrige los datos del prospecto antes de continuar."
+        );
       }
       return;
     }
@@ -481,10 +517,42 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
         </div>
       )}
 
+      {/* Bloqueo por CURP duplicada. Cuando el duplicado es de un compañero del
+          mismo equipo (mismo líder), el mensaje lo nombra. (PAL-003) */}
+      {isCurpDuplicate && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-2xl text-xs font-semibold flex items-start gap-3 animate-fade-in">
+          <Users className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <span className="whitespace-pre-line leading-normal">{curpDuplicateMessage}</span>
+        </div>
+      )}
+
       {ocrSuccessMsg && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-fade-in shadow-sm">
           <FileCheck className="h-5 w-5 flex-shrink-0" />
           <span>{ocrSuccessMsg}</span>
+        </div>
+      )}
+
+      {/* Advertencia de cliente duplicado en el mismo equipo por NSS (PAL-003). No
+          bloquea. El caso de CURP ya lo cubre el banner de bloqueo de arriba. */}
+      {teamDuplicate && !isCurpDuplicate && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 p-4 rounded-2xl text-xs font-semibold flex items-start gap-3 animate-fade-in shadow-sm">
+          <Users className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div className="leading-normal">
+            <span className="block font-black uppercase tracking-wider text-[11px] mb-0.5">
+              Cliente duplicado en tu equipo
+            </span>
+            <span className="block">
+              <strong>{teamDuplicate.aliadoName}</strong>, un aliado con tu mismo líder, ya tiene registrado a{" "}
+              <strong>{teamDuplicate.fullName || "este cliente"}</strong>
+              {teamDuplicate.matchedBy === "nss"
+                ? " con el mismo NSS"
+                : teamDuplicate.matchedBy === "ambos"
+                ? " con la misma CURP y NSS"
+                : " con la misma CURP"}
+              . Coordínense para no trabajar el mismo cliente por duplicado.
+            </span>
+          </div>
         </div>
       )}
 
@@ -601,9 +669,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
                   )}
                   {isCurpDuplicate && (
                     <span className="text-[10px] text-red-500 dark:text-red-400 font-semibold mt-1 block whitespace-pre-line leading-normal">
-                      Este cliente ya se encuentra registrado con la misma CURP.{"\n"}
-                      No es posible continuar con un registro duplicado.{"\n"}
-                      Por favor revisa la información antes de avanzar.
+                      {curpDuplicateMessage}
                     </span>
                   )}
                 </div>

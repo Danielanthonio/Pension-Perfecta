@@ -165,6 +165,15 @@ export interface Prospect {
   updated_at: string;
 }
 
+// Resultado de la alerta de cliente duplicado entre aliados del mismo equipo
+// (PAL-003): identifica al compañero (mismo líder + misma empresa) que ya tiene
+// registrado al cliente y por qué campo coincide.
+export interface TeamDuplicate {
+  aliadoName: string;
+  fullName: string;
+  matchedBy: "curp" | "nss" | "ambos";
+}
+
 export interface InvitationCode {
   id: string;
   code: string;
@@ -238,6 +247,7 @@ interface AppContextType {
   ) => Promise<Prospect>;
   deleteProspect: (id: string) => Promise<void>;
   checkCurpExists: (curp: string) => Promise<boolean>;
+  checkTeamDuplicate: (curp: string, nss: string) => Promise<TeamDuplicate | null>;
   restoreProspect: (id: string) => Promise<void>;
   permanentlyDeleteProspect: (id: string) => Promise<void>;
   editProspectPersonalData: (
@@ -2311,6 +2321,81 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // Alerta de cliente duplicado entre aliados del mismo equipo (PAL-003):
+  // devuelve al compañero que comparte líder y empresa y que ya tiene registrado
+  // al cliente (coincidencia por CURP o por NSS), o null si no hay duplicado.
+  const checkTeamDuplicate = async (
+    curpToCheck: string,
+    nssToCheck: string
+  ): Promise<TeamDuplicate | null> => {
+    const cleanCurp = (curpToCheck || "").trim().toUpperCase();
+    const cleanNss = (nssToCheck || "").trim();
+    if (!cleanCurp && !cleanNss) return null;
+
+    // El concepto de "equipo" solo aplica dentro de una empresa multialiado.
+    if (!user?.empresa_multialiado_id) return null;
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const storedProspects = localStorage.getItem("pensionflow_prospects");
+      let allProspects: Prospect[] = [];
+      if (storedProspects) {
+        try {
+          allProspects = JSON.parse(storedProspects);
+        } catch (e) {
+          allProspects = prospects;
+        }
+      } else {
+        allProspects = prospects;
+      }
+
+      const callerLideres = new Set(user.lider_ids || []);
+      if (callerLideres.size === 0) return null;
+
+      for (const p of allProspects) {
+        if (p.aliado_id === user.id) continue;
+        if (p.empresa_multialiado_id !== user.empresa_multialiado_id) continue;
+        if (p.notes_director?.startsWith("[DELETED:") || p.notes_director?.startsWith("[PURGED:")) continue;
+
+        const curpMatch = !!cleanCurp && p.curp?.toUpperCase() === cleanCurp;
+        const nssMatch = !!cleanNss && p.nss === cleanNss;
+        if (!curpMatch && !nssMatch) continue;
+
+        // El dueño del expediente debe compartir al menos un líder con quien captura.
+        const owner = profiles.find((prof) => prof.id === p.aliado_id);
+        const ownerLideres = owner?.lider_ids || [];
+        const sharesLider = ownerLideres.some((id) => callerLideres.has(id));
+        if (!sharesLider) continue;
+
+        return {
+          aliadoName: p.aliado_name || owner?.full_name || "otro aliado",
+          fullName: p.full_name,
+          matchedBy: curpMatch && nssMatch ? "ambos" : curpMatch ? "curp" : "nss",
+        };
+      }
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc("check_team_duplicate", {
+        target_curp: cleanCurp,
+        target_nss: cleanNss,
+      });
+      if (error) {
+        console.warn("Error calling RPC check_team_duplicate:", error);
+        return null;
+      }
+      if (!data) return null;
+      return {
+        aliadoName: data.aliado_name || "otro aliado",
+        fullName: data.full_name || "",
+        matchedBy: data.matched_by || "curp",
+      };
+    } catch (err) {
+      console.error("Error checking team duplicate:", err);
+      return null;
+    }
+  };
+
   const deleteProspect = async (id: string): Promise<void> => {
     const target = prospects.find((p) => p.id === id);
     if (!target) return;
@@ -4279,6 +4364,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         addProspect,
         deleteProspect,
         checkCurpExists,
+        checkTeamDuplicate,
         restoreProspect,
         permanentlyDeleteProspect,
         editProspectPersonalData,
