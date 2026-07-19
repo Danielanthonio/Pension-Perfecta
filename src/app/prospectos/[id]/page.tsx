@@ -71,7 +71,7 @@ export default function ProspectoDetalle() {
   const router = useRouter();
   const id = params.id as string;
 
-  const { user, prospects, profiles, empresasMultialiado, saveSimulation, saveSimulationDraft, updateProspectStatus, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment, isDemoMode } = useApp();
+  const { user, prospects, profiles, empresasMultialiado, saveSimulation, saveSimulationDraft, updateProspectStatus, updateProspectModalidad, uploadDocument, deleteDocument, triggerPushNotification, getFileContent, editProspectPersonalData, scheduleAssessment, appSettings, isDemoMode } = useApp();
   const backPath = user?.role === "aliado" ? "/dashboard" : "/admin";
 
   const getStageBadgeColor = (status: Prospect["status"]) => {
@@ -205,7 +205,18 @@ export default function ProspectoDetalle() {
   });
 
   const handleOpenAgendaDetail = () => {
-    // Pregunta la modalidad (40/10) y abre el link configurado por Dirección.
+    // El Director/AM define la modalidad al aprobar. El aliado solo abre la agenda
+    // de esa modalidad. Si aún no está definida (casos previos), se pregunta.
+    const modalidad = prospect?.modalidad;
+    if (modalidad) {
+      const url = modalidad === "40" ? appSettings.meeting_link_m40 : appSettings.meeting_link_m10;
+      if (!url || !url.trim()) {
+        alert(`El director aún no ha configurado el link de Modalidad ${modalidad}. Solicítalo a Dirección.`);
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
     setModalityOpen(true);
   };
 
@@ -282,6 +293,8 @@ export default function ProspectoDetalle() {
 
   const [showApprovalModal, setShowApprovalModal] = useState<boolean>(false);
   const [selectedApprovalOption, setSelectedApprovalOption] = useState<Prospect["status"] | null>(null);
+  // Modalidad (40 / 10) que el Director/AM define al aprobar el expediente.
+  const [selectedApprovalModalidad, setSelectedApprovalModalidad] = useState<"40" | "10" | null>(null);
 
   // Ally file upload states
   const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | null>(null);
@@ -1080,6 +1093,15 @@ export default function ProspectoDetalle() {
                 <span>Ejecutivo: <span className="font-extrabold text-indigo-650">{prospect.aliado_name || "Asesor B2B"}</span></span>
                 <span>•</span>
                 <span>Actualizado: <span className="font-extrabold text-slate-600">{new Date(prospect.updated_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></span>
+                {prospect.modalidad && (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                    prospect.modalidad === "40"
+                      ? "bg-blue-50 text-blue-700 border-blue-150"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-150"
+                  }`}>
+                    Modalidad {prospect.modalidad}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1539,15 +1561,31 @@ export default function ProspectoDetalle() {
                         <div className="bg-white/95 dark:bg-slate-900 rounded-2xl p-4 border border-indigo-150 dark:border-indigo-900/50 space-y-3 shadow-sm text-center">
                           <span className="block text-[8px] font-bold text-indigo-550 dark:text-indigo-400 uppercase tracking-wider">Acción Requerida</span>
                           <h4 className="text-xs font-bold text-slate-800 dark:text-white">Agendar Asesoría Comercial</h4>
+                          {/* Modalidad con la que Dirección aprobó al cliente: define la agenda disponible. */}
+                          {prospect.modalidad ? (
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                              prospect.modalidad === "40"
+                                ? "bg-blue-50 text-blue-700 border-blue-150 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+                            }`}>
+                              Aprobado en Modalidad {prospect.modalidad}
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-150">
+                              Modalidad por definir
+                            </div>
+                          )}
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal mb-1">
-                            Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:
+                            {prospect.modalidad
+                              ? `Se abrirá únicamente la agenda oficial de la Modalidad ${prospect.modalidad}.`
+                              : "Coordinar la sesión de presentación con el cliente utilizando la agenda de LeadConnector:"}
                           </p>
                           <div className="flex flex-col gap-2">
                             <button
                               onClick={handleOpenAgendaDetail}
                               className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-blue-500/10 hover:scale-[1.01] gap-1.5"
                             >
-                              <span>1. Abrir Agenda Oficial</span>
+                              <span>1. Abrir Agenda{prospect.modalidad ? ` (Modalidad ${prospect.modalidad})` : " Oficial"}</span>
                               <ArrowUpRight className="h-3.5 w-3.5" />
                             </button>
                             <button
@@ -1672,7 +1710,9 @@ export default function ProspectoDetalle() {
                     badgeBg = "bg-emerald-50 border-emerald-100 text-emerald-600";
                     iconComp = <CheckCircle className="h-4 w-4" />;
                     titleStr = "Expediente APROBADO";
-                    descStr = "El prospecto cuenta con el dictamen técnico aprobado para Modalidad 40.";
+                    descStr = prospect.modalidad
+                      ? `El prospecto cuenta con el dictamen técnico aprobado para Modalidad ${prospect.modalidad}.`
+                      : "El prospecto cuenta con el dictamen técnico aprobado.";
                   } else if (isRejected) {
                     badgeBg = "bg-red-50 border-red-100 text-red-600";
                     iconComp = <XCircle className="h-4 w-4" />;
@@ -1844,6 +1884,11 @@ export default function ProspectoDetalle() {
       return;
     }
 
+    if (!selectedApprovalModalidad) {
+      alert("Por favor indica la modalidad de aprobación (Modalidad 40 o Modalidad 10). El aliado verá solo la agenda de esa modalidad.");
+      return;
+    }
+
     if (semanas <= 0 || pensionMejorada <= pensionActual || financiamiento <= 0) {
       alert("Por favor verifica los números. Tu Pensión Perfecta debe superar a la actual, y el financiamiento debe ser mayor a cero.");
       return;
@@ -1860,7 +1905,8 @@ export default function ProspectoDetalle() {
       comments,
     });
 
-    await updateProspectStatus(prospect.id, selectedApprovalOption, `Expediente aprobado en subetapa: ${selectedApprovalOption}`);
+    await updateProspectModalidad(prospect.id, selectedApprovalModalidad);
+    await updateProspectStatus(prospect.id, selectedApprovalOption, `Expediente aprobado en subetapa: ${selectedApprovalOption} (Modalidad ${selectedApprovalModalidad})`);
 
     setShowApprovalModal(false);
     setSelectedApprovalOption(null);
@@ -2061,6 +2107,44 @@ export default function ProspectoDetalle() {
               )}
             </div>
           )}
+          {/* Modalidad de aprobación (40 / 10). Editable por Director/AM; el aliado solo la ve. */}
+          <div className="flex-1">
+            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Modalidad</span>
+            {user?.role === "director" || user?.role === "account_manager" ? (
+              <div className="flex gap-1.5">
+                {(["40", "10"] as const).map((m) => {
+                  const isSel = prospect.modalidad === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => updateProspectModalidad(prospect.id, m)}
+                      className={`flex-1 rounded-xl py-1.5 px-2 text-[11px] font-black border transition-all ${
+                        isSel
+                          ? m === "40"
+                            ? "bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500/20"
+                            : "bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500/20"
+                          : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-350"
+                      }`}
+                      title={`Aprobar en Modalidad ${m}`}
+                    >
+                      Mod. {m}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                prospect.modalidad === "40"
+                  ? "bg-blue-50 text-blue-700 border-blue-150"
+                  : prospect.modalidad === "10"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-150"
+                  : "bg-slate-100/80 text-slate-500 border-slate-200"
+              }`}>
+                {prospect.modalidad ? `Modalidad ${prospect.modalidad}` : "Por definir"}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Edit Buttons widget */}
@@ -2682,7 +2766,10 @@ export default function ProspectoDetalle() {
                 </button>
                 {/* Aprobar */}
                 <button
-                  onClick={() => setShowApprovalModal(true)}
+                  onClick={() => {
+                    setSelectedApprovalModalidad(prospect.modalidad || null);
+                    setShowApprovalModal(true);
+                  }}
                   className="flex-[1.4] lg:flex-none py-3.5 px-5 lg:px-8 bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-2xl text-xs font-extrabold uppercase tracking-wide transition-all active:scale-[0.97] flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40 ring-1 ring-inset ring-white/10"
                 >
                   <CheckCircle className="h-5 w-5 stroke-[2.5]" />
@@ -3005,6 +3092,43 @@ export default function ProspectoDetalle() {
               <p className="text-xs text-slate-400 font-semibold mt-1">
                 Selecciona la subetapa de aprobación (se guardarán los valores del simulador):
               </p>
+            </div>
+
+            {/* Modalidad de aprobación (40 / 10). Obligatoria: define qué agenda verá el aliado. */}
+            <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+              <div>
+                <h4 className="text-xs font-black text-slate-800 tracking-tight">Modalidad de aprobación</h4>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-tight">
+                  Indica con qué modalidad se aprueba. El aliado verá solo la agenda de esta modalidad.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { id: "40" as const, label: "Modalidad 40", accent: "blue" },
+                  { id: "10" as const, label: "Modalidad 10", accent: "emerald" },
+                ]).map((m) => {
+                  const isSel = selectedApprovalModalidad === m.id;
+                  const selClasses =
+                    m.accent === "blue"
+                      ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20 text-blue-700"
+                      : "border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/20 text-emerald-700";
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedApprovalModalidad(m.id)}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-sm font-black transition-all ${
+                        isSel ? selClasses : "border-slate-200 bg-white text-slate-500 hover:border-slate-350"
+                      }`}
+                    >
+                      <span className={`h-6 w-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                        isSel ? "bg-white/70" : "bg-slate-100 text-slate-500"
+                      }`}>{m.id}</span>
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-3">

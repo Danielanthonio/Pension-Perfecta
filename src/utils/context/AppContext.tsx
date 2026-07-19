@@ -142,6 +142,9 @@ export interface Prospect {
   notes_aliado?: string;
   notes_director?: string;
   empresa_multialiado_id?: string | null;
+  // Modalidad de aprobación (40 / 10) que definen el Director o el Account Manager.
+  // El aliado la ve en su portal y solo se le abre la agenda de esa modalidad.
+  modalidad?: "40" | "10" | null;
   simulation?: Simulation;
   sim_emitted_at?: string | null;
   documents: DocumentItem[];
@@ -243,6 +246,7 @@ interface AppContextType {
   isProspectPurged: (p: Prospect) => boolean;
   getProspectDeletedAt: (p: Prospect) => Date | null;
   updateProspectStatus: (id: string, newStatus: Prospect["status"], comments?: string) => Promise<void>;
+  updateProspectModalidad: (id: string, modalidad: "40" | "10") => Promise<void>;
   saveSimulation: (
     id: string,
     simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
@@ -694,6 +698,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       notes_aliado: dbProspect.notes_aliado || "",
       notes_director: dbProspect.notes_director || "",
       empresa_multialiado_id: dbProspect.empresa_multialiado_id || null,
+      modalidad: dbProspect.modalidad || null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,
@@ -2719,6 +2724,27 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // Modalidad de aprobación (40 / 10). La define el Director o el Account Manager
+  // al aprobar (o desde la tarjeta del expediente). No cambia el status: solo marca
+  // qué agenda verá el aliado.
+  const updateProspectModalidad = async (id: string, modalidad: "40" | "10") => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const updated = prospects.map((p) =>
+        p.id === id ? { ...p, modalidad, updated_at: new Date().toISOString() } : p
+      );
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+      return;
+    }
+    try {
+      const { error } = await supabase.from("prospects").update({ modalidad }).eq("id", id);
+      if (error) throw error;
+      setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, modalidad } : p)));
+    } catch (error) {
+      console.error("Error updating prospect modalidad in Supabase:", error);
+    }
+  };
+
   const saveSimulationDraft = async (
     id: string,
     simulationData: Omit<Simulation, "totalCredito" | "roiMonths">
@@ -4232,6 +4258,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         isProspectPurged,
         getProspectDeletedAt,
         updateProspectStatus,
+        updateProspectModalidad,
         saveSimulation,
         saveSimulationDraft,
         scheduleAssessment,
