@@ -30,6 +30,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
+import MeetingModalityModal from "@/components/MeetingModalityModal";
 
 function ClientesContent() {
   const {
@@ -71,6 +72,7 @@ function ClientesContent() {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
+  const [modalityOpen, setModalityOpen] = useState(false);
 
   // Fechas por etapa desde prospect_status_history: prospectId -> (status -> primer timestamp ms).
   // El sistema las registra automáticamente en cada cambio de estado (trigger en BD).
@@ -180,12 +182,15 @@ function ClientesContent() {
   });
 
   // Tab grouping
+  // "En Evaluación": prospectos aún en evaluación técnica o condicionados (incl. aportación).
+  // Los condicionados NO están aprobados, por eso viven aquí y no en "Listo para Presentar".
   const enEvaluacion = filteredActive.filter((p) =>
-    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion"].includes(p.status)
+    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"].includes(p.status)
   );
 
+  // "Listo para Presentar": el aliado solo ve al cliente aquí cuando está en etapa APROBADO.
   const listoPresentar = filteredActive.filter((p) =>
-    ["aprobado_listo", "aportacion"].includes(p.status) ||
+    p.status === "aprobado_listo" ||
     (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"))
   );
 
@@ -326,7 +331,7 @@ function ClientesContent() {
         {/* Colored pill tabs — semantic per stage */}
         <div className="flex flex-wrap items-center gap-2 flex-1">
           {[
-            { id: "evaluacion", label: "Evaluados", count: enEvaluacion.length, Icon: Layers,
+            { id: "evaluacion", label: "En Evaluación", count: enEvaluacion.length, Icon: Layers,
               active: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/50",
               badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300", dot: "bg-blue-500" },
             { id: "listo", label: "Listo para Presentar", count: listoPresentar.length, Icon: CheckSquare,
@@ -394,13 +399,13 @@ function ClientesContent() {
         {activeTab === "evaluacion" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Evaluados Técnicamente</h3>
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Prospectos En Evaluación</h3>
             </div>
 
             {enEvaluacion.length === 0 ? (
               <div className="py-16 text-center">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm">
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos evaluados</h4>
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos en evaluación</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
                   Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.
                 </p>
@@ -517,15 +522,13 @@ function ClientesContent() {
                               >
                                 <FileText className="h-4 w-4" />
                               </Link>
-                              <a
-                                href="https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={() => setModalityOpen(true)}
                                 className="p-1.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 text-white rounded-xl shadow border border-emerald-450 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
-                                title="Abrir Agenda Externa"
+                                title="Agendar Asesoría (Modalidad 40 / 10)"
                               >
                                 <Calendar className="h-4 w-4" />
-                              </a>
+                              </button>
                               <button
                                 onClick={() => handleOpenSchedule(p)}
                                 className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
@@ -907,6 +910,9 @@ function ClientesContent() {
           </div>
         )}
       </div>
+
+      {/* Selector de modalidad para agendar (abre el link configurado por Dirección) */}
+      <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
 
       {/* Scheduling Assessment Modal */}
       {selectedProspect && (

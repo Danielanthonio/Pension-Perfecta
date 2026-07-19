@@ -140,7 +140,10 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     p.status === "pagado_comision"
   ).length;
 
-  const enEvaluacionCount = proyectosCount;
+  // Un proyecto cuenta como "evaluado" SOLO cuando ya tiene un dictamen/respuesta
+  // (aprobado, condicionado, rechazado u otorgado). Los estados previos al dictamen
+  // (evaluacion_pendiente, doc_proceso, analisis_riesgo) todavía NO cuentan como evaluados.
+  const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
 
   // Financiamientos Aprobados: sum of simulation.financiamiento for any approved/active/closed project
   const approvedStatuses = [

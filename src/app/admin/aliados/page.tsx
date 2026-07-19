@@ -32,6 +32,9 @@ import {
 const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
 const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
 const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"];
+// "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
+// Excluye los estados previos al dictamen: evaluacion_pendiente, doc_proceso y analisis_riesgo.
+const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
 
 export default function GestorAliados() {
   const { prospects, profiles, isProspectDeleted, isProspectPurged, empresasMultialiado } = useApp();
@@ -95,8 +98,8 @@ export default function GestorAliados() {
   const getAllyMetrics = (ally: UserProfile) => {
     const allyProspects = getAllyProspects(ally);
     const clientes = allyProspects.length;
-    // Embudo del dashboard: todos los clientes cuentan como evaluados (T. Eval = 100%).
-    const evaluados = clientes;
+    // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
+    const evaluados = allyProspects.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
     const aprobados = allyProspects.filter((p) => APPROVED_STAGE.includes(p.status)).length;
     const condicionados = allyProspects.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
     const rechazados = allyProspects.filter((p) => p.status === "rechazado").length;
@@ -194,8 +197,8 @@ export default function GestorAliados() {
   const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
   const globalLost = filteredProspectsGlobal.filter((p) => p.status === "cerrado_perdido").length;
 
-  // Embudo del dashboard: todos los clientes cuentan como evaluados (T. Eval = 100%).
-  const globalEvaluation = totalProspectsSent;
+  // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
+  const globalEvaluation = filteredProspectsGlobal.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
 
   // Global Averages
   const avgProspectsPerAlly = allies.length > 0 ? (totalProspectsSent / allies.length).toFixed(1) : "0.0";

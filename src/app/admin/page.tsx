@@ -20,6 +20,9 @@ import { Suspense } from "react";
 const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "firma_programada"];
 const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "aportacion"];
 const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_programada", "pagado_comision"];
+// "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
+// Excluye los estados previos al dictamen: evaluacion_pendiente, doc_proceso y analisis_riesgo.
+const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
 
 function PipelineManagerContent() {
   const {
@@ -173,7 +176,7 @@ function PipelineManagerContent() {
 
     const getStats = (prospectsList: Prospect[]): RowStats => {
       const totalClientes = prospectsList.length;
-      const evaluados = totalClientes;
+      const evaluados = prospectsList.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
       const aprobados = prospectsList.filter((p) => APPROVED_STAGE.includes(p.status)).length;
       const condicionados = prospectsList.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
       // "Cerrado perdido" es solo un estado del cliente, no un rechazo.

@@ -33,10 +33,6 @@ export default function GestionAccountManagers() {
     const groupProspects = prospects.filter((p) => allyIds.includes(p.aliado_id));
     const totalCount = groupProspects.length;
 
-    const enEvaluacion = groupProspects.filter((p) =>
-      ["evaluacion_pendiente", "analisis_riesgo", "doc_proceso"].includes(p.status)
-    ).length;
-
     const aprobados = groupProspects.filter((p) =>
       ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
     ).length;
@@ -49,6 +45,11 @@ export default function GestionAccountManagers() {
     const rechazados = groupProspects.filter((p) => p.status === "rechazado").length;
 
     const otorgados = groupProspects.filter((p) => p.status === "pagado_comision").length;
+
+    // "Evaluados" = proyectos que ya tienen un dictamen/respuesta (aprobado, condicionado,
+    // rechazado u otorgado). Los estados previos al dictamen (evaluacion_pendiente,
+    // analisis_riesgo, doc_proceso) todavía NO cuentan como evaluados.
+    const enEvaluacion = aprobados + condicionados + rechazados + otorgados;
 
     const approvedStatuses = [
       "aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso",

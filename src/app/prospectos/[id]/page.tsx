@@ -38,6 +38,7 @@ import {
   User,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
+import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex } from "@/components/ui/projectStepper";
 
@@ -102,6 +103,7 @@ export default function ProspectoDetalle() {
 
   const [prospect, setProspect] = useState<Prospect | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modalityOpen, setModalityOpen] = useState(false);
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
 
@@ -203,7 +205,8 @@ export default function ProspectoDetalle() {
   });
 
   const handleOpenAgendaDetail = () => {
-    window.open("https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5", "_blank");
+    // Pregunta la modalidad (40/10) y abre el link configurado por Dirección.
+    setModalityOpen(true);
   };
 
   const handleConfirmScheduleDetail = async () => {
@@ -1153,7 +1156,7 @@ export default function ProspectoDetalle() {
               </div>
 
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {(["IMSS", "AFORE", "OTROS"] as const).map((type) => {
+                {(["IMSS", "AFORE"] as const).map((type) => {
                   const status = getDocStatus(type);
                   const doc = prospect.documents.find((d) => d.file_type === type);
                   const isUploading = uploadingType === type;
@@ -1163,12 +1166,9 @@ export default function ProspectoDetalle() {
                   if (type === "IMSS") {
                     label = "Reporte de Semanas IMSS";
                     description = "Reporte certificado de semanas cotizadas emitido por el IMSS.";
-                  } else if (type === "AFORE") {
+                  } else {
                     label = "Estado de Cuenta AFORE";
                     description = "Último estado de cuenta o captura digital legible de Afore.";
-                  } else {
-                    label = "Documentos Adicionales";
-                    description = "Identificación oficial (INE), CURP u otros documentos de soporte.";
                   }
 
                   return (
@@ -1724,6 +1724,9 @@ export default function ProspectoDetalle() {
 
         {/* User Settings Modal */}
         <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+        {/* Selector de modalidad para agendar */}
+        <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
       </div>
     );
   }
@@ -2036,25 +2039,27 @@ export default function ProspectoDetalle() {
               </span>
             )}
           </div>
-          <div className="flex-1">
-            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Subetapa</span>
-            {user?.role === "director" || user?.role === "account_manager" ? (
-              <select
-                value={currentStage.subStage}
-                onChange={(e) => handleSubStageChange(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl py-1.5 px-3 text-xs font-bold outline-none transition-colors cursor-pointer"
-              >
-                <option value="">Ninguna</option>
-                {(SUB_STAGES_BY_STAGE[currentStage.stage] || []).map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-full text-[10px] font-black uppercase tracking-wider">
-                {currentStage.subStage || "Ninguna"}
-              </span>
-            )}
-          </div>
+          {(SUB_STAGES_BY_STAGE[currentStage.stage]?.length ?? 0) > 0 && (
+            <div className="flex-1">
+              <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Subetapa</span>
+              {user?.role === "director" || user?.role === "account_manager" ? (
+                <select
+                  value={currentStage.subStage}
+                  onChange={(e) => handleSubStageChange(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl py-1.5 px-3 text-xs font-bold outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">Ninguna</option>
+                  {(SUB_STAGES_BY_STAGE[currentStage.stage] || []).map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  {currentStage.subStage || "Ninguna"}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Edit Buttons widget */}

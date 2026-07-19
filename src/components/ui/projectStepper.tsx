@@ -23,6 +23,14 @@ export const STEP_DEFS: { label: string; desc: string }[] = [
   { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
 ];
 
+// La línea de tiempo (pipeline de cierre) SOLO aplica una vez que el proyecto fue APROBADO
+// o va más adelante en el pipeline. Antes del dictamen de aprobación —evaluación pendiente,
+// condicionado o rechazado— no hay línea de tiempo que mostrar.
+export const TIMELINE_STATUSES: readonly string[] = ["aprobado_listo", ...STEP_STATUSES];
+export function hasProjectTimeline(status: string): boolean {
+  return TIMELINE_STATUSES.includes(status);
+}
+
 // Estado actual del prospecto -> índice del hito activo en el stepper.
 export function getActiveStageIndex(status: string): number {
   switch (status) {

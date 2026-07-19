@@ -15,11 +15,13 @@ import {
   Trash2,
   FolderKanban,
   ArrowRight,
+  ArrowLeftRight,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
-import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
+import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 
@@ -29,6 +31,7 @@ function ClientesAdminContent() {
     prospects,
     profiles,
     updateProspectStatus,
+    reassignProspect,
     deleteProspect,
     restoreProspect,
     permanentlyDeleteProspect,
@@ -97,6 +100,50 @@ function ClientesAdminContent() {
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // Reassign modal state — director/AM pueden mover un proyecto a otro aliado.
+  const [reassignTarget, setReassignTarget] = useState<Prospect | null>(null);
+  const [reassignAllyId, setReassignAllyId] = useState<string>("");
+  const [reassigning, setReassigning] = useState(false);
+
+  // Aliados a los que se puede reasignar: el director puede reasignar a cualquier
+  // aliado; el account manager solo a los aliados de su cartera.
+  const eligibleAllies = React.useMemo(
+    () =>
+      profiles
+        .filter(
+          (p) =>
+            p.role === "aliado" &&
+            (user?.role === "director" || p.account_manager_id === user?.id)
+        )
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    [profiles, user]
+  );
+
+  const openReassignModal = (prospect: Prospect) => {
+    setReassignTarget(prospect);
+    setReassignAllyId("");
+    setReassigning(false);
+  };
+
+  const closeReassignModal = () => {
+    setReassignTarget(null);
+    setReassignAllyId("");
+    setReassigning(false);
+  };
+
+  const handleConfirmReassign = async () => {
+    if (!reassignTarget || !reassignAllyId) return;
+    setReassigning(true);
+    try {
+      await reassignProspect(reassignTarget.id, reassignAllyId);
+      closeReassignModal();
+    } catch (err) {
+      console.error("Error al reasignar el proyecto:", err);
+      alert("No se pudo reasignar el proyecto. Intenta de nuevo.");
+      setReassigning(false);
+    }
+  };
 
   // Línea de tiempo del aliado por fila (misma que ve el aliado en Mis Clientes).
   // Se carga bajo demanda al expandir para no traer todo el historial de golpe.
@@ -275,6 +322,25 @@ function ClientesAdminContent() {
   return (
     <>
       <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+
+        {/* Barra de acción: subir un nuevo proyecto (director / account manager) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Pipeline de expedientes</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Sube un nuevo proyecto o gestiona los expedientes existentes.</p>
+          </div>
+          <Link
+            href="/admin/nuevo"
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 ${
+              isAM
+                ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
+                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+            }`}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Subir Proyecto
+          </Link>
+        </div>
 
         {/* Director Pipeline Assignment Filters */}
         {!isAM && (
@@ -503,7 +569,10 @@ function ClientesAdminContent() {
                       const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                       const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
                       const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
-                      const isExpanded = expandedId === p.id;
+                      // La línea de tiempo solo aplica a proyectos aprobados (o más adelante
+                      // en el pipeline de cierre). Antes del dictamen de aprobación no se muestra.
+                      const showTimeline = hasProjectTimeline(p.status);
+                      const isExpanded = expandedId === p.id && showTimeline;
                       return (
                         <React.Fragment key={p.id}>
                         <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
@@ -570,22 +639,24 @@ function ClientesAdminContent() {
                                   <option key={stage.id} value={stage.id} className="dark:bg-slate-900">{stage.label}</option>
                                 ))}
                               </select>
-                              <select
-                                value={getStageAndSubStage(p.status).subStage}
-                                onChange={async (e) => {
-                                  const currentMapping = getStageAndSubStage(p.status);
-                                  const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
-                                  await handleStageChange(p.id, newStatus as any);
-                                }}
-                                className={`py-1 px-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-[10px] font-semibold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer ${
-                                  isAM ? "focus:ring-1 focus:ring-blue-500" : "focus:ring-1 focus:ring-emerald-500"
-                                }`}
-                              >
-                                <option value="" className="dark:bg-slate-900">Ninguna</option>
-                                {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
-                                  <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
-                                ))}
-                              </select>
+                              {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage]?.length ?? 0) > 0 && (
+                                <select
+                                  value={getStageAndSubStage(p.status).subStage}
+                                  onChange={async (e) => {
+                                    const currentMapping = getStageAndSubStage(p.status);
+                                    const newStatus = getStatusFromStageAndSubStage(currentMapping.stage, e.target.value);
+                                    await handleStageChange(p.id, newStatus as any);
+                                  }}
+                                  className={`py-1 px-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-[10px] font-semibold text-slate-700 dark:text-slate-300 outline-none transition-all cursor-pointer ${
+                                    isAM ? "focus:ring-1 focus:ring-blue-500" : "focus:ring-1 focus:ring-emerald-500"
+                                  }`}
+                                >
+                                  <option value="" className="dark:bg-slate-900">Ninguna</option>
+                                  {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
+                                    <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                           </td>
                           {/* Registrado */}
@@ -599,6 +670,7 @@ function ClientesAdminContent() {
                           {/* Acciones */}
                           <td className="px-5 py-2.5">
                             <div className="flex items-center justify-end gap-2">
+                              {showTimeline && (
                               <button
                                 onClick={() => toggleTimeline(p.id)}
                                 className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border transition-all active:scale-95 ${
@@ -612,6 +684,7 @@ function ClientesAdminContent() {
                                 Línea de tiempo
                                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                               </button>
+                              )}
                               <Link
                                 href={`/prospectos/${p.id}`}
                                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
@@ -622,6 +695,13 @@ function ClientesAdminContent() {
                               >
                                 Auditar <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                               </Link>
+                              <button
+                                onClick={() => openReassignModal(p)}
+                                className="inline-flex items-center justify-center h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
+                                title="Reasignar a otro aliado"
+                              >
+                                <ArrowLeftRight className="h-3.5 w-3.5" />
+                              </button>
                               <button
                                 onClick={() => openDeleteModal(p)}
                                 className="inline-flex items-center justify-center h-8 w-8 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20"
@@ -722,6 +802,82 @@ function ClientesAdminContent() {
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 {deleting ? "Eliminando..." : deleteStep === 1 ? "Sí, Mover a Papelera" : "Confirmar Envío"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reassign Modal */}
+      {reassignTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
+              <div className="h-11 w-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500 dark:text-indigo-400 flex items-center justify-center border border-indigo-150 dark:border-indigo-800/40">
+                <ArrowLeftRight className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Reasignar proyecto</h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                  Transfiere este expediente a otro aliado. Se le notificará y aparecerá en su cartera.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-indigo-100 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold">
+                  {reassignTarget.full_name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block truncate">{reassignTarget.full_name}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                    Aliado actual: {reassignTarget.aliado_name || "Asesor Comercial"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                Nuevo aliado
+              </label>
+              <select
+                value={reassignAllyId}
+                onChange={(e) => setReassignAllyId(e.target.value)}
+                className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-indigo-500 outline-none rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                autoFocus
+              >
+                <option value="">Selecciona un aliado...</option>
+                {eligibleAllies
+                  .filter((a) => a.id !== reassignTarget.aliado_id)
+                  .map((a) => (
+                    <option key={a.id} value={a.id} className="dark:bg-slate-900">
+                      {a.full_name}
+                    </option>
+                  ))}
+              </select>
+              {eligibleAllies.filter((a) => a.id !== reassignTarget.aliado_id).length === 0 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-2">
+                  No hay otros aliados disponibles para reasignar.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={closeReassignModal}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReassign}
+                disabled={!reassignAllyId || reassigning}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                {reassigning ? "Reasignando..." : "Confirmar reasignación"}
               </button>
             </div>
           </div>

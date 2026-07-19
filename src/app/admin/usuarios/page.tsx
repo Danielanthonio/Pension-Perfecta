@@ -26,6 +26,9 @@ import {
   X,
   UserX,
   ChevronDown,
+  Link2,
+  Loader2,
+  Save,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -48,8 +51,12 @@ export default function GestionUsuarios() {
     invitationCodes,
     generateInvitationCode,
     triggerPushNotification,
+    appSettings,
+    updateAppSettings,
     dbError,
   } = useApp();
+
+  const isCurrentUserDirector = user?.role === "director";
 
   const isCurrentUserAM = user?.role === "account_manager";
 
@@ -87,6 +94,45 @@ export default function GestionUsuarios() {
 
   // Collapsible panel for the secondary widgets (latest registrations + codes)
   const [showExtras, setShowExtras] = useState(false);
+
+  // Meeting links (Modalidad 40 / 10) — global config editable solo por Dirección
+  const [linkM40, setLinkM40] = useState("");
+  const [linkM10, setLinkM10] = useState("");
+  const [savingLinks, setSavingLinks] = useState(false);
+  const [linksSaved, setLinksSaved] = useState(false);
+  const [linksError, setLinksError] = useState("");
+
+  // Sincroniza los inputs con la config global cuando ésta cambie/cargue
+  React.useEffect(() => {
+    setLinkM40(appSettings.meeting_link_m40 || "");
+    setLinkM10(appSettings.meeting_link_m10 || "");
+  }, [appSettings.meeting_link_m40, appSettings.meeting_link_m10]);
+
+  const linksDirty =
+    linkM40.trim() !== (appSettings.meeting_link_m40 || "").trim() ||
+    linkM10.trim() !== (appSettings.meeting_link_m10 || "").trim();
+
+  const handleSaveMeetingLinks = async () => {
+    setLinksError("");
+    const isValidUrl = (u: string) => u.trim() === "" || /^https?:\/\/.+/i.test(u.trim());
+    if (!isValidUrl(linkM40) || !isValidUrl(linkM10)) {
+      setLinksError("Los links deben iniciar con http:// o https://");
+      return;
+    }
+    setSavingLinks(true);
+    try {
+      await updateAppSettings({
+        meeting_link_m40: linkM40.trim(),
+        meeting_link_m10: linkM10.trim(),
+      });
+      setLinksSaved(true);
+      setTimeout(() => setLinksSaved(false), 2500);
+    } catch (err: any) {
+      setLinksError(err?.message || "No se pudieron guardar los links. Intenta de nuevo.");
+    } finally {
+      setSavingLinks(false);
+    }
+  };
 
   // Form Validations
   const isNameValid = fullName.trim().length >= 3;
@@ -427,6 +473,78 @@ export default function GestionUsuarios() {
           <p className="leading-relaxed whitespace-pre-line">
             {errorMsg.replace("LÍMITE_CORREOS: ", "")}
           </p>
+        </div>
+      )}
+
+      {/* Links de Reunión (Modalidad 40 / 10) — solo Dirección */}
+      {isCurrentUserDirector && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm max-w-4xl">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm shrink-0">
+              <Link2 className="h-5 w-5" strokeWidth={2.2} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight">Links de Reunión</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal mt-0.5">
+                Agenda que se abre cuando un aliado programa una asesoría. Actualízalos aquí cuando cambien.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                <span className="h-5 w-5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-black">40</span>
+                Modalidad 40
+              </label>
+              <input
+                type="url"
+                inputMode="url"
+                value={linkM40}
+                onChange={(e) => setLinkM40(e.target.value)}
+                placeholder="https://…"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 transition-all"
+              />
+            </div>
+            <div>
+              <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                <span className="h-5 w-5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-black">10</span>
+                Modalidad 10
+              </label>
+              <input
+                type="url"
+                inputMode="url"
+                value={linkM10}
+                onChange={(e) => setLinkM10(e.target.value)}
+                placeholder="https://…"
+                className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400 transition-all"
+              />
+            </div>
+          </div>
+
+          {linksError && (
+            <p className="mt-3 text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {linksError}
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-3 mt-4">
+            {linksSaved && (
+              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 animate-fade-in">
+                <Check className="h-3.5 w-3.5" />
+                Guardado
+              </span>
+            )}
+            <button
+              onClick={handleSaveMeetingLinks}
+              disabled={savingLinks || !linksDirty}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
+            >
+              {savingLinks ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {savingLinks ? "Guardando…" : "Guardar links"}
+            </button>
+          </div>
         </div>
       )}
 

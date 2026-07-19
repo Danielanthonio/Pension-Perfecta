@@ -385,6 +385,12 @@ export default function AdminLayout({
         subtitle: "Visualiza, audita y gestiona el pipeline de expedientes comerciales y prospectos.",
       };
     }
+    if (cleanPath === "/admin/nuevo") {
+      return {
+        title: "Subir Proyecto",
+        subtitle: "Registra un nuevo prospecto y adjunta su documentación para evaluación.",
+      };
+    }
     if (cleanPath === "/admin/aliados") {
       return {
         title: "Gestión de Aliados",

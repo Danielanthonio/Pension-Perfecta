@@ -208,7 +208,6 @@ function DashboardContent() {
 
     const getStats = (prospectsList: Prospect[]) => {
       const totalClientes = prospectsList.length;
-      const evaluados = totalClientes;
       const aprobados = prospectsList.filter((p) =>
         ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
       ).length;
@@ -217,6 +216,11 @@ function DashboardContent() {
       ).length;
       // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
       const rechazados = prospectsList.filter((p) => p.status === "rechazado").length;
+      const otorgados = prospectsList.filter((p) => p.status === "pagado_comision").length;
+      // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u
+      // otorgado). No cuenta los estados previos al dictamen (evaluacion_pendiente, doc_proceso,
+      // analisis_riesgo).
+      const evaluados = aprobados + condicionados + rechazados + otorgados;
 
       const approvedStatuses = [
         "aprobado_listo",

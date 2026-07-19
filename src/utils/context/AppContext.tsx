@@ -177,6 +177,18 @@ export interface ToastMessage {
   recipient: string;
 }
 
+// Configuración global de la app (una sola fila en la tabla `app_settings`).
+// Los links de agenda de asesoría los administra la Dirección de forma manual y
+// cambian con el tiempo; el aliado los usa al agendar según la modalidad.
+export interface AppSettings {
+  meeting_link_m40: string;
+  meeting_link_m10: string;
+}
+
+// Link de LeadConnector vigente al momento de introducir esta función. Sirve de
+// default en modo demo y como fallback si aún no se ha configurado en la BD.
+const DEFAULT_MEETING_LINK = "https://api.leadconnectorhq.com/widget/booking/tTynbYT83ugTjMBmwCf5";
+
 interface AppContextType {
   user: UserProfile | null;
   activeRole: UserRole;
@@ -186,6 +198,8 @@ interface AppContextType {
   profiles: UserProfile[];
   messagingContacts: UserProfile[];
   toast: ToastMessage | null;
+  appSettings: AppSettings;
+  updateAppSettings: (updates: Partial<AppSettings>) => Promise<void>;
   isDemoMode: boolean;
   isProvisionalSession: boolean;
   isLoading: boolean;
@@ -223,6 +237,7 @@ interface AppContextType {
       email: string;
     }
   ) => Promise<void>;
+  reassignProspect: (id: string, newAliadoId: string) => Promise<void>;
   isProspectDeleted: (p: Prospect) => boolean;
   isProspectPurged: (p: Prospect) => boolean;
   getProspectDeletedAt: (p: Prospect) => Date | null;
@@ -537,6 +552,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [empresasMultialiado, setEmpresasMultialiado] = useState<EmpresaMultialiado[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    meeting_link_m40: DEFAULT_MEETING_LINK,
+    meeting_link_m10: DEFAULT_MEETING_LINK,
+  });
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isProvisionalSession, setIsProvisionalSession] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -915,6 +934,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         setNotifications(INITIAL_NOTIFICATIONS);
         localStorage.setItem("pensionflow_notifications", JSON.stringify(INITIAL_NOTIFICATIONS));
       }
+
+      const storedAppSettings = localStorage.getItem("pensionflow_app_settings");
+      if (storedAppSettings) {
+        try {
+          const parsed = JSON.parse(storedAppSettings);
+          setAppSettings({
+            meeting_link_m40: parsed.meeting_link_m40 || DEFAULT_MEETING_LINK,
+            meeting_link_m10: parsed.meeting_link_m10 || DEFAULT_MEETING_LINK,
+          });
+        } catch {
+          /* keep defaults */
+        }
+      }
       setIsLoading(false);
     } else {
       // Production mode with Supabase
@@ -1281,6 +1313,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                 read: n.read,
                 created_at: n.created_at
               })));
+            }
+
+            // Fetch global app settings (links de reunión configurables)
+            const { data: dbSettings } = await client
+              .from("app_settings")
+              .select("*")
+              .eq("id", 1)
+              .maybeSingle();
+            if (dbSettings) {
+              setAppSettings({
+                meeting_link_m40: dbSettings.meeting_link_m40 || DEFAULT_MEETING_LINK,
+                meeting_link_m10: dbSettings.meeting_link_m10 || DEFAULT_MEETING_LINK,
+              });
             }
           }
         } catch (error: any) {
@@ -2491,6 +2536,64 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // Reasigna un proyecto a otro aliado. Disponible para director y account manager
+  // en Gestión de Clientes. Actualiza aliado_id + aliado_name y hereda la empresa
+  // multialiado del nuevo aliado. Notifica al aliado receptor.
+  const reassignProspect = async (id: string, newAliadoId: string): Promise<void> => {
+    const target = prospects.find((p) => p.id === id);
+    const newAliado = profiles.find((p) => p.id === newAliadoId);
+    if (!newAliado) throw new Error("El aliado destino no existe.");
+    if (target && target.aliado_id === newAliadoId) return; // sin cambios
+
+    const newEmpresaId = newAliado.empresa_multialiado_id || null;
+    const patch = {
+      aliado_id: newAliadoId,
+      aliado_name: newAliado.full_name,
+      empresa_multialiado_id: newEmpresaId,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const updated = prospects.map((p) => (p.id === id ? { ...p, ...patch } : p));
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+
+      if (target) {
+        const newNotif: NotificationItem = {
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Proyecto Asignado 📁",
+          message: `Se te asignó el proyecto de ${target.full_name}.`,
+          type: "info",
+          read: false,
+          created_at: new Date().toISOString(),
+        };
+        setNotifications([newNotif, ...notifications]);
+        saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+      }
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("prospects").update(patch).eq("id", id);
+      if (error) throw error;
+
+      setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
+      if (target) {
+        await supabase.from("notifications").insert({
+          user_id: newAliadoId,
+          title: "Proyecto Asignado 📁",
+          message: `Se te asignó el proyecto de ${target.full_name}.`,
+          type: "info",
+          read: false,
+        });
+      }
+    } catch (err) {
+      console.error("Error reassigning prospect:", err);
+      throw err;
+    }
+  };
+
   const updateProspectStatus = async (
     id: string,
     newStatus: Prospect["status"],
@@ -3420,6 +3523,26 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // Actualiza la configuración global de links de reunión. Solo la Dirección debe
+  // llamar esto (la RLS de `app_settings` rechaza updates de otros roles).
+  const updateAppSettings = async (updates: Partial<AppSettings>): Promise<void> => {
+    const next: AppSettings = { ...appSettings, ...updates };
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      setAppSettings(next);
+      saveToStorage("pensionflow_app_settings", next);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("app_settings")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+    if (error) throw error;
+
+    setAppSettings(next);
+  };
+
   const updateProfileAdmin = async (
     id: string,
     updates: Partial<Omit<UserProfile, "id" | "created_at">>
@@ -4076,6 +4199,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         profiles: exposedProfiles,
         messagingContacts,
         toast,
+        appSettings,
+        updateAppSettings,
         isDemoMode,
         isProvisionalSession,
         isLoading,
@@ -4095,6 +4220,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         restoreProspect,
         permanentlyDeleteProspect,
         editProspectPersonalData,
+        reassignProspect,
         isProspectDeleted,
         isProspectPurged,
         getProspectDeletedAt,
@@ -4249,7 +4375,10 @@ export const STAGES_LIST = [
 ];
 
 export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
-  evaluacion_pendiente: ["Falta Reporte", "Falta Afore", "Pendiente Documentos"],
+  // "Evaluación pendiente" ya no tiene subetapas: no se muestra selector de subetapa
+  // para esta etapa. Los estados legacy (falta_reporte/falta_afore/pendiente_documentos)
+  // siguen mapeando en getStageAndSubStage para datos ya existentes.
+  evaluacion_pendiente: [],
   rechazado: ["No aplica"],
   condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral"],
   aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Cerrada Ganada"],
