@@ -124,8 +124,12 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   // 1. Filter counts according to the specific mappings using displayProspects
   const proyectosCount = displayProspects.length;
 
+  // "Aprobado" = misma etapa que usa Gestión Clientes (getStageAndSubStage → stage "aprobado"):
+  // el dictamen de aprobación + todo el pipeline de cierre posterior (Agenda Asesoría, Firma
+  // Carta Compromiso, Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Un proyecto en
+  // esos estados YA fue aprobado. Solo sale del bucket al pasar a "otorgado" (pagado_comision).
   const aprobadosCount = displayProspects.filter((p) =>
-    ["aprobado_listo", "asesoria_agendada", "firma_programada"].includes(p.status)
+    ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
   ).length;
 
   const condicionadosCount = displayProspects.filter((p) =>
@@ -141,8 +145,8 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   ).length;
 
   // Un proyecto cuenta como "evaluado" SOLO cuando ya tiene un dictamen/respuesta
-  // (aprobado, condicionado, rechazado u otorgado). Los estados previos al dictamen
-  // (evaluacion_pendiente, doc_proceso, analisis_riesgo) todavía NO cuentan como evaluados.
+  // (aprobado, condicionado, rechazado u otorgado). El único estado previo al dictamen
+  // (evaluacion_pendiente) todavía NO cuenta como evaluado.
   const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
 
   // Financiamientos Aprobados: sum of simulation.financiamiento for any approved/active/closed project
