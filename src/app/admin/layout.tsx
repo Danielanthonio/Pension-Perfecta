@@ -23,6 +23,7 @@ import {
   Calendar,
   Contact,
   Filter,
+  FileBarChart,
   LayoutDashboard,
   ChevronDown,
   Sun,
@@ -43,6 +44,7 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
 
   const items = [
     { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
+    { href: `/admin/reportes${qs}`, active: cleanPath === "/admin/reportes", Icon: FileBarChart, label: "Reportes" },
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Aliados" },

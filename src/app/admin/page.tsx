@@ -10,6 +10,8 @@ import SalesFunnel from "@/components/SalesFunnel";
 import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sorting";
 import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection, GESTION_DIRECTA_ID } from "@/components/ui/AliadoPicker";
+// Buckets de estado (fuente única de verdad compartida con el módulo Reportes).
+import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "./_pipelineBuckets";
 import {
   Users,
   Filter,
@@ -18,17 +20,6 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-
-// Status buckets shared by the comparative table and the KPI strip.
-// "Aprobado" = misma etapa que usa Gestión Clientes (getStageAndSubStage → stage "aprobado"):
-// el dictamen de aprobación + todo el pipeline de cierre posterior (Agenda Asesoría, Firma Carta
-// Compromiso, Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Ya fueron aprobados.
-const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"];
-const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"];
-const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
-// "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
-// El único estado previo al dictamen que se excluye es evaluacion_pendiente.
-const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
 
 function PipelineManagerContent() {
   const {
