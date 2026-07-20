@@ -5,12 +5,13 @@ import {
   useApp,
   Prospect,
   UserProfile,
+  isLostStatus,
 } from "@/utils/context/AppContext";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
-import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "../_pipelineBuckets";
+import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "../_pipelineBuckets";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -192,8 +193,8 @@ function ReportesContent() {
     [activeProspects, startDate, endDate]
   );
 
-  // Base del embudo (sin cerrado_perdido).
-  const pipeline = useMemo(() => filteredByDate.filter((p) => p.status !== "cerrado_perdido"), [filteredByDate]);
+  // Base del embudo (sin cerrado_perdido, incl. sus subetapas).
+  const pipeline = useMemo(() => filteredByDate.filter((p) => !isLostStatus(p.status)), [filteredByDate]);
 
   // ── Embudo comercial (tarjetas de arriba) ────────────────────────────────────
   const f = useMemo(() => {
@@ -202,9 +203,9 @@ function ReportesContent() {
     const aprobados = pipeline.filter((p) => APPROVED_STAGE.includes(p.status)).length;
     const condicionados = pipeline.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
     const rechazados = pipeline.filter((p) => p.status === "rechazado").length;
-    const otorgados = pipeline.filter((p) => p.status === "pagado_comision").length;
+    const otorgados = pipeline.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).length;
     const finAprobado = pipeline.filter((p) => FINANCED_APPROVED.includes(p.status)).reduce((s, p) => s + financiamientoOf(p), 0);
-    const finOtorgado = pipeline.filter((p) => p.status === "pagado_comision").reduce((s, p) => s + financiamientoOf(p), 0);
+    const finOtorgado = pipeline.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).reduce((s, p) => s + financiamientoOf(p), 0);
     return { proyectos, evaluados, aprobados, condicionados, rechazados, otorgados, finAprobado, finOtorgado };
   }, [pipeline]);
 
@@ -215,9 +216,9 @@ function ReportesContent() {
     { label: "Aprobados", value: String(f.aprobados), sub: pct(f.aprobados), tone: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" },
     { label: "Condicionados", value: String(f.condicionados), sub: pct(f.condicionados), tone: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
     { label: "Rechazados", value: String(f.rechazados), sub: pct(f.rechazados), tone: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" },
-    { label: "Otorgados", value: String(f.otorgados), sub: pct(f.otorgados), tone: "text-teal-600 dark:text-teal-400", bar: "bg-teal-500" },
+    { label: "Fin. Otorgado", value: String(f.otorgados), sub: pct(f.otorgados), tone: "text-teal-600 dark:text-teal-400", bar: "bg-teal-500" },
     { label: "Financiamiento aprobado", value: fmtCurrency(f.finAprobado), sub: "acumulado", tone: "text-indigo-600 dark:text-indigo-400", bar: "bg-indigo-500", wide: true },
-    { label: "Financiamiento otorgado", value: fmtCurrency(f.finOtorgado), sub: "liberado", tone: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500", wide: true },
+    { label: "Financiamiento otorgado", value: fmtCurrency(f.finOtorgado), sub: "otorgado", tone: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500", wide: true },
   ];
 
   // ── Serie temporal: proyectos ingresados (día / mes / año) ────────────────────
@@ -306,11 +307,13 @@ function ReportesContent() {
   }, [pipeline, profiles]);
   const amTotal = amSegments.reduce((s, x) => s + x.value, 0);
 
-  // ── Cerrada Ganada / esperando finanzas (firma_programada) ────────────────────
+  // ── Fin. Otorgado esperando que finanzas libere la comisión (firma_programada) ──
+  // Nota: firma_programada = Fin. Otorgado ejecutado pero aún NO pagado (pagado_comision);
+  // por eso el worklist "esperando finanzas" filtra solo firma_programada.
   const enFinanzas = useMemo(() => pipeline.filter((p) => p.status === "firma_programada"), [pipeline]);
   const finTotalMonto = enFinanzas.reduce((s, p) => s + financiamientoOf(p), 0);
 
-  // Barras mensuales de Cerrada Ganada (por fecha del último cambio de estado).
+  // Barras mensuales de Fin. Otorgado esperando finanzas (por fecha del último cambio de estado).
   const ganadaMonthly = useMemo(() => {
     if (enFinanzas.length === 0) return [];
     const map = new Map<string, { d: Date; count: number }>();
@@ -335,11 +338,11 @@ function ReportesContent() {
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const rows: (string | number)[][] = [["Sección", "Concepto", "Valor"]];
-    rows.push(["Embudo", "Proyectos", f.proyectos], ["Embudo", "Evaluados", f.evaluados], ["Embudo", "Aprobados", f.aprobados], ["Embudo", "Condicionados", f.condicionados], ["Embudo", "Rechazados", f.rechazados], ["Embudo", "Otorgados", f.otorgados], ["Embudo", "Financiamiento aprobado", Math.round(f.finAprobado)], ["Embudo", "Financiamiento otorgado", Math.round(f.finOtorgado)]);
+    rows.push(["Embudo", "Proyectos", f.proyectos], ["Embudo", "Evaluados", f.evaluados], ["Embudo", "Aprobados", f.aprobados], ["Embudo", "Condicionados", f.condicionados], ["Embudo", "Rechazados", f.rechazados], ["Embudo", "Fin. Otorgado", f.otorgados], ["Embudo", "Financiamiento aprobado", Math.round(f.finAprobado)], ["Embudo", "Financiamiento otorgado", Math.round(f.finOtorgado)]);
     tipoSegments.forEach((s) => rows.push(["Tipo de financiamiento", s.label, s.value]));
     amSegments.forEach((s) => rows.push(["Contribución AM (proyectos)", s.label, s.value]));
     breakdownRows.forEach((r) => rows.push(["Aprobados por etapa", r.label, r.count]));
-    rows.push(["Finanzas", "En Cerrada Ganada (esperando finanzas)", enFinanzas.length], ["Finanzas", "Monto esperando finanzas", Math.round(finTotalMonto)]);
+    rows.push(["Finanzas", "En Fin. Otorgado (esperando finanzas)", enFinanzas.length], ["Finanzas", "Monto esperando finanzas", Math.round(finTotalMonto)]);
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -463,7 +466,7 @@ function ReportesContent() {
         </div>
       </div>
 
-      {/* 3 · Tres paneles: aprobados por etapa · contribución AM · Cerrada Ganada mensual */}
+      {/* 3 · Tres paneles: aprobados por etapa · contribución AM · Fin. Otorgado mensual */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Aprobados por línea de tiempo */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
@@ -510,19 +513,19 @@ function ReportesContent() {
           </div>
         </div>
 
-        {/* Cerrada Ganada por mes */}
+        {/* Fin. Otorgado por mes */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
           <div className="flex items-center gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-teal-500/10">
               <CalendarClock className="h-4 w-4" strokeWidth={2.2} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Cerrada Ganada por mes</h3>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Fin. Otorgado por mes</h3>
               <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">{enFinanzas.length} caso(s) · {fmtCurrency(finTotalMonto)}</p>
             </div>
           </div>
           {ganadaMonthly.length === 0 ? (
-            <div className="py-16 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500">Aún no hay casos en Cerrada Ganada.</div>
+            <div className="py-16 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500">Aún no hay casos en Fin. Otorgado.</div>
           ) : (
             <div className="flex items-end justify-between gap-2 h-[200px] pt-4">
               {ganadaMonthly.map((m) => (
@@ -546,7 +549,7 @@ function ReportesContent() {
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Esperando respuesta de finanzas</h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">Casos en Cerrada Ganada pendientes de que finanzas libere la comisión.</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">Casos en Fin. Otorgado pendientes de que finanzas libere la comisión.</p>
             </div>
           </div>
           <div className="text-right shrink-0">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense, useMemo } from "react";
-import { useApp, getStageAndSubStage, Prospect } from "@/utils/context/AppContext";
+import { useApp, getStageAndSubStage, Prospect, isLostStatus } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, UserX, Sparkles, ChevronRight, ChevronDown, Filter } from "lucide-react";
 import Link from "next/link";
@@ -218,7 +218,7 @@ function DashboardContent() {
       // "Cerrado perdido" es SOLO un estado del cliente: no forma parte del embudo/pipeline,
       // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
       // base "Clientes", para que la tabla cuadre con el embudo.
-      const active = prospectsList.filter((p) => p.status !== "cerrado_perdido");
+      const active = prospectsList.filter((p) => !isLostStatus(p.status));
       const totalClientes = active.length;
       // "Aprobado" = misma etapa que Gestión Clientes (getStageAndSubStage → "aprobado"): dictamen
       // de aprobación + pipeline de cierre posterior. Un proyecto ahí YA fue aprobado.

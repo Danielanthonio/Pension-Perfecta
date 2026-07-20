@@ -7,6 +7,7 @@ import {
   getStageAndSubStage,
   STAGES_LIST,
   SUB_STAGES_BY_STAGE,
+  isLostStatus,
 } from "@/utils/context/AppContext";
 import {
   Search,
@@ -219,7 +220,7 @@ function ClientesContent() {
   const rechazados = filteredActive.filter((p) => p.status === "rechazado");
 
   // "Cerrado perdido" no es un rechazo: es solo un estado del cliente. Va en su propia pestaña.
-  const cerradosPerdidos = filteredActive.filter((p) => p.status === "cerrado_perdido");
+  const cerradosPerdidos = filteredActive.filter((p) => isLostStatus(p.status));
 
   // Los hitos del pipeline y su formato de fecha viven en el componente compartido
   // ProjectStepper (src/components/ui/projectStepper) para que aliado y dirección

@@ -5,13 +5,14 @@ import {
   useApp,
   Prospect,
   UserProfile,
+  isLostStatus,
 } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sorting";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection, GESTION_DIRECTA_ID } from "@/components/ui/AliadoPicker";
 // Buckets de estado (fuente única de verdad compartida con el módulo Reportes).
-import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "./_pipelineBuckets";
+import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "./_pipelineBuckets";
 import {
   Users,
   Filter,
@@ -141,7 +142,7 @@ function PipelineManagerContent() {
       // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
       // base "Clientes". De lo contrario la tabla no cuadra con el embudo (un AM podría mostrar
       // más clientes que el total de proyectos del embudo).
-      const active = prospectsList.filter((p) => p.status !== "cerrado_perdido");
+      const active = prospectsList.filter((p) => !isLostStatus(p.status));
       const totalClientes = active.length;
       const evaluados = active.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
       const aprobados = active.filter((p) => APPROVED_STAGE.includes(p.status)).length;
@@ -153,12 +154,12 @@ function PipelineManagerContent() {
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
       const finOtorgados = active
-        .filter((p) => p.status === "pagado_comision" && p.simulation)
+        .filter((p) => FIN_OTORGADO_STAGE.includes(p.status) && p.simulation)
         .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
       const tasaEvaluacion = totalClientes > 0 ? (evaluados / totalClientes) * 100 : 0;
       const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
-      const tasaCierre = aprobados > 0 ? (active.filter((p) => p.status === "pagado_comision").length / aprobados) * 100 : 0;
+      const tasaCierre = aprobados > 0 ? (active.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).length / aprobados) * 100 : 0;
 
       return { clientes: totalClientes, evaluados, aprobados, condicionados, rechazados, finAprobados, finOtorgados, tasaEvaluacion, tasaAprobacion, tasaCierre };
     };

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp, Prospect, UserProfile } from "@/utils/context/AppContext";
+import { useApp, Prospect, UserProfile, isLostStatus } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import {
@@ -116,7 +116,7 @@ export default function GestorAliados() {
     const rechazados = allyProspects.filter((p) => p.status === "rechazado").length;
     const financed = allyProspects.filter((p) => p.status === "pagado_comision").length;
     // "Cerrado perdido" es solo un estado del cliente, no un rechazo ni parte del funnel.
-    const lost = allyProspects.filter((p) => p.status === "cerrado_perdido").length;
+    const lost = allyProspects.filter((p) => isLostStatus(p.status)).length;
 
     // Montos ($) — financiamiento aprobado vs. otorgado, igual que el dashboard.
     const finAprobados = allyProspects
@@ -206,7 +206,7 @@ export default function GestorAliados() {
 
   const globalFinanced = filteredProspectsGlobal.filter((p) => p.status === "pagado_comision").length;
   const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
-  const globalLost = filteredProspectsGlobal.filter((p) => p.status === "cerrado_perdido").length;
+  const globalLost = filteredProspectsGlobal.filter((p) => isLostStatus(p.status)).length;
 
   // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
   const globalEvaluation = filteredProspectsGlobal.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
@@ -862,7 +862,7 @@ export default function GestorAliados() {
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-150"
                                     : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura"].includes(p.status)
                                     ? "bg-amber-50 text-amber-700 border-amber-150"
-                                    : p.status === "cerrado_perdido"
+                                    : isLostStatus(p.status)
                                     ? "bg-slate-100 text-slate-500 border-slate-200"
                                     : p.status === "rechazado"
                                     ? "bg-rose-50 text-rose-600 border-rose-150"
@@ -875,7 +875,7 @@ export default function GestorAliados() {
                                   ? "Evaluación"
                                   : ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura"].includes(p.status)
                                   ? "Condicionado"
-                                  : p.status === "cerrado_perdido"
+                                  : isLostStatus(p.status)
                                   ? "Cerrado Perdido"
                                   : p.status === "rechazado"
                                   ? "Rechazado"

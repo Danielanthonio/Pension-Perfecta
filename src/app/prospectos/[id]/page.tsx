@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, getCalcValidUntil, STAGES_LIST, SUB_STAGES_BY_STAGE } from "@/utils/context/AppContext";
+import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, getCalcValidUntil, STAGES_LIST, SUB_STAGES_BY_STAGE, isLostStatus } from "@/utils/context/AppContext";
 import { createClient } from "@/utils/supabase/client";
 import {
   ArrowLeft,
@@ -109,7 +109,7 @@ export default function ProspectoDetalle() {
   const [isEditingApproved, setIsEditingApproved] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
 
-  const isApproved = prospect ? (getStageAndSubStage(prospect.status).stage === "aprobado" || prospect.status === "aportacion") : false;
+  const isApproved = prospect ? (["aprobado", "otorgado"].includes(getStageAndSubStage(prospect.status).stage) || prospect.status === "aportacion") : false;
 
   // Simulation calculator input states
   const [semanas, setSemanas] = useState<number>(0);
@@ -277,9 +277,10 @@ export default function ProspectoDetalle() {
   const [statusDates, setStatusDates] = useState<Record<string, number>>({});
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
-  // Cerrado perdido (lo marca el Account Manager / Director; exige motivo)
+  // Cerrado perdido (lo marca el Account Manager / Director; exige subetapa + detalle opcional)
   const [showLostModal, setShowLostModal] = useState(false);
   const [lostReason, setLostReason] = useState("");
+  const [lostSubStatus, setLostSubStatus] = useState<"cerrado_riesgo" | "cerrado_desiste" | null>(null);
 
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [realFileData, setRealFileData] = useState<string | null>(null);
@@ -610,7 +611,7 @@ export default function ProspectoDetalle() {
     // Puntero al hito en curso (mismo criterio que el stepper). Se oculta en estados
     // terminales, donde no hay un "siguiente paso" real.
     const activeIndex = getActiveStageIndex(prospect.status);
-    const terminal = ["rechazado", "cerrado_perdido"].includes(prospect.status);
+    const terminal = prospect.status === "rechazado" || isLostStatus(prospect.status);
     type RowState = "done" | "current" | "pending";
     const rows: { label: string; date: string | null; state: RowState }[] = [
       { label: "Proyecto creado", date: fmt(new Date(prospect.created_at).getTime()), state: "done" },
@@ -1497,7 +1498,7 @@ export default function ProspectoDetalle() {
             {/* Respuesta del Director Feedback Card */}
             {(() => {
               const status = prospect.status;
-              const isApproved = getStageAndSubStage(status).stage === "aprobado" || status === "aportacion";
+              const isApproved = ["aprobado", "otorgado"].includes(getStageAndSubStage(status).stage) || status === "aportacion";
               const isRejected = status === "rechazado";
 
               let cardStyles = "";
@@ -1714,7 +1715,7 @@ export default function ProspectoDetalle() {
                 {/* Stage 4: Dictamen Oficial */}
                 {(() => {
                   const status = prospect.status;
-                  const isApproved = getStageAndSubStage(status).stage === "aprobado" || status === "aportacion";
+                  const isApproved = ["aprobado", "otorgado"].includes(getStageAndSubStage(status).stage) || status === "aportacion";
                   const isRejected = status === "rechazado";
                   const isConditioned = !isApproved && !isRejected && !["evaluacion_pendiente"].includes(status) && prospect.documents.length > 0;
                   
@@ -1854,13 +1855,17 @@ export default function ProspectoDetalle() {
   };
 
   const handleCloseLost = async () => {
-    if (!lostReason.trim()) {
-      alert("Por favor indica el motivo por el que se cierra perdido este proyecto.");
+    if (!lostSubStatus) {
+      alert("Por favor selecciona el motivo del cierre perdido (Análisis de riesgo rechazado o Desiste).");
       return;
     }
-    await updateProspectStatus(prospect.id, "cerrado_perdido", `Cerrado perdido: ${lostReason.trim()}`);
+    const label = lostSubStatus === "cerrado_riesgo" ? "Análisis de riesgo rechazado" : "Desiste";
+    const detail = lostReason.trim();
+    const note = detail ? `Cerrado perdido · ${label}: ${detail}` : `Cerrado perdido · ${label}`;
+    await updateProspectStatus(prospect.id, lostSubStatus, note);
     setShowLostModal(false);
     setLostReason("");
+    setLostSubStatus(null);
     router.push(backPath);
   };
 
@@ -3017,11 +3022,40 @@ export default function ProspectoDetalle() {
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                 Motivo del cierre perdido (obligatorio)
               </label>
+              <div className="grid grid-cols-1 gap-2">
+                {([
+                  { id: "cerrado_riesgo", label: "Análisis de riesgo rechazado", desc: "El expediente no pasó el análisis de riesgo." },
+                  { id: "cerrado_desiste", label: "Desiste", desc: "El cliente ya no continúa / no acepta la propuesta." },
+                ] as const).map((opt) => {
+                  const active = lostSubStatus === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setLostSubStatus(opt.id)}
+                      className={`text-left rounded-xl border px-3.5 py-2.5 transition-all ${
+                        active
+                          ? "border-slate-700 bg-slate-50 ring-1 ring-slate-500/20"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="block text-xs font-bold text-slate-800">{opt.label}</span>
+                      <span className="block text-[10px] font-semibold text-slate-400 mt-0.5">{opt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Detalle (opcional)
+              </label>
               <textarea
                 value={lostReason}
                 onChange={(e) => setLostReason(e.target.value)}
-                rows={4}
-                placeholder="Escribe el motivo (ej. El cliente no acepta la propuesta, ya no está interesado, eligió otra opción...)"
+                rows={3}
+                placeholder="Detalle adicional del cierre (opcional)…"
                 className="w-full bg-slate-50 border border-slate-200 focus:border-slate-500 outline-none rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors resize-none"
               />
             </div>
@@ -3031,6 +3065,7 @@ export default function ProspectoDetalle() {
                 onClick={() => {
                   setShowLostModal(false);
                   setLostReason("");
+                  setLostSubStatus(null);
                 }}
                 className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
               >
@@ -3302,14 +3337,14 @@ export default function ProspectoDetalle() {
                 },
                 {
                   id: "firma_programada",
-                  label: "Cerrada Ganada",
-                  desc: "Caso cerrado y ganado",
+                  label: "Esperando líneas de captura",
+                  desc: "Fin. Otorgado: se ejecutan las líneas de captura",
                   iconColor: "text-indigo-500",
                   icon: CheckCircle,
                 },
                 {
                   id: "pagado_comision",
-                  label: "Pagado / Cerrado",
+                  label: "Pagado cerrado",
                   desc: "Comisión liberada y cobrada",
                   iconColor: "text-emerald-500",
                   icon: DollarSign,

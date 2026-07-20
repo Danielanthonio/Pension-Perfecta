@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Prospect, useApp } from "@/utils/context/AppContext";
+import { Prospect, useApp, isLostStatus } from "@/utils/context/AppContext";
 import {
   ChevronDown,
   Users,
@@ -75,7 +75,7 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   // "Cerrado perdido" es SOLO un estado de cliente: no forma parte del embudo/pipeline,
   // así que se excluye de todos los conteos del funnel (base y etapas).
   const activeProspects = useMemo(
-    () => prospects.filter((p) => p.status !== "cerrado_perdido"),
+    () => prospects.filter((p) => !isLostStatus(p.status)),
     [prospects]
   );
 
@@ -124,12 +124,13 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   // 1. Filter counts according to the specific mappings using displayProspects
   const proyectosCount = displayProspects.length;
 
-  // "Aprobado" = misma etapa que usa Gestión Clientes (getStageAndSubStage → stage "aprobado"):
-  // el dictamen de aprobación + todo el pipeline de cierre posterior (Agenda Asesoría, Firma
-  // Carta Compromiso, Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Un proyecto en
-  // esos estados YA fue aprobado. Solo sale del bucket al pasar a "otorgado" (pagado_comision).
+  // "Aprobado" = dictamen de aprobación + pipeline de cierre HASTA Firma de Contrato
+  // (Agenda Asesoría, Firma Carta Compromiso, Análisis de Riesgo, Firma de Contrato). Al
+  // ejecutarse el financiamiento (Cerrada Ganada = firma_programada) el proyecto pasa a
+  // "Fin. Otorgado" y ya NO cuenta como Aprobado. (Debe seguir el mismo criterio que
+  // src/app/admin/_pipelineBuckets.ts para que embudo y Reportes cuadren.)
   const aprobadosCount = displayProspects.filter((p) =>
-    ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
+    ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato"].includes(p.status)
   ).length;
 
   const condicionadosCount = displayProspects.filter((p) =>
@@ -140,12 +141,15 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     p.status === "rechazado"
   ).length;
 
+  // "Fin. Otorgado" = financiamiento otorgado/ejecutado: Cerrada Ganada (firma_programada,
+  // se ejecutan las líneas de captura) + Pagado/Cerrado (pagado_comision, comisión liberada).
+  // Este conteo cuadra con la etapa "Fin. Otorgado" de la línea de tiempo.
   const otorgadosCount = displayProspects.filter((p) =>
-    p.status === "pagado_comision"
+    ["firma_programada", "pagado_comision"].includes(p.status)
   ).length;
 
   // Un proyecto cuenta como "evaluado" SOLO cuando ya tiene un dictamen/respuesta
-  // (aprobado, condicionado, rechazado u otorgado). El único estado previo al dictamen
+  // (aprobado, condicionado, rechazado o fin. otorgado). El único estado previo al dictamen
   // (evaluacion_pendiente) todavía NO cuenta como evaluado.
   const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
 
@@ -164,9 +168,11 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
     .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
-  // Financiamientos Otorgados: sum of simulation.totalCredito for closed/paid projects only (pagado_comision)
+  // Financiamientos Otorgados: Σ del financiamiento otorgado/ejecutado — proyectos en
+  // Fin. Otorgado (Cerrada Ganada = firma_programada, ya se ejecutaron las líneas de captura,
+  // + Pagado/Cerrado = pagado_comision).
   const finOtorgados = displayProspects
-    .filter((p) => p.status === "pagado_comision" && p.simulation)
+    .filter((p) => ["firma_programada", "pagado_comision"].includes(p.status) && p.simulation)
     .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
 
   // 2. Conversion rates calculations
@@ -251,7 +257,7 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
       accent: "bg-rose-500",
     },
     {
-      label: "OTORGADOS",
+      label: "Fin. Otorgado",
       value: otorgadosCount,
       icon: Gift,
       iconWrap: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",

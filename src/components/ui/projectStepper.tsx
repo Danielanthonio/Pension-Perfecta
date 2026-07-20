@@ -12,8 +12,8 @@ export const STEP_STATUSES = [
   "doc_proceso",       // 1 · Firma Carta Compromiso
   "analisis_riesgo",   // 2 · Análisis de Riesgo
   "firma_contrato",    // 3 · Firma de Contrato
-  "firma_programada",  // 4 · Cerrada Ganada
-  "pagado_comision",   // 5 · Pagado / Cerrado
+  "firma_programada",  // 4 · Fin. Otorgado · Esperando líneas de captura
+  "pagado_comision",   // 5 · Fin. Otorgado · Pagado cerrado
 ] as const;
 
 export const STEP_DEFS: { label: string; desc: string }[] = [
@@ -21,8 +21,8 @@ export const STEP_DEFS: { label: string; desc: string }[] = [
   { label: "Firma Carta Compromiso", desc: "Carta compromiso firmada por el cliente" },
   { label: "Análisis de Riesgo", desc: "En análisis de riesgo operativo" },
   { label: "Firma de Contrato", desc: "Contrato de financiamiento firmado" },
-  { label: "Cerrada Ganada", desc: "Caso cerrado y ganado" },
-  { label: "Pagado / Cerrado", desc: "Comisión liberada y cobrada" },
+  { label: "Esperando líneas de captura", desc: "Fin. Otorgado: se ejecutan las líneas de captura" },
+  { label: "Pagado cerrado", desc: "Comisión liberada y cobrada" },
 ];
 
 // La línea de tiempo (pipeline de cierre) SOLO aplica una vez que el proyecto fue APROBADO

@@ -137,6 +137,8 @@ export interface Prospect {
     | "falta_afore"
     | "pendiente_documentos"
     | "cerrado_perdido"
+    | "cerrado_riesgo"
+    | "cerrado_desiste"
     | "falta_semanas"
     | "falta_afore_cuenta"
     | "posible_simulacion"
@@ -2729,7 +2731,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           notifTitle = "Expediente Rechazado ❌";
           notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
           toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
-        } else if (newStatus === "cerrado_perdido") {
+        } else if (isLostStatus(newStatus)) {
           notifTitle = "Proyecto Cerrado Perdido";
           notifMsg = `El proyecto de ${target.full_name} se cerró como perdido. ${comments || "Sin motivo especificado."}`;
         } else if (newStatus === "pagado_comision") {
@@ -2750,7 +2752,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             id: `notif-${Math.random().toString(36).substr(2, 9)}`,
             title: notifTitle,
             message: notifMsg,
-            type: newStatus === "rechazado" ? "alert" : newStatus === "cerrado_perdido" ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
+            type: newStatus === "rechazado" ? "alert" : isLostStatus(newStatus) ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
             read: false,
             created_at: new Date().toISOString(),
           };
@@ -2795,7 +2797,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             notifTitle = "Expediente Rechazado ❌";
             notifMsg = `El ${reviewerLabel} rechazó el caso de ${target.full_name}. Comentarios: ${comments || "Sin comentarios técnicos."}`;
             toastMsg = `⚠️ Estimado Roberto: Lamentamos informarte que el expediente de ${target.full_name} no cumple con los criterios técnicos requeridos. Motivo: ${comments || "Documentación inconsistente."}`;
-          } else if (newStatus === "cerrado_perdido") {
+          } else if (isLostStatus(newStatus)) {
             notifTitle = "Proyecto Cerrado Perdido";
             notifMsg = `El proyecto de ${target.full_name} se cerró como perdido. ${comments || "Sin motivo especificado."}`;
           } else if (newStatus === "pagado_comision") {
@@ -2816,7 +2818,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             user_id: target.aliado_id,
             title: notifTitle,
             message: notifMsg,
-            type: newStatus === "rechazado" ? "error" : newStatus === "cerrado_perdido" ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
+            type: newStatus === "rechazado" ? "error" : isLostStatus(newStatus) ? "warning" : newStatus === "pagado_comision" ? "success" : "info",
             read: false,
           });
 
@@ -4511,9 +4513,17 @@ export const STAGES_LIST = [
   { id: "rechazado", label: "Rechazado" },
   { id: "condicionado", label: "Condicionado" },
   { id: "aprobado", label: "Aprobado" },
-  { id: "otorgado", label: "Otorgado" },
+  { id: "otorgado", label: "Fin. Otorgado" },
   { id: "cerrado_perdido", label: "Cerrado Perdido" }
 ];
+
+// Todos los estados que representan un "Cerrado Perdido" (etapa cerrado_perdido):
+// el legacy + las 2 subetapas con estado propio. Úsalo para excluir/contar cerrados
+// perdidos en el embudo y las métricas (no basta comparar contra "cerrado_perdido").
+export const LOST_STATUSES = ["cerrado_perdido", "cerrado_riesgo", "cerrado_desiste"] as const;
+export function isLostStatus(status: string): boolean {
+  return (LOST_STATUSES as readonly string[]).includes(status);
+}
 
 export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   // "Evaluación pendiente" ya no tiene subetapas: no se muestra selector de subetapa
@@ -4522,9 +4532,11 @@ export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: [],
   rechazado: ["No aplica"],
   condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral", "Agenda futura"],
-  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato", "Cerrada Ganada"],
-  otorgado: ["Pagado / Cerrado"],
-  cerrado_perdido: ["No acepta propuesta"]
+  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato"],
+  // "Fin. Otorgado": el financiamiento ya se otorga/ejecuta. "Esperando líneas de captura"
+  // = firma_programada (se ejecutan las líneas de captura); "Pagado cerrado" = pagado_comision.
+  otorgado: ["Esperando líneas de captura", "Pagado cerrado"],
+  cerrado_perdido: ["Análisis de riesgo rechazado", "Desiste"]
 };
 
 export function getStageAndSubStage(status: string): { stage: string; subStage: string } {
@@ -4558,13 +4570,18 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
     case "firma_contrato":
       return { stage: "aprobado", subStage: "Firma de Contrato" };
     case "firma_programada":
-      return { stage: "aprobado", subStage: "Cerrada Ganada" };
+      return { stage: "otorgado", subStage: "Esperando líneas de captura" };
     case "pagado_comision":
-      return { stage: "otorgado", subStage: "Pagado / Cerrado" };
+      return { stage: "otorgado", subStage: "Pagado cerrado" };
     case "aprobado_listo":
       return { stage: "aprobado", subStage: "" };
+    case "cerrado_riesgo":
+      return { stage: "cerrado_perdido", subStage: "Análisis de riesgo rechazado" };
+    case "cerrado_desiste":
+      return { stage: "cerrado_perdido", subStage: "Desiste" };
     case "cerrado_perdido":
-      return { stage: "cerrado_perdido", subStage: "No acepta propuesta" };
+      // Legacy: los cerrados perdidos previos (motivo en notas) se muestran como "Desiste".
+      return { stage: "cerrado_perdido", subStage: "Desiste" };
     default:
       return { stage: "evaluacion_pendiente", subStage: "" };
   }
@@ -4593,15 +4610,17 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     if (subStage === "Firma Carta Compromiso") return "doc_proceso";
     if (subStage === "Analisis de Riesgo") return "analisis_riesgo";
     if (subStage === "Firma de Contrato") return "firma_contrato";
-    if (subStage === "Cerrada Ganada") return "firma_programada";
     return "aprobado_listo";
   }
   if (stage === "otorgado") {
-    if (subStage === "Pagado / Cerrado") return "pagado_comision";
-    return "pagado_comision";
+    if (subStage === "Esperando líneas de captura") return "firma_programada";
+    if (subStage === "Pagado cerrado") return "pagado_comision";
+    return "firma_programada";
   }
   if (stage === "cerrado_perdido") {
-    return "cerrado_perdido";
+    if (subStage === "Análisis de riesgo rechazado") return "cerrado_riesgo";
+    if (subStage === "Desiste") return "cerrado_desiste";
+    return "cerrado_desiste";
   }
   return "evaluacion_pendiente";
 }
