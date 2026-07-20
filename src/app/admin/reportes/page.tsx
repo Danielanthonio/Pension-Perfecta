@@ -8,7 +8,7 @@ import {
 } from "@/utils/context/AppContext";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
-import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
+import { TipoFinanciamientoBadge, getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
 import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "../_pipelineBuckets";
 import { useSearchParams } from "next/navigation";
@@ -258,12 +258,21 @@ function ReportesContent() {
 
   // ── Dona: tipos de financiamiento ─────────────────────────────────────────────
   const tipoSegments = useMemo(() => {
-    const cnt = (fn: (p: Prospect) => boolean) => filteredByDate.filter(fn).length;
+    // El tipo se resuelve por cliente a exactamente uno de 3 valores: Crédito de
+    // nómina / Modalidad 40 / Modalidad 10. Modalidad 40/10 sin decidir cae en
+    // Modalidad 40 (default), igual que el badge por cliente (getFinanciamientoResuelto).
+    let cn = 0, m40 = 0, m10 = 0;
+    for (const p of filteredByDate) {
+      const meta = getFinanciamientoResuelto(p.tipo_financiamiento, p.modalidad);
+      if (!meta) continue;
+      if (meta.kind === "credito_nomina") cn++;
+      else if (meta.kind === "modalidad_10") m10++;
+      else m40++;
+    }
     return [
-      { label: "Crédito de nómina", value: cnt((p) => p.tipo_financiamiento === "credito_nomina"), color: CAT_VARS[0] },
-      { label: "Modalidad 40", value: cnt((p) => p.tipo_financiamiento === "modalidad_40_10" && p.modalidad === "40"), color: CAT_VARS[1] },
-      { label: "Modalidad 10", value: cnt((p) => p.tipo_financiamiento === "modalidad_40_10" && p.modalidad === "10"), color: CAT_VARS[2] },
-      { label: "Modalidad 40/10 · por definir", value: cnt((p) => p.tipo_financiamiento === "modalidad_40_10" && !p.modalidad), color: "var(--cat-muted)" },
+      { label: "Crédito de nómina", value: cn, color: CAT_VARS[0] },
+      { label: "Modalidad 40", value: m40, color: CAT_VARS[1] },
+      { label: "Modalidad 10", value: m10, color: CAT_VARS[2] },
     ].filter((s) => s.value > 0);
   }, [filteredByDate]);
   const tipoTotal = tipoSegments.reduce((s, x) => s + x.value, 0);
