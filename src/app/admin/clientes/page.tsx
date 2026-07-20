@@ -549,7 +549,7 @@ function ClientesAdminContent() {
                           </td>
                           {/* Tipo de financiamiento */}
                           <td className="px-4 py-2.5">
-                            <TipoFinanciamientoBadge value={p.tipo_financiamiento} />
+                            <TipoFinanciamientoBadge value={p.tipo_financiamiento} modalidad={p.modalidad} />
                           </td>
                           {/* Asignación */}
                           <td className="px-4 py-2.5">

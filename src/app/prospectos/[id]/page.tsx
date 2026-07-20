@@ -35,13 +35,14 @@ import {
   Maximize2,
   Minimize2,
   Building2,
+  Wallet,
   User,
 } from "lucide-react";
 import UserSettingsModal from "@/components/UserSettingsModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex } from "@/components/ui/projectStepper";
-import { TipoFinanciamientoBadge, getTipoFinanciamientoMeta, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
+import { TipoFinanciamientoBadge, getFinanciamientoResuelto, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -1102,16 +1103,7 @@ export default function ProspectoDetalle() {
                 <span>•</span>
                 <span>Actualizado: <span className="font-extrabold text-slate-600">{new Date(prospect.updated_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></span>
                 {prospect.tipo_financiamiento && (
-                  <TipoFinanciamientoBadge value={prospect.tipo_financiamiento} />
-                )}
-                {prospect.modalidad && (
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                    prospect.modalidad === "40"
-                      ? "bg-blue-50 text-blue-700 border-blue-150"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-150"
-                  }`}>
-                    Modalidad {prospect.modalidad}
-                  </span>
+                  <TipoFinanciamientoBadge value={prospect.tipo_financiamiento} modalidad={prospect.modalidad} />
                 )}
               </div>
             </div>
@@ -1176,10 +1168,10 @@ export default function ProspectoDetalle() {
           </div>
         </div>
 
-        {/* Banner prominente del tipo de financiamiento — deja claro al recibir el
-            expediente si es Crédito de nómina o Modalidad 40/10. */}
+        {/* Banner prominente del financiamiento resuelto — deja claro al recibir el
+            expediente si es Crédito de nómina, Modalidad 40 o Modalidad 10. */}
         {prospect.tipo_financiamiento && (() => {
-          const tipoMeta = getTipoFinanciamientoMeta(prospect.tipo_financiamiento);
+          const tipoMeta = getFinanciamientoResuelto(prospect.tipo_financiamiento, prospect.modalidad);
           if (!tipoMeta) return null;
           const TipoIcon = tipoMeta.Icon;
           return (
@@ -1935,7 +1927,10 @@ export default function ProspectoDetalle() {
       return;
     }
 
-    if (!selectedApprovalModalidad) {
+    // Crédito de nómina es un financiamiento aparte: NO usa Modalidad 40/10, así
+    // que no se pide ni se guarda. Solo la Modalidad 40/10 exige elegir 40 o 10.
+    const esCN = prospect.tipo_financiamiento === "credito_nomina";
+    if (!esCN && !selectedApprovalModalidad) {
       alert("Por favor indica la modalidad de aprobación (Modalidad 40 o Modalidad 10). El aliado verá solo la agenda de esa modalidad.");
       return;
     }
@@ -1956,8 +1951,11 @@ export default function ProspectoDetalle() {
       comments,
     });
 
-    await updateProspectModalidad(prospect.id, selectedApprovalModalidad);
-    await updateProspectStatus(prospect.id, selectedApprovalOption, `Expediente aprobado en subetapa: ${selectedApprovalOption} (Modalidad ${selectedApprovalModalidad})`);
+    if (!esCN && selectedApprovalModalidad) {
+      await updateProspectModalidad(prospect.id, selectedApprovalModalidad);
+    }
+    const financiamientoNota = esCN ? "Crédito de nómina" : `Modalidad ${selectedApprovalModalidad}`;
+    await updateProspectStatus(prospect.id, selectedApprovalOption, `Expediente aprobado en subetapa: ${selectedApprovalOption} (${financiamientoNota})`);
 
     setShowApprovalModal(false);
     setSelectedApprovalOption(null);
@@ -2158,43 +2156,69 @@ export default function ProspectoDetalle() {
               )}
             </div>
           )}
-          {/* Modalidad de aprobación (40 / 10). Editable por Director/AM; el aliado solo la ve. */}
+          {/* Financiamiento del prospecto. Crédito de nómina lo elige el ALIADO al
+              capturar y Dirección no lo cambia aquí (queda iluminado y bloqueado).
+              La Modalidad (40 / 10) la fija Dirección: se ilumina la que apruebe.
+              Un prospecto de Modalidad 40/10 sin decidir NO ilumina nada hasta que
+              Dirección apruebe 40 o 10 (para el resto todo queda desiluminado). */}
           <div className="flex-1">
-            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Modalidad</span>
-            {user?.role === "director" || user?.role === "account_manager" ? (
-              <div className="flex gap-1.5">
-                {(["40", "10"] as const).map((m) => {
-                  const isSel = prospect.modalidad === m;
-                  return (
+            <span className="text-slate-400 block font-bold uppercase tracking-wider text-[9px] mb-1.5">Financiamiento</span>
+            {(() => {
+              const esCN = prospect.tipo_financiamiento === "credito_nomina";
+              const canEdit = user?.role === "director" || user?.role === "account_manager";
+              const segs = [
+                {
+                  key: "cn",
+                  label: "Créd. nómina",
+                  on: esCN,
+                  onClasses: "bg-amber-50 border-amber-500 text-amber-700 ring-1 ring-amber-500/20 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-500",
+                  // El tipo lo decide el aliado; Dirección no lo cambia desde aquí.
+                  disabled: true,
+                  onClick: undefined as (() => void) | undefined,
+                  title: esCN ? "El aliado capturó este prospecto como Crédito de nómina" : "Este prospecto no es Crédito de nómina",
+                },
+                {
+                  key: "40",
+                  label: "Mod. 40",
+                  on: !esCN && prospect.modalidad === "40",
+                  onClasses: "bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500/20 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-500",
+                  disabled: esCN || !canEdit,
+                  onClick: () => updateProspectModalidad(prospect.id, "40"),
+                  title: esCN ? "No aplica en Crédito de nómina" : "Aprobar en Modalidad 40",
+                },
+                {
+                  key: "10",
+                  label: "Mod. 10",
+                  on: !esCN && prospect.modalidad === "10",
+                  onClasses: "bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500/20 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-500",
+                  disabled: esCN || !canEdit,
+                  onClick: () => updateProspectModalidad(prospect.id, "10"),
+                  title: esCN ? "No aplica en Crédito de nómina" : "Aprobar en Modalidad 10",
+                },
+              ];
+              return (
+                <div className="flex gap-1.5">
+                  {segs.map((s) => (
                     <button
-                      key={m}
+                      key={s.key}
                       type="button"
-                      onClick={() => updateProspectModalidad(prospect.id, m)}
+                      disabled={s.disabled}
+                      onClick={s.disabled ? undefined : s.onClick}
+                      title={s.title}
                       className={`flex-1 rounded-xl py-1.5 px-2 text-[11px] font-black border transition-all ${
-                        isSel
-                          ? m === "40"
-                            ? "bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500/20"
-                            : "bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500/20"
-                          : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-350"
+                        s.on
+                          ? s.onClasses
+                          : s.disabled
+                          ? "bg-slate-50 dark:bg-slate-850/40 border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                          : "bg-slate-50 dark:bg-slate-850/40 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-600"
                       }`}
-                      title={`Aprobar en Modalidad ${m}`}
                     >
-                      Mod. {m}
+                      {s.label}
                     </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                prospect.modalidad === "40"
-                  ? "bg-blue-50 text-blue-700 border-blue-150"
-                  : prospect.modalidad === "10"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-150"
-                  : "bg-slate-100/80 text-slate-500 border-slate-200"
-              }`}>
-                {prospect.modalidad ? `Modalidad ${prospect.modalidad}` : "Por definir"}
-              </span>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -3195,42 +3219,56 @@ export default function ProspectoDetalle() {
               </p>
             </div>
 
-            {/* Modalidad de aprobación (40 / 10). Obligatoria: define qué agenda verá el aliado. */}
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 p-4 space-y-3">
-              <div>
-                <h4 className="text-xs font-black text-slate-800 tracking-tight">Modalidad de aprobación</h4>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-tight">
-                  Indica con qué modalidad se aprueba. El aliado verá solo la agenda de esta modalidad.
-                </p>
+            {/* Modalidad de aprobación (40 / 10). Obligatoria SOLO para Modalidad 40/10:
+                define qué agenda verá el aliado. Crédito de nómina es un financiamiento
+                aparte y no usa Modalidad 40/10, así que no se pide. */}
+            {prospect.tipo_financiamiento === "credito_nomina" ? (
+              <div className="rounded-[20px] border border-amber-200 bg-amber-50/70 p-4 flex items-center gap-3">
+                <Wallet className="h-5 w-5 text-amber-600 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-black text-amber-800 tracking-tight">Crédito de nómina</h4>
+                  <p className="text-[10px] text-amber-700/90 font-semibold mt-0.5 leading-tight">
+                    Este financiamiento no usa Modalidad 40/10. No es necesario elegir modalidad para aprobarlo.
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {([
-                  { id: "40" as const, label: "Modalidad 40", accent: "blue" },
-                  { id: "10" as const, label: "Modalidad 10", accent: "emerald" },
-                ]).map((m) => {
-                  const isSel = selectedApprovalModalidad === m.id;
-                  const selClasses =
-                    m.accent === "blue"
-                      ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20 text-blue-700"
-                      : "border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/20 text-emerald-700";
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSelectedApprovalModalidad(m.id)}
-                      className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-sm font-black transition-all ${
-                        isSel ? selClasses : "border-slate-200 bg-white text-slate-500 hover:border-slate-350"
-                      }`}
-                    >
-                      <span className={`h-6 w-6 rounded-lg flex items-center justify-center text-xs font-black ${
-                        isSel ? "bg-white/70" : "bg-slate-100 text-slate-500"
-                      }`}>{m.id}</span>
-                      {m.label}
-                    </button>
-                  );
-                })}
+            ) : (
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 tracking-tight">Modalidad de aprobación</h4>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-tight">
+                    Indica con qué modalidad se aprueba. El aliado verá solo la agenda de esta modalidad.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { id: "40" as const, label: "Modalidad 40", accent: "blue" },
+                    { id: "10" as const, label: "Modalidad 10", accent: "emerald" },
+                  ]).map((m) => {
+                    const isSel = selectedApprovalModalidad === m.id;
+                    const selClasses =
+                      m.accent === "blue"
+                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20 text-blue-700"
+                        : "border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500/20 text-emerald-700";
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelectedApprovalModalidad(m.id)}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border text-sm font-black transition-all ${
+                          isSel ? selClasses : "border-slate-200 bg-white text-slate-500 hover:border-slate-350"
+                        }`}
+                      >
+                        <span className={`h-6 w-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                          isSel ? "bg-white/70" : "bg-slate-100 text-slate-500"
+                        }`}>{m.id}</span>
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-3">
               {[

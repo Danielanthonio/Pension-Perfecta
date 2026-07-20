@@ -306,7 +306,7 @@ function ClientesContent() {
         <span className="block font-mono tabular-nums text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 leading-none">{p.nss}</span>
         <span className="block text-[9px] font-mono uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[210px]">{p.curp}</span>
         {p.tipo_financiamiento && (
-          <TipoFinanciamientoBadge value={p.tipo_financiamiento} className="mt-1.5" />
+          <TipoFinanciamientoBadge value={p.tipo_financiamiento} modalidad={p.modalidad} className="mt-1.5" />
         )}
       </div>
     </div>

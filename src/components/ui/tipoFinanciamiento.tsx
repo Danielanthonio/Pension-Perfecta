@@ -59,6 +59,74 @@ export function getTipoFinanciamientoLabel(
 }
 
 /**
+ * Financiamiento RESUELTO por cliente. A diferencia de `getTipoFinanciamientoMeta`
+ * (que devuelve el genérico "Modalidad 40/10" que elige el aliado al capturar),
+ * esto colapsa el prospecto a UNA sola clasificación efectiva:
+ *   - Crédito de nómina                → "Crédito de nómina" (ámbar)
+ *   - Modalidad 40/10 aprobada en "10" → "Modalidad 10" (esmeralda)
+ *   - Modalidad 40/10 en cualquier otro caso (aprobada en "40" o aún sin decidir)
+ *                                      → "Modalidad 40" (azul, el default)
+ * Nunca se muestra el combinado "40/10" por cliente: es una o la otra. La
+ * modalidad concreta la fija Dirección al aprobar; mientras tanto se asume 40.
+ */
+export type FinanciamientoKind = "credito_nomina" | "modalidad_40" | "modalidad_10";
+
+export interface FinanciamientoResueltoMeta {
+  kind: FinanciamientoKind;
+  label: string;
+  short: string;
+  description: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  badge: string;
+  accent: string;
+}
+
+const MODALIDAD_40_META: Omit<FinanciamientoResueltoMeta, "kind"> = {
+  label: "Modalidad 40",
+  short: "Modalidad 40",
+  description: "El prospecto se atiende en Modalidad 40.",
+  Icon: Landmark,
+  badge:
+    "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50",
+  accent:
+    "border-blue-500 ring-blue-500 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-500",
+};
+
+const MODALIDAD_10_META: Omit<FinanciamientoResueltoMeta, "kind"> = {
+  label: "Modalidad 10",
+  short: "Modalidad 10",
+  description: "El prospecto se aprobó en Modalidad 10.",
+  Icon: Landmark,
+  badge:
+    "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50",
+  accent:
+    "border-emerald-500 ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-500",
+};
+
+export function getFinanciamientoResuelto(
+  tipo: TipoFinanciamiento | null | undefined,
+  modalidad: string | null | undefined
+): FinanciamientoResueltoMeta | null {
+  if (!tipo) return null;
+  if (tipo === "credito_nomina") {
+    const cn = TIPO_FINANCIAMIENTO_OPTIONS[0];
+    return {
+      kind: "credito_nomina",
+      label: cn.label,
+      short: cn.short,
+      description: cn.description,
+      Icon: cn.Icon,
+      badge: cn.badge,
+      accent: cn.accent,
+    };
+  }
+  // modalidad_40_10 → se resuelve a la modalidad concreta (default 40).
+  return modalidad === "10"
+    ? { kind: "modalidad_10", ...MODALIDAD_10_META }
+    : { kind: "modalidad_40", ...MODALIDAD_40_META };
+}
+
+/**
  * Un "slot" del expediente del prospecto. El expediente siempre tiene dos
  * documentos en dos slots: el primero (`runsOcr`) es del que el OCR lee CURP/NSS
  * y el segundo es de soporte. Qué documentos son depende del tipo de
@@ -140,17 +208,23 @@ export function getDocTypeLabel(fileType: string | null | undefined): string {
 }
 
 /**
- * Badge compacto para listas/tablas. Cuando no hay tipo definido muestra un
- * estado neutro "Sin definir" (prospectos previos a esta función).
+ * Badge compacto para listas/tablas. Muestra el financiamiento RESUELTO del
+ * cliente: Crédito de nómina, Modalidad 40 o Modalidad 10 — nunca el combinado
+ * "40/10". La modalidad concreta la fija Dirección al aprobar (`modalidad`);
+ * mientras no la decida, un prospecto de Modalidad 40/10 se muestra como
+ * Modalidad 40 (el default). Cuando no hay tipo definido muestra un estado
+ * neutro "Sin definir" (prospectos previos a esta función).
  */
 export function TipoFinanciamientoBadge({
   value,
+  modalidad,
   className = "",
 }: {
   value: TipoFinanciamiento | null | undefined;
+  modalidad?: string | null;
   className?: string;
 }) {
-  const meta = getTipoFinanciamientoMeta(value);
+  const meta = getFinanciamientoResuelto(value, modalidad);
 
   if (!meta) {
     return (
