@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useApp, Prospect, UserProfile } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
-import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import {
   Users,
   TrendingUp,
@@ -48,7 +48,7 @@ export default function GestorAliados() {
     (p) =>
       !isProspectDeleted(p) &&
       !isProspectPurged(p) &&
-      (modalidadFilter === "all" || p.modalidad === modalidadFilter)
+      prospectMatchesModalidadFilter(p, modalidadFilter)
   );
 
   // Helper to get Account Manager name

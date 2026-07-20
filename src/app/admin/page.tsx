@@ -8,7 +8,7 @@ import {
 } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
 import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sorting";
-import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection, GESTION_DIRECTA_ID } from "@/components/ui/AliadoPicker";
 // Buckets de estado (fuente única de verdad compartida con el módulo Reportes).
 import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "./_pipelineBuckets";
@@ -69,7 +69,7 @@ function PipelineManagerContent() {
     (p) =>
       !isProspectDeleted(p) &&
       !isProspectPurged(p) &&
-      (modalidadFilter === "all" || p.modalidad === modalidadFilter)
+      prospectMatchesModalidadFilter(p, modalidadFilter)
   );
 
   const filteredByDate = activeProspects.filter((p) => {

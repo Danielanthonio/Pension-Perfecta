@@ -7,7 +7,7 @@ import {
   UserProfile,
 } from "@/utils/context/AppContext";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
-import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
 import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE } from "../_pipelineBuckets";
@@ -177,7 +177,7 @@ function ReportesContent() {
   }, [prospects, user, selectedEntities, profiles]);
 
   const activeProspects = baseFilteredProspects.filter(
-    (p) => !isProspectDeleted(p) && !isProspectPurged(p) && (modalidadFilter === "all" || p.modalidad === modalidadFilter)
+    (p) => !isProspectDeleted(p) && !isProspectPurged(p) && prospectMatchesModalidadFilter(p, modalidadFilter)
   );
 
   const filteredByDate = useMemo(

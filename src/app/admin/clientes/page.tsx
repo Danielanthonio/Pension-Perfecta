@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
-import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
@@ -201,7 +201,7 @@ function ClientesAdminContent() {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
     })
-    .filter((p) => modalidadFilter === "all" || p.modalidad === modalidadFilter);
+    .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter));
 
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;

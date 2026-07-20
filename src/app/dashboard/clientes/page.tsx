@@ -31,7 +31,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
-import { ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 
 function ClientesContent() {
@@ -170,8 +170,8 @@ function ClientesContent() {
       return false;
     }
 
-    // Modalidad filter (Todos / M40 / M10)
-    if (modalidadFilter !== "all" && p.modalidad !== modalidadFilter) {
+    // Modalidad / tipo de financiamiento (Todos / M40 / M10 / CN)
+    if (!prospectMatchesModalidadFilter(p, modalidadFilter)) {
       return false;
     }
 

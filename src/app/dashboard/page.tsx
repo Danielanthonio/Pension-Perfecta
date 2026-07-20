@@ -7,7 +7,7 @@ import { Plus, AlertCircle, Shield, Users, Mail, Phone, User, Award, Layers, Use
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { ModalidadFilter, ModalidadFilterValue } from "@/components/ui/ModalidadFilter";
+import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 
 function DashboardContent() {
   const { prospects, isProspectDeleted, isProspectPurged, user: contextUser, profiles, isDemoMode } = useApp();
@@ -92,8 +92,8 @@ function DashboardContent() {
       return false;
     }
 
-    // Modalidad filter (Todos / M40 / M10)
-    if (modalidadFilter !== "all" && p.modalidad !== modalidadFilter) {
+    // Modalidad / tipo de financiamiento (Todos / M40 / M10 / CN)
+    if (!prospectMatchesModalidadFilter(p, modalidadFilter)) {
       return false;
     }
 

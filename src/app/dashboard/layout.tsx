@@ -217,10 +217,10 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
               ))}
             </select>
           </div>
-          {/* Modalidad de aprobación — solo en la lista de clientes */}
+          {/* Modalidad de aprobación / tipo de financiamiento — solo en la lista de clientes */}
           {isClientes && (
             <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Modalidad</label>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Modalidad / Financiamiento</label>
               <select
                 value={localModalidadFilter}
                 onChange={(e) => setLocalModalidadFilter(e.target.value)}
@@ -229,6 +229,7 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
                 <option value="all">Todas las Modalidades</option>
                 <option value="40" className="bg-slate-900 text-slate-200">Modalidad 40</option>
                 <option value="10" className="bg-slate-900 text-slate-200">Modalidad 10</option>
+                <option value="cn" className="bg-slate-900 text-slate-200">Crédito de nómina</option>
               </select>
             </div>
           )}
