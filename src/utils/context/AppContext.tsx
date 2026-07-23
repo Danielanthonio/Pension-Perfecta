@@ -237,6 +237,11 @@ interface AppContextType {
   notifications: NotificationItem[];
   profiles: UserProfile[];
   messagingContacts: UserProfile[];
+  // Perfiles para el SELECTOR de asignación de proyecto (director/AM eligen a qué
+  // aliado va el proyecto al capturarlo). A diferencia de `profiles` (filtrado por
+  // `exposedProfiles` a la cartera del AM), aquí un AM ve TODOS los aliados del
+  // sistema para poder asignar a cualquiera, no solo a su grupo. Ver [[project-am-asigna-cualquier-aliado]].
+  assignmentProfiles: UserProfile[];
   toast: ToastMessage | null;
   appSettings: AppSettings;
   updateAppSettings: (updates: Partial<AppSettings>) => Promise<void>;
@@ -4447,6 +4452,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         notifications,
         profiles: exposedProfiles,
         messagingContacts,
+        // Lista completa para el selector de asignación: usamos el `profiles` CRUDO
+        // (no `exposedProfiles`). Para el director es todo; para un AM, con el RLS
+        // ampliado (mig 20260722000002), incluye TODOS los aliados del sistema.
+        assignmentProfiles: profiles,
         toast,
         appSettings,
         updateAppSettings,

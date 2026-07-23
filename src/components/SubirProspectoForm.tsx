@@ -36,7 +36,7 @@ interface SubirProspectoFormProps {
 
 export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirProspectoFormProps) {
   const router = useRouter();
-  const { addProspect, user, profiles, checkCurpExists, checkTeamDuplicate } = useApp();
+  const { addProspect, user, assignmentProfiles, checkCurpExists, checkTeamDuplicate } = useApp();
   const isDirector = user?.role === "director";
   // Dirección y Account Managers pueden asignar el proyecto a un aliado al crearlo.
   // Para el aliado que captura sus propios prospectos no aparece este selector.
@@ -588,7 +588,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
                   ¿A qué aliado quedará asignado? *
                 </label>
                 <AsignarAliadoSelect
-                  profiles={profiles}
+                  profiles={assignmentProfiles}
                   value={assignedAliadoId}
                   onChange={setAssignedAliadoId}
                   invalid={formSubmitted && !assignmentReady}
