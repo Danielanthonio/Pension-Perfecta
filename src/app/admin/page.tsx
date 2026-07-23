@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   useApp,
   Prospect,
-  UserProfile,
   isLostStatus,
 } from "@/utils/context/AppContext";
 import SalesFunnel from "@/components/SalesFunnel";
@@ -16,8 +15,6 @@ import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, 
 import {
   Users,
   Filter,
-  ChevronRight,
-  ChevronDown,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -29,7 +26,6 @@ function PipelineManagerContent() {
     profiles,
     isProspectDeleted,
     isProspectPurged,
-    empresasMultialiado,
   } = useApp();
 
   const isAM = user?.role === "account_manager";
@@ -44,7 +40,7 @@ function PipelineManagerContent() {
   // Filtro por modalidad de aprobación (Todos / M40 / M10): recalcula todos los KPIs.
   const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
 
-  // Sort state for the comparative table (top-level entities + leaves).
+  // Sort state for the comparative table (top-level entities).
   const [sortKey, setSortKey] = useState("clientes");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const sort: SortState = {
@@ -96,18 +92,6 @@ function PipelineManagerContent() {
     }).format(val);
   };
 
-  // State for expanded rows in hierarchical view
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
-  // El AM ve su propia fila expandida por defecto. El director trabaja con la jerarquía
-  // colapsada (sin selección) o con la vista comparativa plana (con selección), así que no
-  // requiere auto-expandir.
-  useEffect(() => {
-    if (isAM && user) {
-      setExpandedRows({ [`am-${user.id}`]: true });
-    }
-  }, [isAM, user]);
-
   interface RowStats {
     clientes: number;
     evaluados: number;
@@ -123,25 +107,22 @@ function PipelineManagerContent() {
 
   interface EfficiencyTableRow extends RowStats {
     id: string;
-    level: number;
     name: string;
     subLabel?: string;
-    type: "am" | "category" | "company" | "role-group" | "ally";
-    alliesCount?: number;
-    hasChildren: boolean;
-    isExpanded: boolean;
-    parentId?: string;
+    type: "am" | "ally";
   }
 
-  // Calculate hierarchical visible rows
+  // Filas del detallado. Con el pivote AM-por-PROYECTO ya NO se desglosan los aliados
+  // por account manager: el detallado se mide POR PROYECTO. La vista por defecto es una
+  // fila por AM (+ Gestión Directa); si el director selecciona entidades en el
+  // AliadoPicker, es una fila por selección (comparativa plana, incluye aliados).
   const visibleRows = useMemo(() => {
     const rows: EfficiencyTableRow[] = [];
 
     const getStats = (prospectsList: Prospect[]): RowStats => {
       // "Cerrado perdido" es SOLO un estado del cliente: no forma parte del embudo/pipeline,
       // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
-      // base "Clientes". De lo contrario la tabla no cuadra con el embudo (un AM podría mostrar
-      // más clientes que el total de proyectos del embudo).
+      // base "Proyectos". De lo contrario la tabla no cuadra con el embudo.
       const active = prospectsList.filter((p) => !isLostStatus(p.status));
       const totalClientes = active.length;
       const evaluados = active.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
@@ -165,10 +146,9 @@ function PipelineManagerContent() {
     };
 
     // Value used to order rows, per the selected sort key.
-    const sortVal = (stats: RowStats, alliesCount: number, name: string): number | string => {
+    const sortVal = (stats: RowStats, name: string): number | string => {
       switch (sortKey) {
         case "name": return name;
-        case "aliados": return alliesCount;
         case "clientes": return stats.clientes;
         case "evaluados": return stats.evaluados;
         case "aprobados": return stats.aprobados;
@@ -188,27 +168,17 @@ function PipelineManagerContent() {
       else d = String(va).localeCompare(String(vb), "es", { numeric: true });
       return sortDir === "desc" ? -d : d;
     };
-    // `pool` = proyectos ya restringidos al AM de la rama (con AM por proyecto un aliado
-    // puede tener proyectos bajo varios AMs; ordenar con el pool evita el doble conteo).
-    const sortAllies = (arr: UserProfile[], pool: Prospect[]) =>
-      [...arr].sort((a, b) =>
-        cmp(
-          sortVal(getStats(pool.filter((p) => p.aliado_id === a.id)), 0, a.full_name),
-          sortVal(getStats(pool.filter((p) => p.aliado_id === b.id)), 0, b.full_name)
-        )
-      );
 
     // Vista comparativa plana: el director eligió 1 o más aliados/AMs → una fila por
     // selección (sin jerarquía), lado a lado con sus KPIs. Ver AliadoPicker.
     if (!isAM && selectedEntities.length > 0) {
-      type FlatEntry = { key: string; name: string; subLabel: string; type: "am" | "ally"; alliesCount?: number; stats: RowStats };
+      type FlatEntry = { key: string; name: string; subLabel: string; type: "am" | "ally"; stats: RowStats };
       const flat: FlatEntry[] = [];
       selectedEntities.forEach((id) => {
         if (id === GESTION_DIRECTA_ID) {
           // Gestión Directa = proyectos sin account manager asignado (AM por proyecto).
           const ps = filteredByDate.filter((p) => !p.account_manager_id);
-          const directAllyCount = new Set(ps.map((p) => p.aliado_id)).size;
-          flat.push({ key: `cmp-${id}`, name: "Gestión Directa (Sin AM)", subLabel: "Proyectos sin account manager", type: "am", alliesCount: directAllyCount, stats: getStats(ps) });
+          flat.push({ key: `cmp-${id}`, name: "Gestión Directa (Sin AM)", subLabel: "Proyectos sin account manager", type: "am", stats: getStats(ps) });
           return;
         }
         const prof = profiles.find((p) => p.id === id);
@@ -216,31 +186,27 @@ function PipelineManagerContent() {
         if (prof.role === "account_manager") {
           // AM por proyecto: sus proyectos son los que tienen su id asignado directamente.
           const ps = filteredByDate.filter((p) => p.account_manager_id === prof.id);
-          const amAllyCount = new Set(ps.map((p) => p.aliado_id)).size;
-          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Account Manager", type: "am", alliesCount: amAllyCount, stats: getStats(ps) });
+          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Account Manager", type: "am", stats: getStats(ps) });
         } else {
           // Un aliado ya no tiene UN AM fijo (el AM es por proyecto), así que no se muestra AM.
           const ps = filteredByDate.filter((p) => p.aliado_id === prof.id);
           flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Aliado", type: "ally", stats: getStats(ps) });
         }
       });
-      flat.sort((a, b) => cmp(sortVal(a.stats, a.alliesCount || 0, a.name), sortVal(b.stats, b.alliesCount || 0, b.name)));
+      flat.sort((a, b) => cmp(sortVal(a.stats, a.name), sortVal(b.stats, b.name)));
       flat.forEach((e) => {
         rows.push({
           id: e.key,
-          level: 1,
           name: e.name,
           subLabel: e.subLabel,
           type: e.type,
-          alliesCount: e.alliesCount,
           ...e.stats,
-          hasChildren: false,
-          isExpanded: false,
         });
       });
       return rows;
     }
 
+    // Vista por defecto: una fila por AM (+ Gestión Directa), medida por proyecto.
     let selectedAMs: { id: string | null; name: string }[] = [];
     if (isAM) {
       if (user) {
@@ -256,235 +222,28 @@ function PipelineManagerContent() {
       }
     }
 
-    // Build top-level entities with their stats, then order them by the sort key.
     const amEntries = selectedAMs.map((am) => {
-      const amRowId = `am-${am.id || "direct"}`;
-      // AM por proyecto: los proyectos de la fila son los asignados a ese AM (o sin AM para
-      // Gestión Directa) y los aliados se derivan de los dueños de esos proyectos.
+      // AM por proyecto: los proyectos de la fila son los asignados a ese AM (o sin AM
+      // para Gestión Directa).
       const amProspects = filteredByDate.filter((p) =>
         am.id ? p.account_manager_id === am.id : !p.account_manager_id
       );
-      const amAllyIds = Array.from(new Set(amProspects.map((p) => p.aliado_id)));
-      const amAllies = amAllyIds
-        .map((allyId) => profiles.find((prof) => prof.id === allyId))
-        .filter((prof): prof is UserProfile => !!prof);
-      const amStats = getStats(amProspects);
-      return { am, amRowId, amAllies, amStats, amProspects };
+      return { am, amRowId: `am-${am.id || "direct"}`, amStats: getStats(amProspects) };
     });
-    amEntries.sort((a, b) => cmp(sortVal(a.amStats, a.amAllies.length, a.am.name), sortVal(b.amStats, b.amAllies.length, b.am.name)));
+    amEntries.sort((a, b) => cmp(sortVal(a.amStats, a.am.name), sortVal(b.amStats, b.am.name)));
 
-    amEntries.forEach(({ amRowId, amAllies, amStats, amProspects, am }) => {
-      const amExpanded = !!expandedRows[amRowId];
-
+    amEntries.forEach(({ amRowId, amStats, am }) => {
       rows.push({
         id: amRowId,
-        level: 1,
         name: am.name,
+        subLabel: am.name.startsWith("Gestión Directa") ? undefined : "Account Manager",
         type: "am",
-        alliesCount: amAllies.length,
         ...amStats,
-        hasChildren: amAllies.length > 0,
-        isExpanded: amExpanded,
       });
-
-      if (amExpanded) {
-        // Category 1: Independientes
-        const independentAllies = amAllies.filter((p) => !p.empresa_multialiado_id);
-        const independentAllyIds = independentAllies.map((a) => a.id);
-        const independentProspects = amProspects.filter((p) => independentAllyIds.includes(p.aliado_id));
-        const independentStats = getStats(independentProspects);
-        const indRowId = `${amRowId}-independientes`;
-        const indExpanded = !!expandedRows[indRowId];
-
-        if (independentAllies.length > 0 || independentProspects.length > 0) {
-          rows.push({
-            id: indRowId,
-            level: 2,
-            name: "Independientes",
-            type: "category",
-            alliesCount: independentAllies.length,
-            ...independentStats,
-            hasChildren: independentAllies.length > 0,
-            isExpanded: indExpanded,
-            parentId: amRowId,
-          });
-
-          if (indExpanded) {
-            sortAllies(independentAllies, amProspects).forEach((ally) => {
-              const allyRowId = `${indRowId}-${ally.id}`;
-              // Solo los proyectos del aliado bajo el AM de la rama (evita doble conteo entre AMs).
-              const allyProspects = amProspects.filter((p) => p.aliado_id === ally.id);
-              const allyStats = getStats(allyProspects);
-
-              rows.push({
-                id: allyRowId,
-                level: 3,
-                name: ally.full_name,
-                type: "ally",
-                ...allyStats,
-                hasChildren: false,
-                isExpanded: false,
-                parentId: indRowId,
-              });
-            });
-          }
-        }
-
-        // Category 2: Empresas
-        const companyAllies = amAllies.filter((p) => !!p.empresa_multialiado_id);
-        const companyAllyIds = companyAllies.map((a) => a.id);
-        const companyProspects = amProspects.filter((p) => companyAllyIds.includes(p.aliado_id));
-        const companyStats = getStats(companyProspects);
-        const empCategoryRowId = `${amRowId}-empresas`;
-        const empCategoryExpanded = !!expandedRows[empCategoryRowId];
-
-        if (companyAllies.length > 0 || companyProspects.length > 0) {
-          rows.push({
-            id: empCategoryRowId,
-            level: 2,
-            name: "Empresas",
-            type: "category",
-            alliesCount: companyAllies.length,
-            ...companyStats,
-            hasChildren: companyAllies.length > 0,
-            isExpanded: empCategoryExpanded,
-            parentId: amRowId,
-          });
-
-          if (empCategoryExpanded) {
-            const companyMap = companyAllies.reduce((acc, ally) => {
-              const empId = ally.empresa_multialiado_id || "unknown";
-              if (!acc[empId]) {
-                const companyObj = empresasMultialiado.find((e) => e.id === empId);
-                acc[empId] = {
-                  id: empId,
-                  name: companyObj ? companyObj.nombre : (ally.lider_grupo || "Empresa Desconocida"),
-                  allies: [],
-                };
-              }
-              acc[empId].allies.push(ally);
-              return acc;
-            }, {} as Record<string, { id: string; name: string; allies: UserProfile[] }>);
-
-            Object.values(companyMap).forEach((company) => {
-              const companyRowId = `${empCategoryRowId}-${company.id}`;
-              const companyProspects = amProspects.filter((p) =>
-                company.allies.some((a) => a.id === p.aliado_id)
-              );
-              const companyStats = getStats(companyProspects);
-              const companyExpanded = !!expandedRows[companyRowId];
-
-              rows.push({
-                id: companyRowId,
-                level: 3,
-                name: company.name,
-                type: "company",
-                alliesCount: company.allies.length,
-                ...companyStats,
-                hasChildren: company.allies.length > 0,
-                isExpanded: companyExpanded,
-                parentId: empCategoryRowId,
-              });
-
-              if (companyExpanded) {
-                const companyLeaders = company.allies.filter((a) => a.aliado_tipo === "lider");
-                const companyAlliesOnly = company.allies.filter((a) => a.aliado_tipo !== "lider");
-
-                if (companyLeaders.length > 0) {
-                  const leadersHeaderId = `${companyRowId}-lideres-header`;
-                  rows.push({
-                    id: leadersHeaderId,
-                    level: 4,
-                    name: "Líderes",
-                    type: "role-group",
-                    clientes: 0, evaluados: 0, aprobados: 0, condicionados: 0, rechazados: 0,
-                    finAprobados: 0, finOtorgados: 0, tasaEvaluacion: 0, tasaAprobacion: 0, tasaCierre: 0,
-                    hasChildren: false,
-                    isExpanded: false,
-                    parentId: companyRowId,
-                  });
-
-                  sortAllies(companyLeaders, amProspects).forEach((leader) => {
-                    const leaderRowId = `${leadersHeaderId}-${leader.id}`;
-                    // Solo los proyectos del líder bajo el AM de la rama (evita doble conteo entre AMs).
-                    const leaderProspects = amProspects.filter((p) => p.aliado_id === leader.id);
-                    const leaderStats = getStats(leaderProspects);
-
-                    rows.push({
-                      id: leaderRowId,
-                      level: 5,
-                      name: leader.full_name,
-                      type: "ally",
-                      ...leaderStats,
-                      hasChildren: false,
-                      isExpanded: false,
-                      parentId: leadersHeaderId,
-                    });
-                  });
-                }
-
-                if (companyAlliesOnly.length > 0) {
-                  const alliesHeaderId = `${companyRowId}-aliados-header`;
-                  rows.push({
-                    id: alliesHeaderId,
-                    level: 4,
-                    name: "Aliados",
-                    type: "role-group",
-                    clientes: 0, evaluados: 0, aprobados: 0, condicionados: 0, rechazados: 0,
-                    finAprobados: 0, finOtorgados: 0, tasaEvaluacion: 0, tasaAprobacion: 0, tasaCierre: 0,
-                    hasChildren: false,
-                    isExpanded: false,
-                    parentId: companyRowId,
-                  });
-
-                  sortAllies(companyAlliesOnly, amProspects).forEach((ally) => {
-                    const allyRowId = `${alliesHeaderId}-${ally.id}`;
-                    // Solo los proyectos del aliado bajo el AM de la rama (evita doble conteo entre AMs).
-                    const allyProspects = amProspects.filter((p) => p.aliado_id === ally.id);
-                    const allyStats = getStats(allyProspects);
-
-                    const getLeaderNames = (a: UserProfile) => {
-                      if (!a.lider_ids || a.lider_ids.length === 0) return "Sin líder asignado";
-                      const names = a.lider_ids
-                        .map((lId: string) => profiles.find((p) => p.id === lId)?.full_name)
-                        .filter(Boolean);
-                      return names.join(", ") || "Sin líder asignado";
-                    };
-
-                    rows.push({
-                      id: allyRowId,
-                      level: 5,
-                      name: ally.full_name,
-                      subLabel: `Líder: ${getLeaderNames(ally)}`,
-                      type: "ally",
-                      ...allyStats,
-                      hasChildren: false,
-                      isExpanded: false,
-                      parentId: alliesHeaderId,
-                    });
-                  });
-                }
-              }
-            });
-          }
-        }
-      }
     });
 
     return rows;
-  }, [amsList, profiles, filteredByDate, empresasMultialiado, expandedRows, user, isAM, selectedEntities, sortKey, sortDir]);
-
-  const toggleRow = (rowId: string) => {
-    setExpandedRows((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
-  };
-
-  const getActionButtonText = (row: EfficiencyTableRow) => {
-    if (row.type === "am") return row.isExpanded ? "Ocultar" : "Ver aliados";
-    if (row.type === "category" && row.name === "Independientes") return row.isExpanded ? "Ocultar" : "Ver aliados";
-    if (row.type === "category" && row.name === "Empresas") return row.isExpanded ? "Ocultar" : "Ver empresas";
-    if (row.type === "company") return row.isExpanded ? "Ocultar" : "Ver detalle";
-    return null;
-  };
+  }, [amsList, profiles, filteredByDate, user, isAM, selectedEntities, sortKey, sortDir]);
 
   const accent = isAM ? "blue" : "emerald";
   const sortOptions = [
@@ -496,7 +255,6 @@ function PipelineManagerContent() {
     { id: "finOtorgados", label: "Fin. otorgado" },
     { id: "tasaAprobacion", label: "Tasa aprobación" },
     { id: "tasaCierre", label: "Tasa cierre" },
-    { id: "aliados", label: "Nº de aliados" },
     { id: "name", label: "Nombre (A-Z)" },
   ];
 
@@ -559,7 +317,7 @@ function PipelineManagerContent() {
             <div>
               <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Sin datos de rendimiento</h4>
               <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
-                No hay asesores asignados ni prospectos registrados bajo el filtro actual.
+                No hay proyectos registrados bajo el filtro actual.
               </p>
             </div>
           </div>
@@ -569,7 +327,6 @@ function PipelineManagerContent() {
               <thead>
                 <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
                   <SortHeader col="name" label="Account Manager / Entidad" sort={sort} align="left" className="pl-4" />
-                  <SortHeader col="aliados" label="Aliados" sort={sort} align="center" />
                   <SortHeader col="clientes" label="Proyectos" sort={sort} align="center" />
                   <SortHeader col="evaluados" label="Eval." sort={sort} align="center" />
                   <SortHeader col="aprobados" label="Aprob." sort={sort} align="center" />
@@ -583,94 +340,47 @@ function PipelineManagerContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                {visibleRows.map((row) => {
-                  if (row.type === "role-group") {
-                    return (
-                      <tr key={row.id} className="bg-slate-50 dark:bg-slate-950/30">
-                        <td
-                          colSpan={12}
-                          className="px-4 py-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.1em]"
-                          style={{ paddingLeft: `${row.level * 1.25}rem` }}
-                        >
+                {visibleRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group bg-slate-50/40 dark:bg-slate-900/40"
+                  >
+                    <td className="py-2.5 pr-3 pl-4">
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate text-slate-900 dark:text-white font-bold">
                           {row.name}
-                        </td>
-                      </tr>
-                    );
-                  }
-
-                  const actionText = getActionButtonText(row);
-                  const isLevel1 = row.level === 1;
-
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group ${
-                        isLevel1 ? "bg-slate-50/40 dark:bg-slate-900/40" : ""
-                      }`}
-                    >
-                      <td
-                        className="py-2.5 pr-3 select-none cursor-pointer"
-                        onClick={() => row.hasChildren && toggleRow(row.id)}
-                        style={{ paddingLeft: `${0.75 + (row.level - 1) * 1.1}rem` }}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          {row.hasChildren ? (
-                            <span className="flex-shrink-0 text-slate-400 dark:text-slate-500">
-                              {row.isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                            </span>
-                          ) : (
-                            <span className="w-3.5 h-3.5 flex-shrink-0" />
-                          )}
-
-                          <div className="flex flex-col min-w-0">
-                            <span className={`truncate ${isLevel1 ? "text-slate-900 dark:text-white font-bold" : "text-slate-700 dark:text-slate-300 font-medium"}`}>
-                              {row.name}
-                            </span>
-                            {row.subLabel && (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{row.subLabel}</span>
-                            )}
-                          </div>
-
-                          {row.hasChildren && actionText && (
-                            <span
-                              onClick={(e) => { e.stopPropagation(); toggleRow(row.id); }}
-                              className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[9px] text-slate-500 dark:text-slate-400 font-semibold transition-all cursor-pointer opacity-0 group-hover:opacity-100"
-                            >
-                              {actionText}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-medium text-slate-500 dark:text-slate-400">
-                        {row.alliesCount !== undefined ? row.alliesCount : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-semibold text-slate-800 dark:text-slate-200">{row.clientes}</td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{row.evaluados}</td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{row.aprobados}</td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-amber-600 dark:text-amber-400">{row.condicionados}</td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-rose-500 dark:text-rose-400">{row.rechazados}</td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(row.finAprobados)}</td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.finOtorgados)}</td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className="tabular-nums font-semibold text-slate-500 dark:text-slate-400">{row.tasaEvaluacion.toFixed(0)}%</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className="tabular-nums font-semibold text-slate-500 dark:text-slate-400">{row.tasaAprobacion.toFixed(0)}%</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
-                          row.tasaCierre >= 50
-                            ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
-                            : row.tasaCierre > 0
-                              ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
-                        }`}>
-                          {row.tasaCierre.toFixed(0)}%
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        {row.subLabel && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">{row.subLabel}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-semibold text-slate-800 dark:text-slate-200">{row.clientes}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{row.evaluados}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{row.aprobados}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-amber-600 dark:text-amber-400">{row.condicionados}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-rose-500 dark:text-rose-400">{row.rechazados}</td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(row.finAprobados)}</td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.finOtorgados)}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                      <span className="tabular-nums font-semibold text-slate-500 dark:text-slate-400">{row.tasaEvaluacion.toFixed(0)}%</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                      <span className="tabular-nums font-semibold text-slate-500 dark:text-slate-400">{row.tasaAprobacion.toFixed(0)}%</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                        row.tasaCierre >= 50
+                          ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
+                          : row.tasaCierre > 0
+                            ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                      }`}>
+                        {row.tasaCierre.toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

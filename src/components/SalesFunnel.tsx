@@ -46,17 +46,16 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   };
 
   const showAccountManagers = user?.role === "director";
-  const showAliadosCard = user?.role === "director" || user?.role === "account_manager";
+  // Con el pivote AM-por-PROYECTO el AM ya no tiene "cartera de aliados", así que la
+  // tarjeta ALIADOS deja de medir algo suyo y se le retira: su embudo arranca en
+  // PROYECTOS. El director SÍ conserva el conteo global de aliados (visión de sistema).
+  const showAliadosCard = user?.role === "director";
   let accountManagersCount = 0;
   let alliesCount = 0;
   if (user?.role === "director") {
     accountManagersCount = profiles.filter((p) => p.role === "account_manager" && p.is_active).length;
-    // Director: TODOS los aliados activos (el AM ahora es por proyecto, ya no existe
-    // la "cartera de aliados" de un AM, así que el criterio "con AM asignado" muere).
-    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active).length;
-  } else if (user?.role === "account_manager") {
-    // AM: los `profiles` del contexto para un AM ya vienen acotados a él + los aliados
-    // dueños de sus proyectos, así que basta contar los perfiles activos con rol aliado.
+    // Director: TODOS los aliados activos del sistema (visión global, ya sin la noción
+    // de "cartera de aliados" de un AM).
     alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active).length;
   }
 
