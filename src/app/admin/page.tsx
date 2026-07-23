@@ -188,11 +188,13 @@ function PipelineManagerContent() {
       else d = String(va).localeCompare(String(vb), "es", { numeric: true });
       return sortDir === "desc" ? -d : d;
     };
-    const sortAllies = (arr: UserProfile[]) =>
+    // `pool` = proyectos ya restringidos al AM de la rama (con AM por proyecto un aliado
+    // puede tener proyectos bajo varios AMs; ordenar con el pool evita el doble conteo).
+    const sortAllies = (arr: UserProfile[], pool: Prospect[]) =>
       [...arr].sort((a, b) =>
         cmp(
-          sortVal(getStats(filteredByDate.filter((p) => p.aliado_id === a.id)), 0, a.full_name),
-          sortVal(getStats(filteredByDate.filter((p) => p.aliado_id === b.id)), 0, b.full_name)
+          sortVal(getStats(pool.filter((p) => p.aliado_id === a.id)), 0, a.full_name),
+          sortVal(getStats(pool.filter((p) => p.aliado_id === b.id)), 0, b.full_name)
         )
       );
 
@@ -203,21 +205,23 @@ function PipelineManagerContent() {
       const flat: FlatEntry[] = [];
       selectedEntities.forEach((id) => {
         if (id === GESTION_DIRECTA_ID) {
-          const directAllyIds = profiles.filter((p) => p.role === "aliado" && !p.account_manager_id).map((a) => a.id);
-          const ps = filteredByDate.filter((p) => directAllyIds.includes(p.aliado_id));
-          flat.push({ key: `cmp-${id}`, name: "Gestión Directa (Sin AM)", subLabel: "Aliados sin account manager", type: "am", alliesCount: directAllyIds.length, stats: getStats(ps) });
+          // Gestión Directa = proyectos sin account manager asignado (AM por proyecto).
+          const ps = filteredByDate.filter((p) => !p.account_manager_id);
+          const directAllyCount = new Set(ps.map((p) => p.aliado_id)).size;
+          flat.push({ key: `cmp-${id}`, name: "Gestión Directa (Sin AM)", subLabel: "Proyectos sin account manager", type: "am", alliesCount: directAllyCount, stats: getStats(ps) });
           return;
         }
         const prof = profiles.find((p) => p.id === id);
         if (!prof) return;
         if (prof.role === "account_manager") {
-          const amAllyIds = profiles.filter((p) => p.role === "aliado" && p.account_manager_id === prof.id).map((a) => a.id);
-          const ps = filteredByDate.filter((p) => amAllyIds.includes(p.aliado_id));
-          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Account Manager", type: "am", alliesCount: amAllyIds.length, stats: getStats(ps) });
+          // AM por proyecto: sus proyectos son los que tienen su id asignado directamente.
+          const ps = filteredByDate.filter((p) => p.account_manager_id === prof.id);
+          const amAllyCount = new Set(ps.map((p) => p.aliado_id)).size;
+          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Account Manager", type: "am", alliesCount: amAllyCount, stats: getStats(ps) });
         } else {
+          // Un aliado ya no tiene UN AM fijo (el AM es por proyecto), así que no se muestra AM.
           const ps = filteredByDate.filter((p) => p.aliado_id === prof.id);
-          const amName = prof.account_manager_id ? (profiles.find((a) => a.id === prof.account_manager_id)?.full_name || "AM") : "Gestión Directa";
-          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: `Aliado · ${amName}`, type: "ally", stats: getStats(ps) });
+          flat.push({ key: `cmp-${id}`, name: prof.full_name, subLabel: "Aliado", type: "ally", stats: getStats(ps) });
         }
       });
       flat.sort((a, b) => cmp(sortVal(a.stats, a.alliesCount || 0, a.name), sortVal(b.stats, b.alliesCount || 0, b.name)));
@@ -245,9 +249,9 @@ function PipelineManagerContent() {
     } else {
       // Director sin selección → Todos los AM + Gestión Directa.
       selectedAMs = amsList.map((am) => ({ id: am.id, name: am.full_name }));
-      const unassignedAllies = profiles.filter((p) => p.role === "aliado" && p.is_active && !p.account_manager_id);
-      const unassignedProspects = filteredByDate.filter((p) => unassignedAllies.some((a) => a.id === p.aliado_id));
-      if (unassignedAllies.length > 0 || unassignedProspects.length > 0) {
+      // Gestión Directa = proyectos sin account manager asignado (AM por proyecto).
+      const unassignedProspects = filteredByDate.filter((p) => !p.account_manager_id);
+      if (unassignedProspects.length > 0) {
         selectedAMs.push({ id: null, name: "Gestión Directa (Sin AM)" });
       }
     }
@@ -255,17 +259,21 @@ function PipelineManagerContent() {
     // Build top-level entities with their stats, then order them by the sort key.
     const amEntries = selectedAMs.map((am) => {
       const amRowId = `am-${am.id || "direct"}`;
-      const amAllies = profiles.filter(
-        (p) => p.role === "aliado" && p.is_active && (am.id ? p.account_manager_id === am.id : !p.account_manager_id)
+      // AM por proyecto: los proyectos de la fila son los asignados a ese AM (o sin AM para
+      // Gestión Directa) y los aliados se derivan de los dueños de esos proyectos.
+      const amProspects = filteredByDate.filter((p) =>
+        am.id ? p.account_manager_id === am.id : !p.account_manager_id
       );
-      const amAllyIds = amAllies.map((a) => a.id);
-      const amProspects = filteredByDate.filter((p) => amAllyIds.includes(p.aliado_id));
+      const amAllyIds = Array.from(new Set(amProspects.map((p) => p.aliado_id)));
+      const amAllies = amAllyIds
+        .map((allyId) => profiles.find((prof) => prof.id === allyId))
+        .filter((prof): prof is UserProfile => !!prof);
       const amStats = getStats(amProspects);
-      return { am, amRowId, amAllies, amStats };
+      return { am, amRowId, amAllies, amStats, amProspects };
     });
     amEntries.sort((a, b) => cmp(sortVal(a.amStats, a.amAllies.length, a.am.name), sortVal(b.amStats, b.amAllies.length, b.am.name)));
 
-    amEntries.forEach(({ am, amRowId, amAllies, amStats }) => {
+    amEntries.forEach(({ amRowId, amAllies, amStats, amProspects, am }) => {
       const amExpanded = !!expandedRows[amRowId];
 
       rows.push({
@@ -283,7 +291,7 @@ function PipelineManagerContent() {
         // Category 1: Independientes
         const independentAllies = amAllies.filter((p) => !p.empresa_multialiado_id);
         const independentAllyIds = independentAllies.map((a) => a.id);
-        const independentProspects = filteredByDate.filter((p) => independentAllyIds.includes(p.aliado_id));
+        const independentProspects = amProspects.filter((p) => independentAllyIds.includes(p.aliado_id));
         const independentStats = getStats(independentProspects);
         const indRowId = `${amRowId}-independientes`;
         const indExpanded = !!expandedRows[indRowId];
@@ -302,9 +310,10 @@ function PipelineManagerContent() {
           });
 
           if (indExpanded) {
-            sortAllies(independentAllies).forEach((ally) => {
+            sortAllies(independentAllies, amProspects).forEach((ally) => {
               const allyRowId = `${indRowId}-${ally.id}`;
-              const allyProspects = filteredByDate.filter((p) => p.aliado_id === ally.id);
+              // Solo los proyectos del aliado bajo el AM de la rama (evita doble conteo entre AMs).
+              const allyProspects = amProspects.filter((p) => p.aliado_id === ally.id);
               const allyStats = getStats(allyProspects);
 
               rows.push({
@@ -324,7 +333,7 @@ function PipelineManagerContent() {
         // Category 2: Empresas
         const companyAllies = amAllies.filter((p) => !!p.empresa_multialiado_id);
         const companyAllyIds = companyAllies.map((a) => a.id);
-        const companyProspects = filteredByDate.filter((p) => companyAllyIds.includes(p.aliado_id));
+        const companyProspects = amProspects.filter((p) => companyAllyIds.includes(p.aliado_id));
         const companyStats = getStats(companyProspects);
         const empCategoryRowId = `${amRowId}-empresas`;
         const empCategoryExpanded = !!expandedRows[empCategoryRowId];
@@ -359,7 +368,7 @@ function PipelineManagerContent() {
 
             Object.values(companyMap).forEach((company) => {
               const companyRowId = `${empCategoryRowId}-${company.id}`;
-              const companyProspects = filteredByDate.filter((p) =>
+              const companyProspects = amProspects.filter((p) =>
                 company.allies.some((a) => a.id === p.aliado_id)
               );
               const companyStats = getStats(companyProspects);
@@ -395,9 +404,10 @@ function PipelineManagerContent() {
                     parentId: companyRowId,
                   });
 
-                  sortAllies(companyLeaders).forEach((leader) => {
+                  sortAllies(companyLeaders, amProspects).forEach((leader) => {
                     const leaderRowId = `${leadersHeaderId}-${leader.id}`;
-                    const leaderProspects = filteredByDate.filter((p) => p.aliado_id === leader.id);
+                    // Solo los proyectos del líder bajo el AM de la rama (evita doble conteo entre AMs).
+                    const leaderProspects = amProspects.filter((p) => p.aliado_id === leader.id);
                     const leaderStats = getStats(leaderProspects);
 
                     rows.push({
@@ -427,9 +437,10 @@ function PipelineManagerContent() {
                     parentId: companyRowId,
                   });
 
-                  sortAllies(companyAlliesOnly).forEach((ally) => {
+                  sortAllies(companyAlliesOnly, amProspects).forEach((ally) => {
                     const allyRowId = `${alliesHeaderId}-${ally.id}`;
-                    const allyProspects = filteredByDate.filter((p) => p.aliado_id === ally.id);
+                    // Solo los proyectos del aliado bajo el AM de la rama (evita doble conteo entre AMs).
+                    const allyProspects = amProspects.filter((p) => p.aliado_id === ally.id);
                     const allyStats = getStats(allyProspects);
 
                     const getLeaderNames = (a: UserProfile) => {

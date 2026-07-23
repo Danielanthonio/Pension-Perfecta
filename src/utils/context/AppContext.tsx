@@ -17,7 +17,6 @@ export interface UserProfile {
   invitation_code_used?: string;
   created_at: string;
   is_active?: boolean;
-  account_manager_id?: string | null;
   password_provisional?: string | null;
   aliado_tipo?: "aliado" | "lider";
   lider_grupo?: string | null;
@@ -31,15 +30,15 @@ export interface UserProfile {
   pais?: string | null;
   avatar_url?: string | null;
   // Solo para Account Managers: si está en `true`, el AM participa en la "ruleta"
-  // de asignación automática (recibe aliados nuevos al azar). Lo enciende/apaga el
-  // director en el módulo de Account Managers. Ver [[project-random-assign-am]].
+  // de asignación automática (recibe PROYECTOS nuevos al azar cuando un aliado
+  // captura lo suyo). Lo enciende/apaga el director en el módulo de Account Managers.
   auto_assign_enabled?: boolean;
 }
 
 // Elige al azar un Account Manager que participe en la ruleta de asignación
 // automática (activo + interruptor encendido). Devuelve null si no hay ninguno,
-// en cuyo caso el aliado nuevo queda sin AM (mesa del director). Se usa en modo
-// demo; en producción lo hace el trigger `assign_random_am_on_insert` de la BD.
+// en cuyo caso el PROYECTO queda sin AM (mesa del director). Se usa en modo
+// demo; en producción lo hace el trigger `assign_am_to_prospect` de la BD.
 function pickRandomAutoAssignAM(pool: UserProfile[]): string | null {
   const eligible = pool.filter(
     (p) => p.role === "account_manager" && p.is_active !== false && p.auto_assign_enabled === true
@@ -172,6 +171,10 @@ export interface Prospect {
   // Fecha de nueva evaluación agendada cuando el expediente se condiciona como
   // "Agenda futura" (subetapa de Condicionado). Nullable mientras no aplique.
   reeval_date?: string | null;
+  // Account Manager asignado al PROYECTO (no al aliado): lo sortea la ruleta al
+  // capturar el aliado su propio proyecto; si lo captura un AM, queda de ese AM;
+  // si lo captura Dirección, queda null (gestión directa / mesa de dirección).
+  account_manager_id?: string | null;
   simulation?: Simulation;
   sim_emitted_at?: string | null;
   documents: DocumentItem[];
@@ -342,7 +345,6 @@ const INITIAL_PROFILES: UserProfile[] = [
     role: "aliado",
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: true,
-    account_manager_id: "am-789", // Assigned to Sofia!
   },
   {
     id: "director-456",
@@ -361,6 +363,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     role: "account_manager",
     created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: true,
+    auto_assign_enabled: true, // participa en la ruleta de proyectos (demo)
   },
   {
     id: "aliado-unassigned",
@@ -370,7 +373,6 @@ const INITIAL_PROFILES: UserProfile[] = [
     role: "aliado",
     created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     is_active: true,
-    account_manager_id: null,
   }
 ];
 
@@ -379,6 +381,7 @@ const INITIAL_PROSPECTS: Prospect[] = [
     id: "prospect-1",
     aliado_id: "aliado-123",
     aliado_name: "Roberto Asesor",
+    account_manager_id: "am-789",
     full_name: "Norberto Javier González Ventura",
     nss: "68876602886",
     curp: "GOVN680820HDFLNS02",
@@ -422,6 +425,7 @@ const INITIAL_PROSPECTS: Prospect[] = [
     id: "prospect-2",
     aliado_id: "aliado-123",
     aliado_name: "Roberto Asesor",
+    account_manager_id: "am-789",
     full_name: "Ana María Torres Ruiz",
     nss: "09876543210",
     curp: "TORA731005MDFRRN09",
@@ -454,6 +458,7 @@ const INITIAL_PROSPECTS: Prospect[] = [
     id: "prospect-3",
     aliado_id: "aliado-123",
     aliado_name: "Roberto Asesor",
+    account_manager_id: "am-789",
     full_name: "Juan Pérez García",
     nss: "12345678901",
     curp: "PEGJ700512HDFRRN01",
@@ -497,6 +502,7 @@ const INITIAL_PROSPECTS: Prospect[] = [
     id: "prospect-4",
     aliado_id: "aliado-123",
     aliado_name: "Roberto Asesor",
+    account_manager_id: "am-789",
     full_name: "Héctor Ramírez Soto",
     nss: "55123456789",
     curp: "RASH650315HDFMNR08",
@@ -658,15 +664,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
         
       if (prof) {
-        // Sync metadata to auth.users if missing or mismatch
+        // Sync metadata to auth.users if missing or mismatch.
+        // (El AM ya no vive en el perfil del aliado: solo se sincroniza el rol.)
         const meta = authUser.user_metadata || {};
-        if (meta.role !== prof.role || meta.account_manager_id !== prof.account_manager_id) {
-          console.log("Syncing missing/outdated role or account_manager_id to auth metadata...");
+        if (meta.role !== prof.role) {
+          console.log("Syncing missing/outdated role to auth metadata...");
           try {
             await client.auth.updateUser({
               data: {
-                role: prof.role,
-                account_manager_id: prof.account_manager_id
+                role: prof.role
               }
             });
           } catch (updateErr) {
@@ -751,6 +757,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       modalidad: dbProspect.modalidad || null,
       tipo_financiamiento: dbProspect.tipo_financiamiento || null,
       reeval_date: dbProspect.reeval_date || null,
+      account_manager_id: dbProspect.account_manager_id ?? null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,
@@ -1271,14 +1278,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                  prospectsQuery = prospectsQuery.eq("aliado_id", activeUser.id);
                }
              } else if (activeUser && activeUser.role === "account_manager") {
-               const assignedAllyIds = mappedProfiles
-                 .filter((p: any) => p.role === "aliado" && p.account_manager_id === activeUser.id)
-                 .map((p: any) => p.id);
-               if (assignedAllyIds.length > 0) {
-                 prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
-               } else {
-                 prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
-               }
+               // El AM trabaja POR PROYECTO: ve los prospects que tienen su id
+               // como account_manager_id (ya no la cartera de aliados).
+               prospectsQuery = prospectsQuery.eq("account_manager_id", activeUser.id);
              }
             const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
             if (prospectsError) {
@@ -1919,14 +1921,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                   prospectsQuery = prospectsQuery.eq("aliado_id", activeProfile.id);
                 }
               } else if (activeProfile.role === "account_manager") {
-                const assignedAllyIds = mappedProfiles
-                  .filter((p: any) => p.role === "aliado" && p.account_manager_id === activeProfile.id)
-                  .map((p: any) => p.id);
-                if (assignedAllyIds.length > 0) {
-                  prospectsQuery = prospectsQuery.in("aliado_id", assignedAllyIds);
-                } else {
-                  prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
-                }
+                // El AM trabaja POR PROYECTO: ve los prospects que tienen su id
+                // como account_manager_id (ya no la cartera de aliados).
+                prospectsQuery = prospectsQuery.eq("account_manager_id", activeProfile.id);
               }
               const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
               if (prospectsError) {
@@ -2131,12 +2128,23 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         ? assignedProfile.empresa_multialiado_id || null
         : user?.empresa_multialiado_id || null;
 
+      // Account Manager del PROYECTO (espejo del trigger `assign_am_to_prospect`):
+      // aliado capturando lo suyo → ruleta; un AM captura → el proyecto es suyo;
+      // Dirección captura → sin AM (gestión directa).
+      let projectAmId: string | null = null;
+      if (user?.role === "aliado" && ownerId === creatorId) {
+        projectAmId = pickRandomAutoAssignAM(profiles);
+      } else if (user?.role === "account_manager") {
+        projectAmId = user.id;
+      }
+
       const newProspect: Prospect = {
         ...cleanProspectData,
         id: newId,
         aliado_id: ownerId,
         aliado_name: ownerName,
         empresa_multialiado_id: ownerEmpresa,
+        account_manager_id: projectAmId,
         status: "evaluacion_pendiente",
         documents: docs,
         google_drive_folder: driveFolderId,
@@ -2171,10 +2179,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           created_at: new Date().toISOString(),
         });
       }
-      // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager lo
-      // atenderá (caso complementario al de "Proyecto Asignado 📁").
-      if (user?.role === "aliado" && (!assignedProfile || assignedProfile.id === creatorId) && user?.account_manager_id) {
-        const amName = profiles.find((p) => p.id === user.account_manager_id)?.full_name || "tu Account Manager";
+      // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager le
+      // sorteó la ruleta (caso complementario al de "Proyecto Asignado 📁").
+      // En producción esta notificación la emite el trigger `notify_on_prospect_insert`.
+      if (user?.role === "aliado" && ownerId === creatorId && newProspect.account_manager_id) {
+        const amName = profiles.find((p) => p.id === newProspect.account_manager_id)?.full_name || "tu Account Manager";
         notifBatch.unshift({
           id: `notif-${Math.random().toString(36).substr(2, 9)}`,
           title: "Account Manager asignado 👤",
@@ -2200,11 +2209,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         let creatorId: string | undefined = undefined;
         let creatorName: string | undefined = undefined;
         let creatorEmpresa: string | null = null;
-        // AM y rol del creador: para avisarle qué Account Manager atenderá su
-        // proyecto cuando un aliado captura para sí mismo. `role` se lee CRUDO de la
-        // BD (aliado = 'aliado'; director = 'admin'), así el guard `=== 'aliado'` es correcto.
-        let creatorAmId: string | null = null;
-        let creatorRole: string | undefined = undefined;
 
         if (supabase) {
           const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -2212,19 +2216,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             creatorId = authUser.id;
             const { data: profile } = await supabase
               .from("profiles")
-              .select("full_name, empresa_multialiado_id, account_manager_id, role")
+              .select("full_name, empresa_multialiado_id")
               .eq("id", authUser.id)
               .maybeSingle();
             if (profile) {
               creatorName = profile.full_name;
               creatorEmpresa = profile.empresa_multialiado_id;
-              creatorAmId = profile.account_manager_id;
-              creatorRole = profile.role;
             } else {
               creatorName = user?.full_name;
               creatorEmpresa = user?.empresa_multialiado_id || null;
-              creatorAmId = user?.account_manager_id || null;
-              creatorRole = user?.role;
             }
           }
         }
@@ -2233,8 +2233,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           creatorId = user?.id;
           creatorName = user?.full_name;
           creatorEmpresa = user?.empresa_multialiado_id || null;
-          creatorAmId = user?.account_manager_id || null;
-          creatorRole = user?.role;
         }
 
         if (!creatorId) {
@@ -2367,7 +2365,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        // Aviso al aliado cuando Dirección/AM le asignó el proyecto al crearlo.
+        // Aviso al aliado cuando la DIRECCIÓN le asignó el proyecto al crearlo.
+        // (La RLS de notifications solo permite INSERT a admin/director; cuando el
+        // creador es un AM este insert falla en silencio y el aviso equivalente lo
+        // emite el trigger `notify_on_prospect_insert` de la BD.)
         if (assignId && assignId !== creatorId) {
           await supabase.from("notifications").insert({
             user_id: assignId,
@@ -2378,24 +2379,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager lo
-        // atenderá. Caso complementario y mutuamente excluyente con "Proyecto
-        // Asignado 📁" (que aplica solo si Dirección/AM asigna a un tercero).
-        if (creatorRole === "aliado" && creatorAmId && (!assignId || assignId === creatorId)) {
-          const { data: amProfile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", creatorAmId)
-            .maybeSingle();
-          const amName = amProfile?.full_name || "tu Account Manager";
-          await supabase.from("notifications").insert({
-            user_id: creatorId,
-            title: "Account Manager asignado 👤",
-            message: `Tu proyecto de ${newProspect.full_name} será atendido por ${amName}.`,
-            type: "info",
-            read: false,
-          });
-        }
+        // Aviso "Account Manager asignado 👤" al aliado que capturó lo suyo y aviso
+        // al AM sorteado: los emite la BD (trigger `notify_on_prospect_insert`,
+        // SECURITY DEFINER) porque la RLS de notifications bloquea el insert del
+        // aliado. El AM del proyecto ya viene en newProspect.account_manager_id
+        // (lo fijó el trigger BEFORE INSERT `assign_am_to_prospect`).
 
         triggerPushNotification(
           `🔔 Nuevo prospecto (${tipoLabel}): ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
@@ -3390,17 +3378,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         
         const storedProfiles = localStorage.getItem("pensionflow_profiles");
         const parsedProfiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
-        // El AM se sortea de la ruleta, sin importar quién generó el código (en
-        // producción esto lo hace el trigger de la BD; aquí es para el modo demo).
-        const accountManagerId = pickRandomAutoAssignAM(parsedProfiles);
-
+        // El aliado ya NO lleva Account Manager: el AM se sortea POR PROYECTO
+        // cuando el aliado captura (ver addProspect / trigger assign_am_to_prospect).
         const newProfile: UserProfile = {
           id: `aliado-${Math.random().toString(36).substr(2, 9)}`,
           full_name: fullName,
           email,
           phone,
           role: "aliado",
-          account_manager_id: accountManagerId,
           created_at: new Date().toISOString()
         };
         
@@ -3424,9 +3409,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           throw new Error("El código de invitación no es válido, ya fue utilizado o no existe.");
         }
 
-        // El Account Manager NO se hereda del creador del código: lo sortea la BD
-        // (trigger `assign_random_am_on_insert`) entre los AM que están en la ruleta,
-        // al insertar el perfil. El director puede re-asignarlo después a mano.
+        // El aliado ya NO lleva Account Manager en su perfil: el AM se sortea
+        // POR PROYECTO al capturar (trigger `assign_am_to_prospect` de la BD).
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
@@ -3463,7 +3447,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               phone,
               role: "aliado",
               invitation_code_used: code.trim().toUpperCase(),
-              // account_manager_id lo asigna el trigger de la BD (ruleta de AM).
             });
             
           // If successful, try to mark invitation code as used
@@ -3574,16 +3557,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
     if (isDemoMode || isProvisionalSession || !supabase) {
-      // Al crear un aliado sin AM, se sortea uno de la ruleta (en producción esto
-      // lo hace el trigger de la BD; aquí lo replicamos para el modo demo).
-      const assignedAmId =
-        profileData.role === "aliado" && !profileData.account_manager_id
-          ? pickRandomAutoAssignAM(profiles)
-          : (profileData.account_manager_id ?? null);
-
+      // El aliado nuevo ya NO lleva Account Manager: la ruleta reparte PROYECTOS
+      // (ver addProspect / trigger assign_am_to_prospect), no aliados.
       const newProfile: UserProfile = {
         ...profileData,
-        account_manager_id: assignedAmId,
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
         created_at: new Date().toISOString(),
       };
@@ -3667,7 +3644,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: dbRole,
             invitation_code_used: profileData.invitation_code_used || null,
             password_provisional: profileData.password_provisional || null,
-            account_manager_id: profileData.account_manager_id || null,
           })
           .select()
           .single();
@@ -3685,7 +3661,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: profileData.role,
             invitation_code_used: profileData.invitation_code_used || undefined,
             password_provisional: profileData.password_provisional || undefined,
-            account_manager_id: profileData.account_manager_id || undefined,
             created_at: new Date().toISOString(),
           };
 
@@ -3706,7 +3681,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             role: (dbProfile.role === "admin" || dbProfile.role === "director") ? "director" : (dbProfile.role as any),
             invitation_code_used: dbProfile.invitation_code_used,
             password_provisional: dbProfile.password_provisional,
-            account_manager_id: dbProfile.account_manager_id,
             created_at: dbProfile.created_at,
           };
 
@@ -3725,21 +3699,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        // Avisar al Account Manager que le tocó el aliado en la ruleta de asignación.
-        // (El AM lo eligió el trigger de la BD; se refleja en dbProfile.account_manager_id.)
-        if (newProfile.account_manager_id) {
-          try {
-            await supabase.from("notifications").insert({
-              user_id: newProfile.account_manager_id,
-              title: "Nuevo aliado asignado 🎲",
-              message: `Se te asignó al aliado ${newProfile.full_name} en la asignación automática.`,
-              type: "info",
-              read: false,
-            });
-          } catch (amNotifyErr) {
-            console.warn("No se pudo notificar al AM asignado:", amNotifyErr);
-          }
-        }
+        // La ruleta ya no reparte ALIADOS: el AM se sortea por PROYECTO al
+        // capturar (el aviso "Nuevo proyecto asignado 🎲" al AM lo emite el
+        // trigger `notify_on_prospect_insert` de la BD).
 
         triggerPushNotification(
           `👤 Registro Completo: Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Puede iniciar sesión con su correo: ${newProfile.email}`,
@@ -3885,7 +3847,6 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
         if (updates.role !== undefined) dbUpdates.role = dbRole;
         if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
-        if (updates.account_manager_id !== undefined) dbUpdates.account_manager_id = updates.account_manager_id;
         if (updates.auto_assign_enabled !== undefined) dbUpdates.auto_assign_enabled = updates.auto_assign_enabled;
         if (updates.password_provisional !== undefined) dbUpdates.password_provisional = updates.password_provisional;
 
@@ -4417,39 +4378,60 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     });
   };
 
+  // Perfiles visibles por rol. Con el AM POR PROYECTO, la relación aliado↔AM se
+  // deriva de los prospects (ya no de una cartera fija en el perfil):
+  //   · AM     → él mismo + los aliados dueños de SUS proyectos
+  //   · aliado → él mismo + los AMs asignados a SUS proyectos
   const exposedProfiles = React.useMemo(() => {
     if (!user) return [];
     if (user.role === "director") return profiles;
     if (user.role === "account_manager") {
-      return profiles.filter(p => p.id === user.id || (p.role === "aliado" && p.account_manager_id === user.id));
+      const myAllyIds = new Set(
+        prospects.filter(p => p.account_manager_id === user.id).map(p => p.aliado_id)
+      );
+      return profiles.filter(p => p.id === user.id || (p.role === "aliado" && myAllyIds.has(p.id)));
     }
     if (user.role === "aliado") {
-      return profiles.filter(p => p.id === user.id || p.id === user.account_manager_id);
+      const myAmIds = new Set(
+        prospects
+          .filter(p => p.aliado_id === user.id && p.account_manager_id)
+          .map(p => p.account_manager_id as string)
+      );
+      return profiles.filter(p => p.id === user.id || myAmIds.has(p.id));
     }
     return [];
-  }, [user, profiles]);
+  }, [user, profiles, prospects]);
 
   // Contactos del chat general (mensajería directa). Se computa del `profiles` crudo (no del
   // filtrado `exposedProfiles`) para poder incluir a la dirección, con la que todos pueden
-  // hablar. Regla:
-  //   · aliado ↔ su AM + dirección + su(s) líder(es) de grupo
-  //   · líder  ↔ su AM + dirección + su equipo asignado (aliados a su cargo)
-  //   · AM     ↔ sus aliados + dirección
+  // hablar. Con el AM POR PROYECTO, la relación aliado↔AM sale de los prospects:
+  //   · aliado ↔ los AMs de sus proyectos + dirección + su(s) líder(es) de grupo
+  //   · líder  ↔ los AMs de sus proyectos + dirección + su equipo asignado
+  //   · AM     ↔ los aliados dueños de sus proyectos + dirección
   //   · director ↔ todos
-  // La visibilidad de perfiles necesaria ya la dan las políticas RLS existentes: la aditiva de
-  // dirección (20260706000001) y la de líder↔aliados en ambos sentidos (20260630000000).
+  // La visibilidad de perfiles necesaria la dan las políticas RLS: la aditiva de dirección
+  // (20260706000001), líder↔aliados (20260630000000) y "AMs visibles para autenticados"
+  // (20260723000000, el aliado puede leer el perfil del AM de sus proyectos).
   const messagingContacts = React.useMemo(() => {
     if (!user) return [] as UserProfile[];
     const others = profiles.filter(p => p.id !== user.id && p.is_active !== false);
     if (user.role === "director") return others;
     if (user.role === "account_manager") {
-      return others.filter(p => (p.role === "aliado" && p.account_manager_id === user.id) || p.role === "director");
+      const myAllyIds = new Set(
+        prospects.filter(p => p.account_manager_id === user.id).map(p => p.aliado_id)
+      );
+      return others.filter(p => (p.role === "aliado" && myAllyIds.has(p.id)) || p.role === "director");
     }
     if (user.role === "aliado") {
+      const myAmIds = new Set(
+        prospects
+          .filter(p => p.aliado_id === user.id && p.account_manager_id)
+          .map(p => p.account_manager_id as string)
+      );
       // Unificado y simétrico: sirve tanto para un líder (equipo vía `p.lider_ids`) como para un
       // aliado regular (sus líderes vía `user.lider_ids`). Cada quien ve solo lo que le aplica.
       return others.filter(p =>
-        p.id === user.account_manager_id ||
+        myAmIds.has(p.id) ||
         p.role === "director" ||
         // Mi(s) líder(es): perfiles cuyo id está en mis lider_ids.
         (user.lider_ids?.includes(p.id) ?? false) ||
@@ -4458,16 +4440,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       );
     }
     return [] as UserProfile[];
-  }, [user, profiles]);
+  }, [user, profiles, prospects]);
 
   const exposedProspects = React.useMemo(() => {
     if (!user) return [];
     if (user.role === "director") return prospects;
     if (user.role === "account_manager") {
-      const assignedAllyIds = profiles
-        .filter(p => p.role === "aliado" && p.account_manager_id === user.id)
-        .map(p => p.id);
-      return prospects.filter(p => assignedAllyIds.includes(p.aliado_id));
+      // El AM trabaja POR PROYECTO: ve los prospects asignados a él (ya no la
+      // cartera de aliados).
+      return prospects.filter(p => p.account_manager_id === user.id);
     }
     if (user.role === "aliado") {
       if (user.aliado_tipo === "lider") {

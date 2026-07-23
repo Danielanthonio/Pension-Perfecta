@@ -15,9 +15,8 @@ import {
 
 export default function AsignacionAliados() {
   const {
-    profiles,
+    assignmentProfiles,
     prospects,
-    user,
     changeAllyType,
     assignAllyToLider,
     empresasMultialiado,
@@ -37,16 +36,12 @@ export default function AsignacionAliados() {
   // State for multiple leader selection dropdown
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  const isAM = user?.role === "account_manager";
+  // Directorio completo de aliados (lista cruda): director y AM ven a TODOS.
+  const allies = assignmentProfiles.filter((p) => p.role === "aliado");
 
-  // Filter profiles based on access: AMs only see allies/leaders managed by them
-  const allies = profiles.filter(
-    (p) => p.role === "aliado" && (!isAM || p.account_manager_id === user?.id)
-  );
-
-  // Dynamic list of active leaders for assignment dropdown (under this AM, or all if Director)
-  const activeLeaders = profiles.filter(
-    (p) => p.role === "aliado" && p.aliado_tipo === "lider" && (!isAM || p.account_manager_id === user?.id)
+  // Lista dinámica de líderes activos para el dropdown de asignación
+  const activeLeaders = assignmentProfiles.filter(
+    (p) => p.role === "aliado" && p.aliado_tipo === "lider"
   );
 
   // Handle immediate leader assignment for normal allies
@@ -367,15 +362,12 @@ export default function AsignacionAliados() {
                                     />
                                     <div className="absolute z-20 mt-2 w-64 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl shadow-xl overflow-hidden left-0 max-h-64 overflow-y-auto">
                                       <div className="p-2 space-y-1">
-                                        {leadersOfSameCompany
-                                          .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
-                                          .length === 0 ? (
+                                        {leadersOfSameCompany.length === 0 ? (
                                             <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 text-center">
                                               No hay líderes disponibles en esta empresa
                                             </div>
                                           ) : (
                                           leadersOfSameCompany
-                                            .filter(l => !isAM || l.account_manager_id === a.account_manager_id)
                                             .map((l) => {
                                               const isSelected = a.lider_ids?.includes(l.id) || false;
                                               return (

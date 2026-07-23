@@ -157,13 +157,9 @@ function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
 
   const isAM = user?.role === "account_manager";
   const subStagesList = localStageFilter !== "all" ? (SUB_STAGES_BY_STAGE[localStageFilter] || []) : [];
-  const uniqueAllies = profiles.filter((p) => {
-    if (p.role !== "aliado" || !p.is_active) return false;
-    if (user?.role === "account_manager") {
-      return p.account_manager_id === user.id;
-    }
-    return true;
-  });
+  // Con el AM por PROYECTO, `profiles` (exposedProfiles) del AM ya viene acotado a
+  // los aliados dueños de sus proyectos: no hace falta filtrar por cartera.
+  const uniqueAllies = profiles.filter((p) => p.role === "aliado" && p.is_active);
 
   return (
     <div className={`pt-8 border-t border-slate-800/55 mt-6 space-y-4 ${collapsed ? "md:hidden" : ""}`}>

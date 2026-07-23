@@ -340,18 +340,16 @@ function ClientesContent() {
     </div>
   );
 
-  // Account Manager que atiende el proyecto: el dueño es prospect.aliado_id y su
-  // account_manager_id apunta al AM. Devuelve el nombre, o un estado especial:
-  //   null            → no se puede determinar (p.ej. un líder viendo proyectos de
-  //                     su equipo, cuyos perfiles no expone el contexto) → "—"
-  //   "__SIN_AM__"    → el aliado SÍ es visible pero no tiene AM (mesa de dirección)
+  // Account Manager que atiende el PROYECTO: se lee directo de prospect.account_manager_id
+  // (el AM ya no es un atributo del aliado). Devuelve el nombre, o un estado especial:
+  //   null            → hay AM pero su perfil no es visible en el contexto (p.ej. un
+  //                     líder viendo proyectos de su equipo, cuyos AM no vienen) → "—"
+  //   "__SIN_AM__"    → el proyecto no tiene AM asignado (mesa de dirección)
   const AM_NONE = "__SIN_AM__";
   const resolveAccountManager = (p: Prospect): string | null => {
-    const isOwn = p.aliado_id === user?.id;
-    const owner = profiles.find((pr) => pr.id === p.aliado_id);
-    if (!owner && !isOwn) return null; // no determinable
-    const amId = owner?.account_manager_id ?? (isOwn ? user?.account_manager_id : undefined);
+    const amId = p.account_manager_id;
     if (!amId) return AM_NONE;
+    // Para el aliado, exposedProfiles ya incluye a los AMs de sus proyectos.
     return profiles.find((pr) => pr.id === amId)?.full_name ?? null;
   };
 

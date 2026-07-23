@@ -46,8 +46,9 @@ export async function GET(
     const isAM = callerRole === "account_manager";
     const isSelf = user.id === liderId;
 
-    // Check permissions: self (lider), Director, or Account Manager managing this leader
-    const hasPermission = isSelf || isDirector || (isAM && leader.account_manager_id === user.id);
+    // Permisos: el propio líder, Dirección o cualquier Account Manager (la
+    // "cartera" del AM ya no existe: el AM se asigna por PROYECTO).
+    const hasPermission = isSelf || isDirector || isAM;
     if (!hasPermission) {
       return NextResponse.json({ error: "No tienes permisos para ver los aliados de este líder" }, { status: 403 });
     }
@@ -63,8 +64,7 @@ export async function GET(
           full_name,
           email,
           lider_grupo,
-          empresa_multialiado_id,
-          account_manager_id
+          empresa_multialiado_id
         )
       `)
       .eq("lider_id", liderId);
@@ -98,19 +98,8 @@ export async function GET(
 
       total_prospectos += activeProspectsCount;
 
-      // Look up Account Manager name
-      let accountManagerName = "Mesa de Operaciones";
-      if (ally.account_manager_id) {
-        const { data: amProfile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", ally.account_manager_id)
-          .maybeSingle();
-        if (amProfile) {
-          accountManagerName = amProfile.full_name;
-        }
-      }
-
+      // (El AM ya no es un atributo del aliado: se asigna por PROYECTO, así que
+      // el payload ya no incluye account_manager_name.)
       aliados_asignados.push({
         id: ally.id,
         name: ally.full_name,
@@ -118,7 +107,6 @@ export async function GET(
         prospectos_activos: activeProspectsCount,
         assigned_at: new Date(r.created_at).toISOString().split("T")[0],
         empresa_nombre: ally.lider_grupo || leader.lider_grupo || "Sin Empresa",
-        account_manager_name: accountManagerName,
         lider_nombre: leader.full_name,
       });
     }

@@ -10,24 +10,25 @@ import type { UserProfile, Prospect } from "@/utils/context/AppContext";
 // director elige 1 o más aliados y/o AMs a la vez para comparar sus gestiones.
 // Sin selección = Todos.
 
-// Opción sintética: aliados sin account manager asignado ("Gestión Directa (Sin AM)").
+// Opción sintética: proyectos sin account manager ("Gestión Directa (Sin AM)"),
+// es decir, prospectos con account_manager_id null (mesa de dirección).
 export const GESTION_DIRECTA_ID = "__direct__";
 
 // Fuente de verdad del filtrado (usada por ambas páginas). Sin selección → deja pasar todo.
-// Con selección hace match si: el aliado del prospecto está seleccionado directamente, o su
-// account manager está seleccionado, o se seleccionó "Gestión Directa" y el aliado no tiene AM.
+// Con selección hace match si: el aliado del prospecto está seleccionado directamente, o el
+// account manager DEL PROYECTO está seleccionado, o se seleccionó "Gestión Directa" y el
+// proyecto no tiene AM (account_manager_id null).
 export function prospectMatchesSelection(
   p: Prospect,
   selected: string[],
-  profiles: UserProfile[]
+  _profiles: UserProfile[] // ya no se usa (el AM vive en el proyecto); se conserva por compatibilidad
 ): boolean {
   if (selected.length === 0) return true;
   const set = new Set(selected);
   if (set.has(p.aliado_id)) return true;
-  const ally = profiles.find((prof) => prof.id === p.aliado_id);
-  const amId = ally?.account_manager_id;
+  const amId = p.account_manager_id;
   if (amId && set.has(amId)) return true;
-  if (set.has(GESTION_DIRECTA_ID) && ally && !amId) return true;
+  if (set.has(GESTION_DIRECTA_ID) && !amId) return true;
   return false;
 }
 
@@ -96,9 +97,6 @@ export function AliadoPicker({
     if (id === GESTION_DIRECTA_ID) return "Gestión Directa";
     return profiles.find((p) => p.id === id)?.full_name || "—";
   };
-  const amNameOf = (allyAmId?: string | null): string =>
-    allyAmId ? profiles.find((p) => p.id === allyAmId)?.full_name || "AM" : "Gestión Directa";
-
   const q = query.trim().toLowerCase();
   const matches = (name: string) => !q || name.toLowerCase().includes(q);
   const filteredAms = ams.filter((a) => matches(a.full_name));
@@ -193,7 +191,7 @@ export function AliadoPicker({
 
           <div className="max-h-[300px] overflow-y-auto p-1.5 space-y-1">
             {showDirect && (
-              <Option id={GESTION_DIRECTA_ID} label="Gestión Directa (Sin AM)" sub="Aliados sin account manager" />
+              <Option id={GESTION_DIRECTA_ID} label="Gestión Directa (Sin AM)" sub="Proyectos sin account manager" />
             )}
 
             {filteredAms.length > 0 && (
@@ -202,7 +200,7 @@ export function AliadoPicker({
                   Account Managers
                 </p>
                 {filteredAms.map((am) => (
-                  <Option key={am.id} id={am.id} label={am.full_name} sub="Incluye a todos sus aliados" />
+                  <Option key={am.id} id={am.id} label={am.full_name} sub="Incluye todos sus proyectos" />
                 ))}
               </>
             )}
@@ -213,7 +211,7 @@ export function AliadoPicker({
                   Aliados
                 </p>
                 {filteredAllies.map((ally) => (
-                  <Option key={ally.id} id={ally.id} label={ally.full_name} sub={amNameOf(ally.account_manager_id)} />
+                  <Option key={ally.id} id={ally.id} label={ally.full_name} />
                 ))}
               </>
             )}

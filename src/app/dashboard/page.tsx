@@ -127,10 +127,9 @@ function DashboardContent() {
         const matchedRels = localRels.filter((r: any) => r.lider_id === user.id);
         const mappedAllies = matchedRels.map((r: any) => {
           const allyProfile = profiles.find((p) => p.id === r.aliado_asignado_id);
-          const amProfile = profiles.find((p) => p.id === allyProfile?.account_manager_id);
           // Look up all prospects of this ally
           const allyProspects = prospects.filter((p) => p.aliado_id === r.aliado_asignado_id && !isProspectDeleted(p) && !isProspectPurged(p));
-          
+
           return {
             id: r.aliado_asignado_id,
             name: allyProfile?.full_name || "Asesor Comercial Demo",
@@ -138,7 +137,6 @@ function DashboardContent() {
             prospectos_activos: allyProspects.length,
             assigned_at: new Date(r.created_at || Date.now()).toISOString().split("T")[0],
             empresa_nombre: allyProfile?.lider_grupo || user.lider_grupo || "Sin Empresa",
-            account_manager_name: amProfile?.full_name || "Mesa de Operaciones",
             lider_nombre: user.full_name
           };
         });
@@ -171,7 +169,16 @@ function DashboardContent() {
     }
   }, [user, profiles, prospects, isDemoMode]);
 
-  const assignedAM = profiles.find(p => p.id === user?.account_manager_id);
+  // El AM ya no se asigna al aliado sino a cada PROYECTO: se derivan los
+  // account_manager_id distintos (no nulos) de los proyectos del usuario y se
+  // resuelven a perfil (exposedProfiles ya incluye a los AMs de sus proyectos).
+  const projectAmIds = Array.from(
+    new Set(activeProspects.map((p) => p.account_manager_id).filter((id) => !!id))
+  ) as string[];
+  const projectAMs = projectAmIds.flatMap((id) => {
+    const am = profiles.find((p) => p.id === id);
+    return am ? [am] : [];
+  });
 
   // Expanded rows state for indicators table
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -465,20 +472,33 @@ function DashboardContent() {
             )}
           </div>
 
-          {/* Section 2: Account Manager */}
+          {/* Section 2: Account Managers de los proyectos (el AM se asigna por PROYECTO) */}
           <div className="space-y-3 lg:pl-6">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Account Manager Asignado</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Account Managers de tus Proyectos</span>
 
-            {assignedAM ? (
+            {projectAMs.length === 1 ? (
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-sm font-black border border-indigo-200/25 shrink-0">
-                  {assignedAM.full_name.charAt(0)}
+                  {projectAMs[0].full_name.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{assignedAM.full_name}</span>
+                  <span className="block text-sm font-extrabold text-slate-850 dark:text-white truncate leading-tight">{projectAMs[0].full_name}</span>
                   <span className="block text-[10px] text-slate-400 dark:text-slate-550 mt-0.5 font-semibold uppercase tracking-wider">
                     Soporte B2B y Dictámenes
                   </span>
+                </div>
+              </div>
+            ) : projectAMs.length > 1 ? (
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 flex items-center justify-center text-sm font-black border border-indigo-200/25 shrink-0">
+                  {projectAMs.length}
+                </div>
+                <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                  {projectAMs.map((am) => (
+                    <span key={am.id} className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 rounded-lg text-[10px] font-bold border border-indigo-100/50 dark:border-indigo-900/40">
+                      {am.full_name}
+                    </span>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -489,16 +509,18 @@ function DashboardContent() {
                 <div className="min-w-0">
                   <span className="block text-sm font-extrabold text-slate-650 dark:text-slate-400 truncate leading-tight">Mesa de Operaciones</span>
                   <span className="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-semibold">
-                    Espera de asignación del director
+                    Gestión directa de dirección
                   </span>
                 </div>
               </div>
             )}
 
             <div className="pt-2 border-t border-slate-100 dark:border-slate-850 text-[10px] leading-relaxed text-slate-500 dark:text-slate-450 font-medium">
-              {assignedAM 
-                ? `Supervisor: ${assignedAM.full_name}. Contáctale para dudas de clientes o liberación de dictámenes Ley 73.`
-                : "Aún no se te ha asignado un AM. Tus expedientes serán evaluados por el Director de Operaciones."}
+              {projectAMs.length === 1
+                ? `${projectAMs[0].full_name} atiende tus proyectos. Contáctale para dudas de clientes o liberación de dictámenes Ley 73.`
+                : projectAMs.length > 1
+                ? "Estos Account Managers atienden tus proyectos; cada proyecto muestra el suyo en su detalle."
+                : "Tus proyectos aún no tienen AM: serán evaluados directamente por el Director de Operaciones."}
             </div>
           </div>
 

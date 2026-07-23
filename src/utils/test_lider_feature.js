@@ -39,11 +39,11 @@ const MOCK_EMPRESAS = [
 ];
 
 const MOCK_PROFILES = [
-  { id: "am-1", full_name: "AM Carlos", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null, empresa_multialiado_id: null },
-  { id: "am-2", full_name: "AM Sofia", role: "account_manager", aliado_tipo: "aliado", account_manager_id: null, empresa_multialiado_id: null },
-  { id: "ally-1", full_name: "Asesor Pedro", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1", empresa_multialiado_id: null },
-  { id: "ally-2", full_name: "Asesor Maria", role: "aliado", aliado_tipo: "aliado", account_manager_id: "am-1", empresa_multialiado_id: null },
-  { id: "lider-1", full_name: "Lider Yesenia", role: "aliado", aliado_tipo: "lider", lider_grupo: "Apoyamax", account_manager_id: "am-1", empresa_multialiado_id: "emp-1" },
+  { id: "am-1", full_name: "AM Carlos", role: "account_manager", aliado_tipo: "aliado", empresa_multialiado_id: null },
+  { id: "am-2", full_name: "AM Sofia", role: "account_manager", aliado_tipo: "aliado", empresa_multialiado_id: null },
+  { id: "ally-1", full_name: "Asesor Pedro", role: "aliado", aliado_tipo: "aliado", empresa_multialiado_id: null },
+  { id: "ally-2", full_name: "Asesor Maria", role: "aliado", aliado_tipo: "aliado", empresa_multialiado_id: null },
+  { id: "lider-1", full_name: "Lider Yesenia", role: "aliado", aliado_tipo: "lider", lider_grupo: "Apoyamax", empresa_multialiado_id: "emp-1" },
 ];
 
 const MOCK_LIDER_ALIADOS = [
@@ -62,9 +62,7 @@ function validatePatchAllyType({ caller, targetAlly, inputTipo, inputEmpresaId, 
     return { valid: false, error: "Solo Account Managers y Directores pueden cambiar tipo" };
   }
 
-  if (isAM && targetAlly.account_manager_id !== caller.id) {
-    return { valid: false, error: "No tienes permisos para modificar aliados fuera de tu gestión" };
-  }
+  // (Sin gate de cartera: cualquier AM puede cambiar el tipo — el AM se asigna por PROYECTO.)
 
   if (inputTipo === "lider") {
     if (!inputEmpresaId) {

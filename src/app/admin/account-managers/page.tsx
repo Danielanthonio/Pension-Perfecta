@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp } from "@/utils/context/AppContext";
+import { useApp, Prospect } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl } from "@/components/ui/sorting";
 import {
@@ -23,13 +23,15 @@ export default function GestionAccountManagers() {
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
 
-  // Interruptor de "ruleta" de asignación automática por AM. Solo los AM encendidos
-  // reciben aliados nuevos al azar; los apagados (p. ej. cuentas de prueba) quedan
-  // fuera del sorteo. La asignación real la ejecuta el trigger de la BD.
+  // Interruptor de "ruleta" de asignación automática por AM. La ruleta reparte
+  // PROYECTOS: solo los AM encendidos reciben proyectos nuevos al azar cuando un
+  // aliado captura lo suyo; los apagados (p. ej. cuentas de prueba) quedan fuera
+  // del sorteo. La asignación real la ejecuta el trigger assign_am_to_prospect
+  // sobre prospects (el trigger sobre profiles se eliminó).
   const [togglingId, setTogglingId] = useState<string | null>(null);
   // Cuenta solo los AM que realmente entran al sorteo: encendidos Y activos (mismo
   // criterio que `pickRandomAutoAssignAM` y el trigger de la BD). Un AM inactivo,
-  // aunque tenga el interruptor encendido, no recibe aliados.
+  // aunque tenga el interruptor encendido, no recibe proyectos.
   const rouletteCount = accountManagers.filter(
     (am) => am.auto_assign_enabled === true && am.is_active !== false
   ).length;
@@ -55,8 +57,7 @@ export default function GestionAccountManagers() {
     }).format(val);
   };
 
-  const getMetricsForAllies = (allyIds: string[]) => {
-    const groupProspects = prospects.filter((p) => allyIds.includes(p.aliado_id));
+  const getMetricsForProspects = (groupProspects: Prospect[]) => {
     const totalCount = groupProspects.length;
 
     // "Aprobado" = misma etapa que Gestión Clientes (getStageAndSubStage → "aprobado"): dictamen
@@ -101,19 +102,26 @@ export default function GestionAccountManagers() {
     };
   };
 
-  // Build the list of columns to compare: Account Managers + Director's Direct Portfolio
+  // "Aliados" de una columna = aliados distintos dueños de los proyectos de esa lista
+  // (la "cartera de aliados" del AM ya no existe: la relación nace de sus proyectos).
+  const distinctAlliesCount = (groupProspects: Prospect[]) =>
+    new Set(groupProspects.map((p) => p.aliado_id)).size;
+
+  // Proyectos sin AM (account_manager_id null) = mesa de dirección / gestión directa.
+  const directProspects = prospects.filter((p) => !p.account_manager_id);
+
+  // Columnas a comparar: cada Account Manager con SUS proyectos + la gestión directa del director
   const columns = [
     ...accountManagers.map((am) => {
-      const amAllies = allies.filter((a) => a.account_manager_id === am.id);
-      const amAllyIds = amAllies.map((a) => a.id);
+      const amProspects = prospects.filter((p) => p.account_manager_id === am.id);
       return {
         id: am.id,
         name: am.full_name,
         email: am.email,
         type: "account_manager" as const,
-        alliesCount: amAllies.length,
+        alliesCount: distinctAlliesCount(amProspects),
         autoAssign: am.auto_assign_enabled === true,
-        metrics: getMetricsForAllies(amAllyIds),
+        metrics: getMetricsForProspects(amProspects),
       };
     }),
     {
@@ -121,9 +129,9 @@ export default function GestionAccountManagers() {
       name: "Gestión Directa (Director)",
       email: "Operaciones Centrales",
       type: "director" as const,
-      alliesCount: allies.filter((a) => !a.account_manager_id).length,
+      alliesCount: distinctAlliesCount(directProspects),
       autoAssign: false,
-      metrics: getMetricsForAllies(allies.filter((a) => !a.account_manager_id).map((a) => a.id)),
+      metrics: getMetricsForProspects(directProspects),
     },
   ];
 
@@ -175,10 +183,10 @@ export default function GestionAccountManagers() {
         <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/15 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
           <Shuffle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
           <span>
-            La asignación de aliados a Account Manager es <strong className="text-slate-800 dark:text-slate-100">automática y al azar</strong> entre los AM que estén en la ruleta.
+            La asignación de proyectos a Account Manager es <strong className="text-slate-800 dark:text-slate-100">automática y al azar</strong> entre los AM que estén en la ruleta cuando un aliado captura su propio proyecto.
             Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba.
             {rouletteCount === 0 ? (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los aliados nuevos quedan sin supervisor (mesa del director).</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los proyectos nuevos quedan sin AM (mesa del director).</span>
             ) : (
               <span className="font-semibold text-indigo-700 dark:text-indigo-400"> {rouletteCount} {rouletteCount === 1 ? "AM participa" : "AM participan"} en la ruleta.</span>
             )}
@@ -189,7 +197,7 @@ export default function GestionAccountManagers() {
       {/* Global Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard label="Supervisores en Sistema" value={`${totalAMs}`} sub="AMs" tone="indigo" icon={UserCheck} />
-        <StatCard label="Cartera Total de Aliados" value={`${totalAllies}`} sub="Aliados B2B" tone="emerald" icon={Users} />
+        <StatCard label="Aliados en Sistema" value={`${totalAllies}`} sub="Aliados B2B" tone="emerald" icon={Users} />
         <StatCard label="Expedientes en Embudo" value={`${totalProspectsCount}`} sub="Prospectos" tone="amber" icon={Briefcase} />
       </div>
 
@@ -259,7 +267,7 @@ export default function GestionAccountManagers() {
                         aria-checked={col.autoAssign}
                         onClick={() => handleToggleRoulette(col.id, col.autoAssign)}
                         disabled={togglingId === col.id}
-                        title={col.autoAssign ? "Recibe aliados nuevos al azar. Click para sacarlo del sorteo." : "Fuera del sorteo. Click para que reciba aliados nuevos al azar."}
+                        title={col.autoAssign ? "Recibe proyectos nuevos al azar. Click para sacarlo del sorteo." : "Fuera del sorteo. Click para que reciba proyectos nuevos al azar."}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
                           col.autoAssign ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
                         } ${togglingId === col.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}

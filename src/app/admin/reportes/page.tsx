@@ -293,8 +293,8 @@ function ReportesContent() {
   const amSegments = useMemo(() => {
     const map = new Map<string, number>();
     pipeline.forEach((p) => {
-      const ally = profiles.find((pr) => pr.id === p.aliado_id);
-      const amId = ally?.account_manager_id || null;
+      // El AM ahora vive en el PROYECTO; null = gestión directa (sin AM).
+      const amId = p.account_manager_id || null;
       const name = amId ? profiles.find((pr) => pr.id === amId)?.full_name || "Account Manager" : "Sin Account Manager";
       map.set(name, (map.get(name) || 0) + 1);
     });
@@ -504,7 +504,7 @@ function ReportesContent() {
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Contribución por Account Manager</h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">Nº de proyectos por equipo.</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">Nº de proyectos por AM asignado.</p>
             </div>
           </div>
           <div className="flex flex-col items-center gap-4">

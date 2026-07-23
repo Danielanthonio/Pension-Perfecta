@@ -11,21 +11,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Get search params
-    const { searchParams } = new URL(req.url);
-    const accountManagerId = searchParams.get("account_manager_id");
-
-    let query = supabase
+    // (Se eliminó el filtro ?account_manager_id=: el AM se asigna por PROYECTO
+    // y los líderes ya no pertenecen a la cartera de un AM.)
+    const { data: dbLideres, error } = await supabase
       .from("profiles")
       .select("id, full_name, lider_grupo")
       .eq("role", "aliado")
       .eq("aliado_tipo", "lider");
-
-    if (accountManagerId) {
-      query = query.eq("account_manager_id", accountManagerId);
-    }
-
-    const { data: dbLideres, error } = await query;
 
     if (error) {
       console.error("Error fetching leaders:", error);

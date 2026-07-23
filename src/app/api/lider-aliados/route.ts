@@ -57,9 +57,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Solo se pueden asignar aliados de tipo 'aliado' a un Líder" }, { status: 400 });
     }
 
-    if (isAM && ally.account_manager_id !== user.id) {
-      return NextResponse.json({ error: "No tienes permisos para gestionar asignaciones para este aliado" }, { status: 403 });
-    }
+    // (Cualquier AM puede gestionar asignaciones: la "cartera" del AM ya no
+    // existe — el AM se asigna por PROYECTO, no por aliado.)
 
     // Fetch all requested leader profiles
     let leaders: any[] = [];
@@ -91,9 +90,7 @@ export async function POST(req: NextRequest) {
         if (leader.empresa_multialiado_id !== ally.empresa_multialiado_id) {
           return NextResponse.json({ error: `El líder ${leader.full_name} pertenece a una empresa diferente a la del aliado` }, { status: 400 });
         }
-        if (isAM && leader.account_manager_id !== user.id) {
-          return NextResponse.json({ error: `No tienes permisos para asignar al líder ${leader.full_name}` }, { status: 403 });
-        }
+        // (Sin gate de cartera: cualquier AM puede asignar líderes de la misma empresa.)
       }
     }
 

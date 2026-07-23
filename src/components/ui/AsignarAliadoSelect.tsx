@@ -47,9 +47,6 @@ export function AsignarAliadoSelect({
     [profiles]
   );
 
-  const amNameOf = (allyAmId?: string | null): string =>
-    allyAmId ? profiles.find((p) => p.id === allyAmId)?.full_name || "Account Manager" : "Gestión Directa";
-
   const selectedAlly = value ? profiles.find((p) => p.id === value) : null;
 
   const q = query.trim().toLowerCase();
@@ -79,9 +76,6 @@ export function AsignarAliadoSelect({
         {selectedAlly ? (
           <span className="min-w-0 flex-1 text-left">
             <span className="block truncate text-slate-800 dark:text-white">{selectedAlly.full_name}</span>
-            <span className="block truncate text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {amNameOf(selectedAlly.account_manager_id)}
-            </span>
           </span>
         ) : (
           <span className="flex-1 text-left text-slate-400 dark:text-slate-500">{placeholder}</span>
@@ -128,7 +122,6 @@ export function AsignarAliadoSelect({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{ally.full_name}</span>
-                      <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">{amNameOf(ally.account_manager_id)}</span>
                     </span>
                   </button>
                 );

@@ -439,12 +439,11 @@ export default function ProspectoDetalle() {
           return;
         }
 
-        if (user?.role === "account_manager") {
-          const allyProfile = profiles.find((p) => p.id === found.aliado_id);
-          if (!allyProfile || allyProfile.account_manager_id !== user.id) {
-            router.push("/admin");
-            return;
-          }
+        // El AM solo abre SUS proyectos (account_manager_id del PROYECTO). Los
+        // proyectos sin AM (null) son de gestión directa de Dirección.
+        if (user?.role === "account_manager" && found.account_manager_id !== user.id) {
+          router.push("/admin");
+          return;
         }
 
         setProspect(found);
@@ -2014,11 +2013,12 @@ export default function ProspectoDetalle() {
                 }`}>
                   {user.role === "director" ? "Director" : user.role === "account_manager" ? "Account Manager" : "Aliado"}
                 </span>
-                {user.account_manager_id && (
-                  <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
-                    AM: {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Asignado"}
-                  </span>
-                )}
+                {/* AM del PROYECTO (no del perfil): sin AM = mesa de dirección */}
+                <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
+                  AM: {prospect.account_manager_id
+                    ? (profiles?.find((p) => p.id === prospect.account_manager_id)?.full_name || "Asignado")
+                    : "Mesa de dirección"}
+                </span>
               </div>
               <div className={`h-10 w-10 rounded-2xl border flex items-center justify-center text-white text-sm font-black shadow-sm ${
                 user.role === "director"
@@ -2260,15 +2260,20 @@ export default function ProspectoDetalle() {
             El cliente ya aparece arriba, así que no se repite aquí. */}
         {(() => {
           const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
-          const amId = aliadoProfile?.account_manager_id || null;
+          // AM del PROYECTO (no del perfil del aliado); null = gestión directa.
+          const amId = prospect.account_manager_id || null;
           const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
+          // amId presente pero perfil no visible (p. ej. un líder viendo un proyecto
+          // de su equipo, cuyo AM no está en su contexto) → "Asignado", NO "Gestión
+          // directa" (que solo aplica cuando el proyecto realmente no tiene AM).
+          const amName = amProfile?.full_name || (amId ? "Asignado" : "Gestión directa");
           const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
           const empresa = prospect.empresa_multialiado_id ? empresasMultialiado.find((e) => e.id === prospect.empresa_multialiado_id) : null;
           const created = new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
           const chain = [
             { label: "Aliado que lo creó", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B", Icon: User,
               wrap: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" },
-            { label: "Account Manager", name: amProfile?.full_name || "Gestión directa", Icon: ShieldCheck,
+            { label: "Account Manager", name: amName, Icon: ShieldCheck,
               wrap: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" },
             { label: empresa ? "Líder / Empresa" : "Líder asignado",
               name: leaders.length ? leaders.map((l) => l.full_name).join(", ") : (empresa?.nombre || "Sin líder"), Icon: Building2,

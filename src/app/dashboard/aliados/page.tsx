@@ -48,9 +48,8 @@ function AliadosContent() {
         const matchedRels = localRels.filter((r: any) => r.lider_id === user.id);
         const mappedAllies = matchedRels.map((r: any) => {
           const allyProfile = profiles.find((p) => p.id === r.aliado_asignado_id);
-          const amProfile = profiles.find((p) => p.id === allyProfile?.account_manager_id);
           const allyProspects = prospects.filter((p) => p.aliado_id === r.aliado_asignado_id && !isProspectDeleted(p) && !isProspectPurged(p));
-          
+
           return {
             id: r.aliado_asignado_id,
             name: allyProfile?.full_name || "Asesor Comercial Demo",
@@ -58,7 +57,6 @@ function AliadosContent() {
             prospectos_activos: allyProspects.length,
             assigned_at: new Date(r.created_at || Date.now()).toISOString().split("T")[0],
             empresa_nombre: allyProfile?.lider_grupo || user.lider_grupo || "Sin Empresa",
-            account_manager_name: amProfile?.full_name || "Mesa de Operaciones",
             lider_nombre: user.full_name
           };
         });
@@ -137,7 +135,7 @@ function AliadosContent() {
             </div>
             <div>
               <h4 className="text-sm font-bold text-slate-700 dark:text-slate-350">No hay aliados asignados aún</h4>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Los Account Managers le asignarán asesores a tu grupo en breve.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">La dirección asignará asesores a tu grupo en breve.</p>
             </div>
           </div>
         ) : (
@@ -151,7 +149,6 @@ function AliadosContent() {
                     <th className="px-6 py-4 text-center">Prospectos Activos</th>
                     <th className="px-6 py-4">Fecha Asignación</th>
                     <th className="px-6 py-4">Empresa</th>
-                    <th className="px-6 py-4">Account Manager</th>
                     <th className="px-6 py-4">Líder Asignado</th>
                     <th className="px-6 py-4 text-right">Proyectos</th>
                   </tr>
@@ -180,9 +177,6 @@ function AliadosContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
                         {a.empresa_nombre}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-650 dark:text-slate-300 font-semibold">
-                        {a.account_manager_name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-indigo-600 dark:text-indigo-400 font-extrabold">
                         {a.lider_nombre || user.full_name}

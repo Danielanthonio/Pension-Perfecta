@@ -33,6 +33,7 @@ function ClientesAdminContent() {
     user,
     prospects,
     profiles,
+    assignmentProfiles,
     updateProspectStatus,
     reassignProspect,
     deleteProspect,
@@ -89,18 +90,15 @@ function ClientesAdminContent() {
   const [reassignAllyId, setReassignAllyId] = useState<string>("");
   const [reassigning, setReassigning] = useState(false);
 
-  // Aliados a los que se puede reasignar: el director puede reasignar a cualquier
-  // aliado; el account manager solo a los aliados de su cartera.
+  // Aliados a los que se puede reasignar: director y AM pueden mover el proyecto a
+  // CUALQUIER aliado del sistema (la "cartera" del AM ya no existe: el AM es por
+  // proyecto). Se usa la lista CRUDA `assignmentProfiles`, igual que al capturar.
   const eligibleAllies = React.useMemo(
     () =>
-      profiles
-        .filter(
-          (p) =>
-            p.role === "aliado" &&
-            (user?.role === "director" || p.account_manager_id === user?.id)
-        )
+      assignmentProfiles
+        .filter((p) => p.role === "aliado" && p.is_active !== false)
         .sort((a, b) => a.full_name.localeCompare(b.full_name)),
-    [profiles, user]
+    [assignmentProfiles]
   );
 
   const openReassignModal = (prospect: Prospect) => {

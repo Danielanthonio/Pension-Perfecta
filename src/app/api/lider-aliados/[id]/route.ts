@@ -45,21 +45,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Asignación no encontrada" }, { status: 404 });
     }
 
-    // If AM, verify that either the leader or ally belongs to them
-    if (isAM) {
-      // Get the leader profile to check their account_manager_id
-      const { data: leader } = await supabase
-        .from("profiles")
-        .select("account_manager_id")
-        .eq("id", relation.lider_id)
-        .single();
-
-      if (!leader || leader.account_manager_id !== user.id) {
-        return NextResponse.json({
-          error: "No tienes permisos para eliminar esta asignación (el líder no está bajo tu gestión)"
-        }, { status: 403 });
-      }
-    }
+    // (Sin gate de cartera: cualquier AM puede eliminar asignaciones — la
+    // "cartera" del AM ya no existe, el AM se asigna por PROYECTO.)
 
     // Perform delete
     const { error: deleteError } = await supabase

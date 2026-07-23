@@ -79,10 +79,8 @@ export async function PATCH(
       return NextResponse.json({ error: "No se encontró el perfil del aliado a modificar" }, { status: 404 });
     }
 
-    // If AM, must be their own ally
-    if (isAM && allyProfile.account_manager_id !== user.id) {
-      return NextResponse.json({ error: "No tienes permisos para modificar este aliado (no está asignado a ti)" }, { status: 403 });
-    }
+    // (Sin gate de cartera: cualquier AM puede cambiar el tipo — la "cartera"
+    // del AM ya no existe, el AM se asigna por PROYECTO.)
 
     // Validation RT-4 rule 3: No permitir cambiar de "lider" a "aliado" si tiene aliados asignados
     if (allyProfile.aliado_tipo === "lider" && aliado_tipo === "aliado") {

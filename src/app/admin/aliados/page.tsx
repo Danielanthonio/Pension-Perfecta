@@ -51,13 +51,6 @@ export default function GestorAliados() {
       prospectMatchesModalidadFilter(p, modalidadFilter)
   );
 
-  // Helper to get Account Manager name
-  const getAMName = (amId?: string | null) => {
-    if (!amId) return "Sin AM (Director)";
-    const am = profiles.find((p) => p.id === amId);
-    return am ? am.full_name : "Sin AM (Director)";
-  };
-
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
@@ -413,7 +406,6 @@ export default function GestorAliados() {
                             <thead>
                               <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-left">
                                 <th className="px-4 py-2.5">Aliado</th>
-                                <th className="px-4 py-2.5">Account Manager</th>
                                 <th className="px-4 py-2.5 text-center">Estado</th>
                                 <th className="px-4 py-2.5 text-center">Proyectos</th>
                                 <th className="px-4 py-2.5 text-center">Eval.</th>
@@ -445,9 +437,6 @@ export default function GestorAliados() {
                                           <span className="text-[9px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">{ally.email}</span>
                                         </div>
                                       </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
-                                      👤 {getAMName(ally.account_manager_id)}
                                     </td>
                                     <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
@@ -541,7 +530,6 @@ export default function GestorAliados() {
                               <thead>
                                 <tr className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase tracking-widest text-left">
                                   <th className="px-4 py-2.5">Aliado / Rol</th>
-                                  <th className="px-4 py-2.5">Account Manager</th>
                                   <th className="px-4 py-2.5 text-center">Estado</th>
                                   <th className="px-4 py-2.5 text-center">Proyectos</th>
                                   <th className="px-4 py-2.5 text-center">Eval.</th>
@@ -583,9 +571,6 @@ export default function GestorAliados() {
                                               <span className="text-[9px] text-slate-450 dark:text-slate-500 block mt-0.5 leading-none">{leader.email}</span>
                                             </div>
                                           </div>
-                                        </td>
-                                        <td className="px-4 py-2.5 whitespace-nowrap">
-                                          👤 {getAMName(leader.account_manager_id)}
                                         </td>
                                         <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
@@ -643,9 +628,6 @@ export default function GestorAliados() {
                                                 </div>
                                               </div>
                                             </td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
-                                              👤 {getAMName(ally.account_manager_id)}
-                                            </td>
                                             <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${
                                                 isAllyActive ? "bg-emerald-50 text-emerald-600 border-emerald-150" : "bg-slate-100 text-slate-450 border-slate-200"
@@ -693,7 +675,7 @@ export default function GestorAliados() {
                                 {alliesWithoutLeader.length > 0 && (
                                   <>
                                     <tr className="bg-slate-50/50 dark:bg-slate-900/50 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                      <td colSpan={15} className="px-6 py-2.5 border-y border-slate-100 dark:border-slate-800">
+                                      <td colSpan={14} className="px-6 py-2.5 border-y border-slate-100 dark:border-slate-800">
                                         Aliados sin Líder Asignado
                                       </td>
                                     </tr>
@@ -713,9 +695,6 @@ export default function GestorAliados() {
                                                 <span className="text-[8px] text-slate-450 block mt-0.5 leading-none">{ally.email}</span>
                                               </div>
                                             </div>
-                                          </td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-slate-650 dark:text-slate-400">
-                                            👤 {getAMName(ally.account_manager_id)}
                                           </td>
                                           <td className="px-4 py-2.5 whitespace-nowrap text-center">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-bold border ${

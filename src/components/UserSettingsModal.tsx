@@ -27,7 +27,7 @@ interface UserSettingsModalProps {
 }
 
 export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
-  const { user, updateUserProfile, uploadAvatar, triggerPushNotification, profiles } = useApp();
+  const { user, updateUserProfile, uploadAvatar, triggerPushNotification } = useApp();
 
   const [activeTab, setActiveTab] = useState<"personal" | "profile" | "display" | "help">("personal");
 
@@ -80,7 +80,6 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
   // Role based premium styling
   const isAM = user.role === "account_manager";
   const isDirector = user.role === "director";
-  const isAlly = user.role === "aliado";
 
   const primaryBg = isAM
     ? "bg-blue-600 hover:bg-blue-700 shadow-blue-600/10 disabled:bg-blue-400"
@@ -426,32 +425,6 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                     </div>
                   </div>
                 </div>
-
-                {/* Account Manager Asignado for Allies */}
-                {isAlly && (
-                  <div className="pt-2">
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
-                      Account Manager Asignado
-                    </label>
-                    <div className="flex items-center gap-2.5 px-3.5 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
-                        profiles?.find((p) => p.id === user.account_manager_id)?.role === "account_manager"
-                          ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                      }`}>
-                        {profiles?.find((p) => p.id === user.account_manager_id)?.full_name.charAt(0) || "?"}
-                      </div>
-                      <div className="min-w-0">
-                        <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
-                          {profiles?.find((p) => p.id === user.account_manager_id)?.full_name || "Pendiente de asignación"}
-                        </span>
-                        <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                          {profiles?.find((p) => p.id === user.account_manager_id) ? "Asesor de pensiones asignado" : "Espera a ser asignado por el director"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <div className="pt-2 flex items-center justify-between gap-4">
                   {updateSuccess ? (

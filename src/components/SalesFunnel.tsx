@@ -51,9 +51,13 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   let alliesCount = 0;
   if (user?.role === "director") {
     accountManagersCount = profiles.filter((p) => p.role === "account_manager" && p.is_active).length;
-    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active && p.account_manager_id !== null).length;
+    // Director: TODOS los aliados activos (el AM ahora es por proyecto, ya no existe
+    // la "cartera de aliados" de un AM, así que el criterio "con AM asignado" muere).
+    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active).length;
   } else if (user?.role === "account_manager") {
-    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active && p.account_manager_id === user.id).length;
+    // AM: los `profiles` del contexto para un AM ya vienen acotados a él + los aliados
+    // dueños de sus proyectos, así que basta contar los perfiles activos con rol aliado.
+    alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active).length;
   }
 
   // Find allies assigned to this leader
