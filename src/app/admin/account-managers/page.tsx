@@ -102,11 +102,6 @@ export default function GestionAccountManagers() {
     };
   };
 
-  // "Aliados" de una columna = aliados distintos dueños de los proyectos de esa lista
-  // (la "cartera de aliados" del AM ya no existe: la relación nace de sus proyectos).
-  const distinctAlliesCount = (groupProspects: Prospect[]) =>
-    new Set(groupProspects.map((p) => p.aliado_id)).size;
-
   // Proyectos sin AM (account_manager_id null) = mesa de dirección / gestión directa.
   const directProspects = prospects.filter((p) => !p.account_manager_id);
 
@@ -119,7 +114,6 @@ export default function GestionAccountManagers() {
         name: am.full_name,
         email: am.email,
         type: "account_manager" as const,
-        alliesCount: distinctAlliesCount(amProspects),
         autoAssign: am.auto_assign_enabled === true,
         metrics: getMetricsForProspects(amProspects),
       };
@@ -129,7 +123,6 @@ export default function GestionAccountManagers() {
       name: "Gestión Directa (Director)",
       email: "Operaciones Centrales",
       type: "director" as const,
-      alliesCount: distinctAlliesCount(directProspects),
       autoAssign: false,
       metrics: getMetricsForProspects(directProspects),
     },
@@ -146,7 +139,6 @@ export default function GestionAccountManagers() {
       finAprobados: (c) => c.metrics.finAprobados,
       finOtorgados: (c) => c.metrics.finOtorgados,
       tasaCierre: (c) => c.metrics.tasaCierre,
-      aliados: (c) => c.alliesCount,
       name: (c) => c.name,
     },
     "clientes",
@@ -159,7 +151,6 @@ export default function GestionAccountManagers() {
     { id: "finAprobados", label: "Fin. aprobado" },
     { id: "finOtorgados", label: "Fin. otorgado" },
     { id: "tasaCierre", label: "Tasa cierre" },
-    { id: "aliados", label: "Nº de aliados" },
     { id: "name", label: "Nombre (A-Z)" },
   ];
 
@@ -238,13 +229,9 @@ export default function GestionAccountManagers() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-100 dark:border-slate-850">
+                <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-100 dark:border-slate-850">
                   <div className="text-center">
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">Aliados</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{col.alliesCount}</span>
-                  </div>
-                  <div className="text-center border-l border-slate-200/60 dark:border-slate-850">
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">Clientes</span>
+                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">Proyectos</span>
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{m.totalCount}</span>
                   </div>
                 </div>
