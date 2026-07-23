@@ -47,7 +47,7 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
     { href: `/admin/reportes${qs}`, active: cleanPath === "/admin/reportes", Icon: FileBarChart, label: "Reportes" },
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
-    { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Aliados" },
+    { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
     ...(!isAM
       ? [{ href: `/admin/account-managers${qs}`, active: cleanPath === "/admin/account-managers", Icon: Users, label: "Gestión AMs" }]
@@ -423,8 +423,8 @@ export default function AdminLayout({
     }
     if (cleanPath === "/admin/asignacion") {
       return {
-        title: "Asignación de Aliados",
-        subtitle: "Asigna tus asesores comerciales a los gestores de cuentas correspondientes.",
+        title: "Asignación Multialiado",
+        subtitle: "Asigna tus aliados a una empresa multialiado y a sus líderes de grupo.",
       };
     }
     if (cleanPath === "/admin/account-managers") {

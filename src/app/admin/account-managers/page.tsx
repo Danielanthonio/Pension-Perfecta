@@ -175,8 +175,8 @@ export default function GestionAccountManagers() {
         <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/15 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
           <Shuffle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
           <span>
-            Cada aliado nuevo se asigna <strong className="text-slate-800 dark:text-slate-100">al azar</strong> entre los Account Managers que estén en la ruleta.
-            Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba. Puedes re-asignar a mano en la Matriz de Asignaciones.
+            La asignación de aliados a Account Manager es <strong className="text-slate-800 dark:text-slate-100">automática y al azar</strong> entre los AM que estén en la ruleta.
+            Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba.
             {rouletteCount === 0 ? (
               <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los aliados nuevos quedan sin supervisor (mesa del director).</span>
             ) : (

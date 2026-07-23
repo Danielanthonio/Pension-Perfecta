@@ -2171,6 +2171,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           created_at: new Date().toISOString(),
         });
       }
+      // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager lo
+      // atenderá (caso complementario al de "Proyecto Asignado 📁").
+      if (user?.role === "aliado" && (!assignedProfile || assignedProfile.id === creatorId) && user?.account_manager_id) {
+        const amName = profiles.find((p) => p.id === user.account_manager_id)?.full_name || "tu Account Manager";
+        notifBatch.unshift({
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Account Manager asignado 👤",
+          message: `Tu proyecto de ${newProspect.full_name} será atendido por ${amName}.`,
+          type: "info",
+          read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
       setNotifications([...notifBatch, ...notifications]);
       saveToStorage("pensionflow_notifications", [...notifBatch, ...notifications]);
 
@@ -2187,6 +2200,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         let creatorId: string | undefined = undefined;
         let creatorName: string | undefined = undefined;
         let creatorEmpresa: string | null = null;
+        // AM y rol del creador: para avisarle qué Account Manager atenderá su
+        // proyecto cuando un aliado captura para sí mismo. `role` se lee CRUDO de la
+        // BD (aliado = 'aliado'; director = 'admin'), así el guard `=== 'aliado'` es correcto.
+        let creatorAmId: string | null = null;
+        let creatorRole: string | undefined = undefined;
 
         if (supabase) {
           const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -2194,15 +2212,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             creatorId = authUser.id;
             const { data: profile } = await supabase
               .from("profiles")
-              .select("full_name, empresa_multialiado_id")
+              .select("full_name, empresa_multialiado_id, account_manager_id, role")
               .eq("id", authUser.id)
               .maybeSingle();
             if (profile) {
               creatorName = profile.full_name;
               creatorEmpresa = profile.empresa_multialiado_id;
+              creatorAmId = profile.account_manager_id;
+              creatorRole = profile.role;
             } else {
               creatorName = user?.full_name;
               creatorEmpresa = user?.empresa_multialiado_id || null;
+              creatorAmId = user?.account_manager_id || null;
+              creatorRole = user?.role;
             }
           }
         }
@@ -2211,6 +2233,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           creatorId = user?.id;
           creatorName = user?.full_name;
           creatorEmpresa = user?.empresa_multialiado_id || null;
+          creatorAmId = user?.account_manager_id || null;
+          creatorRole = user?.role;
         }
 
         if (!creatorId) {
@@ -2349,6 +2373,25 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             user_id: assignId,
             title: "Proyecto Asignado 📁",
             message: `Se te asignó el proyecto de ${newProspect.full_name}.`,
+            type: "info",
+            read: false,
+          });
+        }
+
+        // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager lo
+        // atenderá. Caso complementario y mutuamente excluyente con "Proyecto
+        // Asignado 📁" (que aplica solo si Dirección/AM asigna a un tercero).
+        if (creatorRole === "aliado" && creatorAmId && (!assignId || assignId === creatorId)) {
+          const { data: amProfile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", creatorAmId)
+            .maybeSingle();
+          const amName = amProfile?.full_name || "tu Account Manager";
+          await supabase.from("notifications").insert({
+            user_id: creatorId,
+            title: "Account Manager asignado 👤",
+            message: `Tu proyecto de ${newProspect.full_name} será atendido por ${amName}.`,
             type: "info",
             read: false,
           });

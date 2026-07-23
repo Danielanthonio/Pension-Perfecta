@@ -340,6 +340,39 @@ function ClientesContent() {
     </div>
   );
 
+  // Account Manager que atiende el proyecto: el dueño es prospect.aliado_id y su
+  // account_manager_id apunta al AM. Devuelve el nombre, o un estado especial:
+  //   null            → no se puede determinar (p.ej. un líder viendo proyectos de
+  //                     su equipo, cuyos perfiles no expone el contexto) → "—"
+  //   "__SIN_AM__"    → el aliado SÍ es visible pero no tiene AM (mesa de dirección)
+  const AM_NONE = "__SIN_AM__";
+  const resolveAccountManager = (p: Prospect): string | null => {
+    const isOwn = p.aliado_id === user?.id;
+    const owner = profiles.find((pr) => pr.id === p.aliado_id);
+    if (!owner && !isOwn) return null; // no determinable
+    const amId = owner?.account_manager_id ?? (isOwn ? user?.account_manager_id : undefined);
+    if (!amId) return AM_NONE;
+    return profiles.find((pr) => pr.id === amId)?.full_name ?? null;
+  };
+
+  const renderAccountManagerCell = (p: Prospect) => {
+    const am = resolveAccountManager(p);
+    if (am === null) {
+      return <span className="text-xs font-semibold text-slate-300 dark:text-slate-600">—</span>;
+    }
+    if (am === AM_NONE) {
+      return <span className="text-[11px] font-semibold italic text-slate-400 dark:text-slate-500">En mesa de dirección</span>;
+    }
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="h-6 w-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-black border border-indigo-100 dark:border-indigo-900/40 shrink-0">
+          {am.charAt(0)}
+        </span>
+        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate max-w-[150px]">{am}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
 
@@ -458,6 +491,7 @@ function ClientesContent() {
                     <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
                       <th className="px-5 py-3.5">Prospecto</th>
                       <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
                       <th className="px-4 py-3.5">Registro</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
@@ -469,6 +503,7 @@ function ClientesContent() {
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
                           <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
                           <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
@@ -529,6 +564,7 @@ function ClientesContent() {
                     <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
                       <th className="px-5 py-3.5">Prospecto</th>
                       <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Crédito Total</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
@@ -540,6 +576,7 @@ function ClientesContent() {
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {p.simulation ? (
                               <div>
@@ -621,7 +658,7 @@ function ClientesContent() {
                     
                     {/* Header Details in Horizontal Grid */}
                     <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 flex-1">
+                      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 flex-1">
                         <div>
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
                           <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight block mt-0.5 flex items-center gap-1.5">
@@ -664,6 +701,15 @@ function ClientesContent() {
                               {getSubStageLabel(p.status)}
                             </span>
                           </div>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Manager</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 truncate">
+                            {(() => {
+                              const am = resolveAccountManager(p);
+                              return am === null ? "—" : am === AM_NONE ? "En mesa de dirección" : am;
+                            })()}
+                          </span>
                         </div>
                       </div>
 
@@ -828,6 +874,7 @@ function ClientesContent() {
                     <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
                       <th className="px-5 py-3.5">Prospecto</th>
                       <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Motivo del Rechazo</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
@@ -839,6 +886,7 @@ function ClientesContent() {
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
                           <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
                             {p.notes_director || <span className="text-slate-400 italic">Sin motivo especificado</span>}
                           </td>
@@ -901,6 +949,7 @@ function ClientesContent() {
                     <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-[0.12em] text-left">
                       <th className="px-5 py-3.5">Prospecto</th>
                       <th className="px-4 py-3.5">Contacto</th>
+                      <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Motivo del Cierre</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
@@ -912,6 +961,7 @@ function ClientesContent() {
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
+                          <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
                           <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-600 dark:text-slate-350 max-w-[200px] truncate" title={p.notes_director || "Sin motivo especificado"}>
                             {p.notes_director || <span className="text-slate-400 italic">Sin motivo especificado</span>}
                           </td>

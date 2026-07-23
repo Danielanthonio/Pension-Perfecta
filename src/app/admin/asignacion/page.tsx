@@ -6,11 +6,9 @@ import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
   Users,
-  UserCheck,
   UserX,
   Search,
   CheckCircle,
-  Check,
   Shield,
   Save,
 } from "lucide-react";
@@ -20,17 +18,13 @@ export default function AsignacionAliados() {
     profiles,
     prospects,
     user,
-    updateProfileAdmin,
     changeAllyType,
     assignAllyToLider,
-    triggerPushNotification,
     empresasMultialiado,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [assignmentFilter, setAssignmentFilter] = useState<"all" | "assigned" | "unassigned">("all");
-  const [selectedAMFilter, setSelectedAMFilter] = useState<string>("all");
-  
+
   // Loading states for individual rows
   const [updatingRow, setUpdatingRow] = useState<string | null>(null);
   const [successRow, setSuccessRow] = useState<string | null>(null);
@@ -44,48 +38,16 @@ export default function AsignacionAliados() {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const isAM = user?.role === "account_manager";
-  const isDirector = user?.role === "director";
 
   // Filter profiles based on access: AMs only see allies/leaders managed by them
   const allies = profiles.filter(
     (p) => p.role === "aliado" && (!isAM || p.account_manager_id === user?.id)
   );
-  
-  const accountManagers = profiles.filter((p) => p.role === "account_manager");
-  
+
   // Dynamic list of active leaders for assignment dropdown (under this AM, or all if Director)
   const activeLeaders = profiles.filter(
     (p) => p.role === "aliado" && p.aliado_tipo === "lider" && (!isAM || p.account_manager_id === user?.id)
   );
-
-  // Handle immediate database update when changing account manager (Directors only)
-  const handleSelectAM = async (allyId: string, value: string) => {
-    setUpdatingRow(allyId);
-    setSuccessRow(null);
-    try {
-      const selectedAMId = value === "" ? null : value;
-      await updateProfileAdmin(allyId, { account_manager_id: selectedAMId });
-      
-      const ally = allies.find((a) => a.id === allyId);
-      const am = accountManagers.find((m) => m.id === selectedAMId);
-      
-      if (ally) {
-        const msg = selectedAMId 
-          ? `💼 Asignación Comercial: El aliado ${ally.full_name} ha sido asignado al Account Manager ${am?.full_name || "Desconocido"}.`
-          : `⚠️ Aliado Desasignado: El aliado ${ally.full_name} ha sido retirado de su Account Manager y queda en espera en la mesa del Director.`;
-        
-        triggerPushNotification(msg, "whatsapp", ally.full_name);
-      }
-
-      setSuccessRow(allyId);
-      setTimeout(() => setSuccessRow(null), 3000);
-    } catch (e) {
-      console.error(e);
-      alert("Error al guardar la asignación del Account Manager");
-    } finally {
-      setUpdatingRow(null);
-    }
-  };
 
   // Handle immediate leader assignment for normal allies
   const handleToggleLider = async (allyId: string, currentLiderIds: string[], clickedLiderId: string) => {
@@ -192,16 +154,6 @@ export default function AsignacionAliados() {
         a.email.toLowerCase().includes(term) ||
         (a.phone && a.phone.toLowerCase().includes(term))
       );
-    })
-    .filter((a) => {
-      const isAssigned = a.account_manager_id !== null && a.account_manager_id !== undefined;
-      if (assignmentFilter === "assigned") return isAssigned;
-      if (assignmentFilter === "unassigned") return !isAssigned;
-      return true;
-    })
-    .filter((a) => {
-      if (selectedAMFilter === "all") return true;
-      return a.account_manager_id === selectedAMFilter;
     });
 
   const sortAsig = useSortable<UserProfile>(
@@ -209,7 +161,6 @@ export default function AsignacionAliados() {
     {
       nombre: (a) => a.full_name,
       prospectos: (a) => getProspectCount(a.id),
-      estado: (a) => (a.account_manager_id ? 1 : 0),
       registro: (a) => a.created_at || "",
     },
     "nombre",
@@ -218,29 +169,18 @@ export default function AsignacionAliados() {
   const sortOptionsAsig = [
     { id: "nombre", label: "Nombre" },
     { id: "prospectos", label: "Prospectos" },
-    { id: "estado", label: "Estado" },
     { id: "registro", label: "Registro" },
   ];
 
   // Stats
   const totalAllies = allies.length;
-  const assignedCount = allies.filter((a) => {
-    return a.account_manager_id !== null && a.account_manager_id !== undefined;
-  }).length;
-  const unassignedCount = totalAllies - assignedCount;
-  
-  // Account Managers list workload filtering
-  const visibleAMs = isAM ? accountManagers.filter(am => am.id === user?.id) : accountManagers;
-  const totalAMs = visibleAMs.length;
 
   return (
     <div className="space-y-8 max-w-[1700px] mx-auto animate-fade-in pb-12 text-slate-800 dark:text-slate-100">
       
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Mis Aliados" value={totalAllies} sub="Total" tone="slate" icon={Users} />
-        <StatCard label="Sin Supervisor" value={unassignedCount} sub="En mesa director" tone="amber" icon={UserX} />
-        <StatCard label="Bajo Supervisión" value={assignedCount} sub="Bajo gestión AM" tone="emerald" icon={UserCheck} />
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Aliados" value={totalAllies} sub="Total" tone="slate" icon={Users} />
         <StatCard label="Líderes de Grupo" value={activeLeaders.length} sub="Líderes activos" tone="indigo" icon={Shield} />
       </div>
 
@@ -254,7 +194,7 @@ export default function AsignacionAliados() {
             {/* Search and Filters Bar */}
             <div className="px-4 py-3 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-850 space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Matriz de Asignaciones</span>
+                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Asignación Multialiado</span>
 
                 <div className="relative w-full sm:w-64">
                   <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
@@ -270,54 +210,8 @@ export default function AsignacionAliados() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Segmented Controller for Assignment State */}
-                <div className="bg-slate-100 dark:bg-slate-950 p-0.5 rounded-xl flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 w-full sm:w-auto">
-                  <button
-                    onClick={() => setAssignmentFilter("all")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "all" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    Todos ({totalAllies})
-                  </button>
-                  <button
-                    onClick={() => setAssignmentFilter("unassigned")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "unassigned" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    Sin Supervisor ({unassignedCount})
-                  </button>
-                  <button
-                    onClick={() => setAssignmentFilter("assigned")}
-                    className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                      assignmentFilter === "assigned" ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    Supervisados ({assignedCount})
-                  </button>
-                </div>
-
-                {/* Filter by Specific AM + Sort */}
-                <div className="flex flex-wrap items-center gap-3">
-                  {!isAM && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">Account Manager</span>
-                      <select
-                        value={selectedAMFilter}
-                        onChange={(e) => setSelectedAMFilter(e.target.value)}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 transition-colors cursor-pointer"
-                      >
-                        <option value="all">Todos los AM</option>
-                        {accountManagers.map((am) => (
-                          <option key={am.id} value={am.id}>{am.full_name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <SortControl options={sortOptionsAsig} sort={sortAsig} accent="emerald" />
-                </div>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <SortControl options={sortOptionsAsig} sort={sortAsig} accent="emerald" />
               </div>
             </div>
 
@@ -338,7 +232,6 @@ export default function AsignacionAliados() {
                   <thead>
                     <tr className="bg-slate-50/60 dark:bg-slate-950/20 border-b border-slate-150 dark:border-slate-850 text-left">
                       <SortHeader col="nombre" label="Aliado Comercial" sort={sortAsig} className="pl-5" />
-                      <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Supervisor AM</th>
                       <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Empresa</th>
                       <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Rol</th>
                       <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Asignar a Líder</th>
@@ -347,8 +240,6 @@ export default function AsignacionAliados() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
                     {sortAsig.sorted.map((a) => {
-                      const currentSelectedVal = a.account_manager_id || "";
-                      const isAssignedNow = currentSelectedVal !== "";
                       const currentProspects = getProspectCount(a.id);
                       const isUpdating = updatingRow === a.id;
                       const isSuccess = successRow === a.id;
@@ -398,33 +289,6 @@ export default function AsignacionAliados() {
                                 </span>
                               </div>
                             </div>
-                          </td>
-
-                          {/* Assign Account Manager */}
-                          <td className="px-3 py-2.5 whitespace-nowrap">
-                            {isAM ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-bold">
-                                👤 {accountManagers.find(m => m.id === currentSelectedVal)?.full_name || "Sin Supervisor"}
-                              </span>
-                            ) : (
-                              <select
-                                value={currentSelectedVal}
-                                onChange={(e) => handleSelectAM(a.id, e.target.value)}
-                                disabled={isUpdating}
-                                className={`font-semibold rounded-xl px-2 py-1.5 border outline-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 focus:border-emerald-500 transition-all cursor-pointer ${
-                                  isAssignedNow
-                                    ? "border-emerald-200/50 bg-emerald-50/10 text-slate-700 dark:text-slate-200" 
-                                    : "border-amber-250/50 bg-amber-50/10 text-amber-700 dark:text-amber-400"
-                                }`}
-                              >
-                                <option value="" className="text-slate-500 dark:bg-slate-900">⚠️ Sin AM (Director)</option>
-                                {accountManagers.map((am) => (
-                                  <option key={am.id} value={am.id} className="text-slate-800 dark:bg-slate-900">
-                                    👤 {am.full_name}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
                           </td>
 
                           {/* Empresa (incluye "Sin empresa") */}
@@ -480,15 +344,12 @@ export default function AsignacionAliados() {
                                 <button
                                   type="button"
                                   onClick={() => setOpenDropdownId(openDropdownId === a.id ? null : a.id)}
-                                  disabled={isUpdating || !a.account_manager_id}
+                                  disabled={isUpdating}
                                   className={`w-full text-left font-semibold rounded-xl px-3 py-1.5 border outline-none flex justify-between items-center transition-all cursor-pointer ${
-                                    !a.account_manager_id 
-                                      ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
-                                      : (a.lider_ids && a.lider_ids.length > 0)
-                                        ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-700 dark:text-indigo-400"
-                                        : "border-slate-200/50 bg-slate-50/10 text-slate-500"
+                                    (a.lider_ids && a.lider_ids.length > 0)
+                                      ? "border-indigo-200/50 bg-indigo-50/10 text-indigo-700 dark:text-indigo-400"
+                                      : "border-slate-200/50 bg-slate-50/10 text-slate-500"
                                   }`}
-                                  title={!a.account_manager_id ? "Asigna primero un Account Manager a este aliado" : ""}
                                 >
                                   <span className="truncate max-w-[150px]">
                                     {(a.lider_ids && a.lider_ids.length > 0) 
