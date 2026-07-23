@@ -206,7 +206,9 @@ export default function GestionUsuarios() {
           role: isCurrentUserAM ? "aliado" : role,
           is_active: isActive,
           password_provisional: passwordProvisional || undefined,
-          account_manager_id: isCurrentUserAM ? user?.id : undefined,
+          // El Account Manager NO se fija aquí: se sortea entre los AM que están en
+          // la ruleta de asignación automática (aun cuando lo crea un AM). El
+          // director puede re-asignarlo después en la Matriz de Asignaciones.
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: true });

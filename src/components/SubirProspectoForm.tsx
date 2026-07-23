@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   Pencil,
   Users,
+  UserCheck,
 } from "lucide-react";
 import {
   TIPO_FINANCIAMIENTO_OPTIONS,
@@ -26,6 +27,7 @@ import {
   getExpedienteDocSlots,
   type TipoFinanciamiento,
 } from "@/components/ui/tipoFinanciamiento";
+import { AsignarAliadoSelect } from "@/components/ui/AsignarAliadoSelect";
 
 interface SubirProspectoFormProps {
   /** Ruta a la que se regresa/redirige tras guardar o cancelar. */
@@ -34,8 +36,14 @@ interface SubirProspectoFormProps {
 
 export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirProspectoFormProps) {
   const router = useRouter();
-  const { addProspect, user, checkCurpExists, checkTeamDuplicate } = useApp();
+  const { addProspect, user, profiles, checkCurpExists, checkTeamDuplicate } = useApp();
   const isDirector = user?.role === "director";
+  // Dirección y Account Managers pueden asignar el proyecto a un aliado al crearlo.
+  // Para el aliado que captura sus propios prospectos no aparece este selector.
+  const canAssign = user?.role === "director" || user?.role === "account_manager";
+
+  // Aliado al que se asignará el proyecto (obligatorio cuando lo crea Dirección/AM).
+  const [assignedAliadoId, setAssignedAliadoId] = useState<string | null>(null);
 
   // Tipo de financiamiento — lo elige el aliado en una ventana bloqueante al
   // abrir la captura. Se mantiene abierta hasta que se selecciona una opción.
@@ -258,7 +266,9 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
   const hasDocuments = aforeFileName !== "" && imssFileName !== "";
   const uploadsInProgress = aforeUploading || imssUploading;
   const filesReady = aforeFileDataUrl !== "" && imssFileDataUrl !== "";
-  const formIsValid = tipoFinanciamiento !== null && nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady;
+  // Cuando lo captura Dirección/AM, es obligatorio elegir el aliado asignado.
+  const assignmentReady = !canAssign || !!assignedAliadoId;
+  const formIsValid = tipoFinanciamiento !== null && nameValid && nssValid && curpValid && !isCurpDuplicate && !checkingCurp && phoneValid && emailValid && hasDocuments && !uploadsInProgress && filesReady && assignmentReady;
 
   // Compañero de equipo (mismo líder + empresa) que ya registró al cliente, si lo
   // conocemos. Sirve para nombrarlo tanto en el bloqueo por CURP como en el aviso.
@@ -363,7 +373,9 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
       // compañero); aquí solo cubrimos los demás errores.
       if (!isCurpDuplicate) {
         setErrorMsg(
-          !hasDocuments
+          !assignmentReady
+            ? "Debes elegir a qué aliado quedará asignado este proyecto antes de enviarlo a evaluación."
+            : !hasDocuments
             ? `Es obligatorio subir tanto ${ocrSlot.title} como ${secondSlot.title} para enviar a evaluación.`
             : "Por favor corrige los datos del prospecto antes de continuar."
         );
@@ -383,6 +395,7 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
           phone,
           email,
           tipo_financiamiento: tipoFinanciamiento,
+          assignToAliadoId: canAssign ? assignedAliadoId : undefined,
           notes_aliado: notesAliado || observaciones,
           simulation: isDirector ? {
             semanas: Number(semanas) || 0,
@@ -559,6 +572,39 @@ export default function SubirProspectoForm({ backHref = "/dashboard" }: SubirPro
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Side: Personal Data */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Asignación del proyecto — solo Dirección / Account Manager.
+              Elige a qué aliado queda asignado el proyecto al capturarlo. */}
+          {canAssign && (
+            <div className="relative z-10 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-t-3xl flex items-center justify-between">
+                <h2 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                  <UserCheck className="h-4.5 w-4.5 text-blue-500 dark:text-blue-400" />
+                  Asignación del Proyecto
+                </h2>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">* Obligatorio</span>
+              </div>
+              <div className="p-6 space-y-2.5">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  ¿A qué aliado quedará asignado? *
+                </label>
+                <AsignarAliadoSelect
+                  profiles={profiles}
+                  value={assignedAliadoId}
+                  onChange={setAssignedAliadoId}
+                  invalid={formSubmitted && !assignmentReady}
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-normal">
+                  Busca y elige al aliado responsable. Al guardar, el proyecto entrará a su cartera y le llegará un aviso de asignación.
+                </p>
+                {formSubmitted && !assignmentReady && (
+                  <span className="text-[10px] text-red-500 dark:text-red-400 font-semibold block">
+                    Selecciona un aliado para continuar.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
               <h2 className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-2">

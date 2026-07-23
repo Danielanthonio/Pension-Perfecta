@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useApp } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl } from "@/components/ui/sorting";
@@ -12,13 +12,39 @@ import {
   Briefcase,
   UserCheck,
   UserX,
+  Shuffle,
 } from "lucide-react";
 
 export default function GestionAccountManagers() {
-  const { profiles, prospects } = useApp();
+  const { profiles, prospects, user, updateProfileAdmin } = useApp();
+
+  const isDirector = user?.role === "director";
 
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
+
+  // Interruptor de "ruleta" de asignación automática por AM. Solo los AM encendidos
+  // reciben aliados nuevos al azar; los apagados (p. ej. cuentas de prueba) quedan
+  // fuera del sorteo. La asignación real la ejecuta el trigger de la BD.
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  // Cuenta solo los AM que realmente entran al sorteo: encendidos Y activos (mismo
+  // criterio que `pickRandomAutoAssignAM` y el trigger de la BD). Un AM inactivo,
+  // aunque tenga el interruptor encendido, no recibe aliados.
+  const rouletteCount = accountManagers.filter(
+    (am) => am.auto_assign_enabled === true && am.is_active !== false
+  ).length;
+
+  const handleToggleRoulette = async (amId: string, current: boolean) => {
+    setTogglingId(amId);
+    try {
+      await updateProfileAdmin(amId, { auto_assign_enabled: !current });
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo actualizar la ruleta de asignación automática.");
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("es-MX", {
@@ -86,6 +112,7 @@ export default function GestionAccountManagers() {
         email: am.email,
         type: "account_manager" as const,
         alliesCount: amAllies.length,
+        autoAssign: am.auto_assign_enabled === true,
         metrics: getMetricsForAllies(amAllyIds),
       };
     }),
@@ -95,6 +122,7 @@ export default function GestionAccountManagers() {
       email: "Operaciones Centrales",
       type: "director" as const,
       alliesCount: allies.filter((a) => !a.account_manager_id).length,
+      autoAssign: false,
       metrics: getMetricsForAllies(allies.filter((a) => !a.account_manager_id).map((a) => a.id)),
     },
   ];
@@ -141,6 +169,22 @@ export default function GestionAccountManagers() {
         </p>
         <SortControl options={sortOptions} sort={sortAM} accent="emerald" />
       </div>
+
+      {/* Explicación de la ruleta de asignación automática (para el director) */}
+      {isDirector && (
+        <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/15 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+          <Shuffle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
+          <span>
+            Cada aliado nuevo se asigna <strong className="text-slate-800 dark:text-slate-100">al azar</strong> entre los Account Managers que estén en la ruleta.
+            Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba. Puedes re-asignar a mano en la Matriz de Asignaciones.
+            {rouletteCount === 0 ? (
+              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los aliados nuevos quedan sin supervisor (mesa del director).</span>
+            ) : (
+              <span className="font-semibold text-indigo-700 dark:text-indigo-400"> {rouletteCount} {rouletteCount === 1 ? "AM participa" : "AM participan"} en la ruleta.</span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Global Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -196,6 +240,41 @@ export default function GestionAccountManagers() {
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{m.totalCount}</span>
                   </div>
                 </div>
+
+                {/* Ruleta de asignación automática (solo AMs; editable por el director) */}
+                {col.type === "account_manager" && (
+                  <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border transition-colors ${
+                    col.autoAssign
+                      ? "border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/15"
+                      : "border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30"
+                  }`}>
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      <Shuffle className={`h-3 w-3 ${col.autoAssign ? "text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} strokeWidth={2.4} />
+                      Ruleta de asignación
+                    </span>
+                    {isDirector ? (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={col.autoAssign}
+                        onClick={() => handleToggleRoulette(col.id, col.autoAssign)}
+                        disabled={togglingId === col.id}
+                        title={col.autoAssign ? "Recibe aliados nuevos al azar. Click para sacarlo del sorteo." : "Fuera del sorteo. Click para que reciba aliados nuevos al azar."}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
+                          col.autoAssign ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
+                        } ${togglingId === col.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                          col.autoAssign ? "translate-x-4" : "translate-x-1"
+                        }`} />
+                      </button>
+                    ) : (
+                      <span className={`text-[9px] font-black uppercase tracking-wide ${col.autoAssign ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}>
+                        {col.autoAssign ? "En sorteo" : "Fuera"}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Vertical Funnel Comparison */}

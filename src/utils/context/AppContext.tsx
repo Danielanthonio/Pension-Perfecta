@@ -30,6 +30,22 @@ export interface UserProfile {
   ciudad?: string | null;
   pais?: string | null;
   avatar_url?: string | null;
+  // Solo para Account Managers: si está en `true`, el AM participa en la "ruleta"
+  // de asignación automática (recibe aliados nuevos al azar). Lo enciende/apaga el
+  // director en el módulo de Account Managers. Ver [[project-random-assign-am]].
+  auto_assign_enabled?: boolean;
+}
+
+// Elige al azar un Account Manager que participe en la ruleta de asignación
+// automática (activo + interruptor encendido). Devuelve null si no hay ninguno,
+// en cuyo caso el aliado nuevo queda sin AM (mesa del director). Se usa en modo
+// demo; en producción lo hace el trigger `assign_random_am_on_insert` de la BD.
+function pickRandomAutoAssignAM(pool: UserProfile[]): string | null {
+  const eligible = pool.filter(
+    (p) => p.role === "account_manager" && p.is_active !== false && p.auto_assign_enabled === true
+  );
+  if (eligible.length === 0) return null;
+  return eligible[Math.floor(Math.random() * eligible.length)].id;
 }
 
 // Campos que el usuario puede editar de su propio perfil (email y rol son fijos).
@@ -243,7 +259,14 @@ interface AppContextType {
     prospectData: Omit<
       Prospect,
       "id" | "aliado_id" | "status" | "created_at" | "updated_at" | "documents" | "simulation"
-    > & { simulation?: Simulation; google_drive_folder?: string; google_drive_url?: string },
+    > & {
+      simulation?: Simulation;
+      google_drive_folder?: string;
+      google_drive_url?: string;
+      // Aliado al que se asigna el proyecto al crearlo (lo elige Dirección/AM).
+      // Si no se envía, el proyecto queda a nombre de quien lo captura.
+      assignToAliadoId?: string | null;
+    },
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ) => Promise<Prospect>;
@@ -602,6 +625,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       ciudad: dbProfile.ciudad || null,
       pais: dbProfile.pais || null,
       avatar_url: dbProfile.avatar_url || null,
+      auto_assign_enabled: dbProfile.auto_assign_enabled === true,
     };
   };
 
@@ -1984,7 +2008,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     prospectData: Omit<
       Prospect,
       "id" | "aliado_id" | "status" | "created_at" | "updated_at" | "documents" | "simulation"
-    > & { simulation?: Simulation; google_drive_folder?: string; google_drive_url?: string },
+    > & {
+      simulation?: Simulation;
+      google_drive_folder?: string;
+      google_drive_url?: string;
+      assignToAliadoId?: string | null;
+    },
     aforeFile?: string | { name: string; dataUrl: string },
     imssFile?: string | { name: string; dataUrl: string }
   ): Promise<Prospect> => {
@@ -1992,6 +2021,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     // `ocrSlot` = documento con OCR (imssFile); `secondSlot` = documento de apoyo (aforeFile).
     const [ocrSlot, secondSlot] = getExpedienteDocSlots(prospectData.tipo_financiamiento);
     const tipoLabel = getTipoFinanciamientoLabel(prospectData.tipo_financiamiento);
+
+    // Asignación directa al crear: Dirección/AM pueden elegir a qué aliado queda
+    // asignado el proyecto. Si no se envía, el dueño es quien lo captura.
+    const { assignToAliadoId, ...cleanProspectData } = prospectData;
+    const assignId = assignToAliadoId || null;
+    const assignedProfile = assignId ? profiles.find((p) => p.id === assignId) : null;
 
     let driveFolderId = "";
     let driveFolderUrl = "";
@@ -2082,12 +2117,21 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         await saveFile(docId, imssDataUrl);
       }
 
+      // Dueño del proyecto: el aliado asignado si Dirección/AM lo eligió; si no,
+      // quien captura. El documento conserva `uploaded_by` = quien captura.
+      const creatorId = user?.id || "aliado-123";
+      const ownerId = assignedProfile?.id || creatorId;
+      const ownerName = assignedProfile?.full_name || user?.full_name || "Roberto Asesor";
+      const ownerEmpresa = assignedProfile
+        ? assignedProfile.empresa_multialiado_id || null
+        : user?.empresa_multialiado_id || null;
+
       const newProspect: Prospect = {
-        ...prospectData,
+        ...cleanProspectData,
         id: newId,
-        aliado_id: user?.id || "aliado-123",
-        aliado_name: user?.full_name || "Roberto Asesor",
-        empresa_multialiado_id: user?.empresa_multialiado_id || null,
+        aliado_id: ownerId,
+        aliado_name: ownerName,
+        empresa_multialiado_id: ownerEmpresa,
         status: "evaluacion_pendiente",
         documents: docs,
         google_drive_folder: driveFolderId,
@@ -2110,8 +2154,20 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         read: false,
         created_at: new Date().toISOString(),
       };
-      setNotifications([newNotif, ...notifications]);
-      saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+      const notifBatch = [newNotif];
+      // Aviso al aliado cuando Dirección/AM le asignó el proyecto al crearlo.
+      if (assignedProfile && assignedProfile.id !== creatorId) {
+        notifBatch.unshift({
+          id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+          title: "Proyecto Asignado 📁",
+          message: `Se te asignó el proyecto de ${newProspect.full_name}.`,
+          type: "info",
+          read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+      setNotifications([...notifBatch, ...notifications]);
+      saveToStorage("pensionflow_notifications", [...notifBatch, ...notifications]);
 
       triggerPushNotification(
         `🔔 Nuevo prospecto (${tipoLabel}): ${newProspect.full_name} ha sido subido por Roberto Asesor. CURP: ${newProspect.curp}. Revisa en tu panel técnico.`,
@@ -2122,37 +2178,61 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return newProspect;
     } else {
       try {
-        let finalAliadoId = undefined;
-        let finalAliadoName = undefined;
-        let finalEmpresaId = null;
+        // Quien captura el prospecto (para `uploaded_by` y como dueño por defecto).
+        let creatorId: string | undefined = undefined;
+        let creatorName: string | undefined = undefined;
+        let creatorEmpresa: string | null = null;
 
         if (supabase) {
           const { data: { user: authUser } } = await supabase.auth.getUser();
           if (authUser) {
-            finalAliadoId = authUser.id;
+            creatorId = authUser.id;
             const { data: profile } = await supabase
               .from("profiles")
               .select("full_name, empresa_multialiado_id")
               .eq("id", authUser.id)
               .maybeSingle();
             if (profile) {
-              finalAliadoName = profile.full_name;
-              finalEmpresaId = profile.empresa_multialiado_id;
+              creatorName = profile.full_name;
+              creatorEmpresa = profile.empresa_multialiado_id;
             } else {
-              finalAliadoName = user?.full_name;
-              finalEmpresaId = user?.empresa_multialiado_id || null;
+              creatorName = user?.full_name;
+              creatorEmpresa = user?.empresa_multialiado_id || null;
             }
           }
         }
 
-        if (!finalAliadoId) {
-          finalAliadoId = user?.id;
-          finalAliadoName = user?.full_name;
-          finalEmpresaId = user?.empresa_multialiado_id || null;
+        if (!creatorId) {
+          creatorId = user?.id;
+          creatorName = user?.full_name;
+          creatorEmpresa = user?.empresa_multialiado_id || null;
         }
 
-        if (!finalAliadoId) {
+        if (!creatorId) {
           throw new Error("No hay una sesión activa de Supabase o su sesión ha expirado. Por favor, inicia sesión de nuevo.");
+        }
+
+        // Dueño del proyecto: el aliado asignado por Dirección/AM al crearlo o, si
+        // no se eligió a nadie, quien lo captura. `uploaded_by` de los documentos
+        // siempre queda como el creador.
+        let finalAliadoId = creatorId;
+        let finalAliadoName = creatorName;
+        let finalEmpresaId = creatorEmpresa;
+
+        if (assignId && assignId !== creatorId) {
+          finalAliadoId = assignId;
+          if (assignedProfile) {
+            finalAliadoName = assignedProfile.full_name;
+            finalEmpresaId = assignedProfile.empresa_multialiado_id || null;
+          } else {
+            const { data: aProfile } = await supabase
+              .from("profiles")
+              .select("full_name, empresa_multialiado_id")
+              .eq("id", assignId)
+              .maybeSingle();
+            finalAliadoName = aProfile?.full_name || finalAliadoName;
+            finalEmpresaId = aProfile?.empresa_multialiado_id ?? null;
+          }
         }
 
         const { data: dbProspect, error: prospectError } = await supabase
@@ -2207,7 +2287,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
-              uploaded_by: finalAliadoId,
+              uploaded_by: creatorId,
             })
             .select()
             .single();
@@ -2231,7 +2311,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               drive_file_id: driveFile.id,
               drive_file_url: driveFile.url,
               drive_folder_id: driveFolderId,
-              uploaded_by: finalAliadoId,
+              uploaded_by: creatorId,
             })
             .select()
             .single();
@@ -2253,6 +2333,17 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             user_id: dir.id,
             title: "Nuevo Prospecto Capturado",
             message: `El aliado ${newProspect.aliado_name} registró a ${newProspect.full_name} (${tipoLabel}) para evaluación Ley 73.`,
+            type: "info",
+            read: false,
+          });
+        }
+
+        // Aviso al aliado cuando Dirección/AM le asignó el proyecto al crearlo.
+        if (assignId && assignId !== creatorId) {
+          await supabase.from("notifications").insert({
+            user_id: assignId,
+            title: "Proyecto Asignado 📁",
+            message: `Se te asignó el proyecto de ${newProspect.full_name}.`,
             type: "info",
             read: false,
           });
@@ -3251,8 +3342,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         
         const storedProfiles = localStorage.getItem("pensionflow_profiles");
         const parsedProfiles = storedProfiles ? JSON.parse(storedProfiles) : INITIAL_PROFILES;
-        const creator = parsedProfiles.find((p: any) => p.id === validCode.created_by);
-        const accountManagerId = creator?.role === "account_manager" ? creator.id : null;
+        // El AM se sortea de la ruleta, sin importar quién generó el código (en
+        // producción esto lo hace el trigger de la BD; aquí es para el modo demo).
+        const accountManagerId = pickRandomAutoAssignAM(parsedProfiles);
 
         const newProfile: UserProfile = {
           id: `aliado-${Math.random().toString(36).substr(2, 9)}`,
@@ -3284,18 +3376,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           throw new Error("El código de invitación no es válido, ya fue utilizado o no existe.");
         }
 
-        // Check if the invitation code was created by an Account Manager
-        let accountManagerId = null;
-        if (dbCode.created_by) {
-          const { data: creatorProfile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", dbCode.created_by)
-            .maybeSingle();
-          if (creatorProfile && creatorProfile.role === "account_manager") {
-            accountManagerId = dbCode.created_by;
-          }
-        }
+        // El Account Manager NO se hereda del creador del código: lo sortea la BD
+        // (trigger `assign_random_am_on_insert`) entre los AM que están en la ruleta,
+        // al insertar el perfil. El director puede re-asignarlo después a mano.
 
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
@@ -3332,7 +3415,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               phone,
               role: "aliado",
               invitation_code_used: code.trim().toUpperCase(),
-              account_manager_id: accountManagerId
+              // account_manager_id lo asigna el trigger de la BD (ruleta de AM).
             });
             
           // If successful, try to mark invitation code as used
@@ -3443,8 +3526,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
     if (isDemoMode || isProvisionalSession || !supabase) {
+      // Al crear un aliado sin AM, se sortea uno de la ruleta (en producción esto
+      // lo hace el trigger de la BD; aquí lo replicamos para el modo demo).
+      const assignedAmId =
+        profileData.role === "aliado" && !profileData.account_manager_id
+          ? pickRandomAutoAssignAM(profiles)
+          : (profileData.account_manager_id ?? null);
+
       const newProfile: UserProfile = {
         ...profileData,
+        account_manager_id: assignedAmId,
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
         created_at: new Date().toISOString(),
       };
@@ -3584,6 +3675,22 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             type: "success",
             read: false,
           });
+        }
+
+        // Avisar al Account Manager que le tocó el aliado en la ruleta de asignación.
+        // (El AM lo eligió el trigger de la BD; se refleja en dbProfile.account_manager_id.)
+        if (newProfile.account_manager_id) {
+          try {
+            await supabase.from("notifications").insert({
+              user_id: newProfile.account_manager_id,
+              title: "Nuevo aliado asignado 🎲",
+              message: `Se te asignó al aliado ${newProfile.full_name} en la asignación automática.`,
+              type: "info",
+              read: false,
+            });
+          } catch (amNotifyErr) {
+            console.warn("No se pudo notificar al AM asignado:", amNotifyErr);
+          }
         }
 
         triggerPushNotification(
@@ -3731,6 +3838,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (updates.role !== undefined) dbUpdates.role = dbRole;
         if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
         if (updates.account_manager_id !== undefined) dbUpdates.account_manager_id = updates.account_manager_id;
+        if (updates.auto_assign_enabled !== undefined) dbUpdates.auto_assign_enabled = updates.auto_assign_enabled;
         if (updates.password_provisional !== undefined) dbUpdates.password_provisional = updates.password_provisional;
 
         const { error } = await supabase
