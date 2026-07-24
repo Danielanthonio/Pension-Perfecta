@@ -294,6 +294,7 @@ interface AppContextType {
     }
   ) => Promise<void>;
   reassignProspect: (id: string, newAliadoId: string) => Promise<void>;
+  reassignAccountManager: (id: string, newAmId: string | null) => Promise<void>;
   isProspectDeleted: (p: Prospect) => boolean;
   isProspectPurged: (p: Prospect) => boolean;
   getProspectDeletedAt: (p: Prospect) => Date | null;
@@ -2823,6 +2824,49 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // Reasigna (o quita) el Account Manager de un PROYECTO. El AM va por proyecto
+  // (prospects.account_manager_id), no por aliado. `newAmId` = null → sin AM.
+  const reassignAccountManager = async (id: string, newAmId: string | null): Promise<void> => {
+    const target = prospects.find((p) => p.id === id);
+    if (!target) return;
+    if ((target.account_manager_id || null) === (newAmId || null)) return; // sin cambios
+
+    const newAm = newAmId ? profiles.find((p) => p.id === newAmId) : null;
+    if (newAmId && !newAm) throw new Error("El Account Manager destino no existe.");
+
+    const patch = {
+      account_manager_id: newAmId || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const updated = prospects.map((p) => (p.id === id ? { ...p, ...patch } : p));
+      setProspects(updated);
+      saveToStorage("pensionflow_prospects", updated);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("prospects").update(patch).eq("id", id);
+      if (error) throw error;
+
+      setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
+      if (newAmId) {
+        await supabase.from("notifications").insert({
+          user_id: newAmId,
+          title: "Proyecto Asignado 📁",
+          message: `Se te asignó como Account Manager el proyecto de ${target.full_name}.`,
+          type: "info",
+          read: false,
+        });
+      }
+    } catch (err) {
+      console.error("Error reassigning account manager:", err);
+      throw err;
+    }
+  };
+
   const updateProspectStatus = async (
     id: string,
     newStatus: Prospect["status"],
@@ -4504,6 +4548,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         permanentlyDeleteProspect,
         editProspectPersonalData,
         reassignProspect,
+        reassignAccountManager,
         isProspectDeleted,
         isProspectPurged,
         getProspectDeletedAt,

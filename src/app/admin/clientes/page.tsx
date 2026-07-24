@@ -11,15 +11,19 @@ import {
 } from "@/utils/context/AppContext";
 import {
   Search,
-  Users,
   Trash2,
   FolderKanban,
   ArrowRight,
   ArrowLeftRight,
   ChevronDown,
   Plus,
+  SlidersHorizontal,
+  RotateCcw,
+  CheckCircle,
+  UserCog,
+  X,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
@@ -36,6 +40,7 @@ function ClientesAdminContent() {
     assignmentProfiles,
     updateProspectStatus,
     reassignProspect,
+    reassignAccountManager,
     deleteProspect,
     restoreProspect,
     permanentlyDeleteProspect,
@@ -48,6 +53,8 @@ function ClientesAdminContent() {
   const isAM = user?.role === "account_manager";
   const accent = isAM ? "blue" : "emerald";
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -60,10 +67,10 @@ function ClientesAdminContent() {
   // Filtro de asignación (director): multi-selección de aliados y/o account managers.
   // Vacío = Todos. Ver AliadoPicker / prospectMatchesSelection.
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
-  // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
+  // Filtro por modalidad de aprobación — lo controla la barra de filtros superior vía URL.
   const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
   // Filtro por origen del aliado: "empresa" (pertenece a una empresa multialiado) vs
-  // "independiente" (sin empresa). Se controla desde el panel izquierdo (FILTRAR) vía URL.
+  // "independiente" (sin empresa). Se controla desde la barra de filtros superior vía URL.
   const origenFilter = searchParams.get("origen") || "all"; // all | empresa | independiente
 
   // Clasifica un prospecto según el aliado dueño: si el aliado pertenece a una empresa
@@ -78,6 +85,31 @@ function ClientesAdminContent() {
     },
     [profiles]
   );
+
+  // Barra de filtros superior (formato clásico, dropdowns): escribe los mismos
+  // params de URL que antes controlaba el panel lateral (etapa/subetapa/modalidad/origen).
+  const updateParams = (mutate: (p: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString());
+    mutate(params);
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  };
+  const clearTopFilters = () => {
+    setSelectedEntities([]);
+    updateParams((p) => ["etapa", "subetapa", "modalidad", "origen"].forEach((k) => p.delete(k)));
+  };
+  // Subetapas disponibles para la etapa elegida (dropdown dependiente).
+  const topSubStages = stageFilter !== "all" ? SUB_STAGES_BY_STAGE[stageFilter] || [] : [];
+  const anyTopFilterActive =
+    stageFilter !== "all" ||
+    subStageFilter !== "all" ||
+    modalidadFilter !== "all" ||
+    origenFilter !== "all" ||
+    selectedEntities.length > 0;
+  // Estilo compartido de los <select> clásicos de la barra superior.
+  const topSelectCls = `px-2.5 py-1.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 outline-none transition-all cursor-pointer ${
+    isAM ? "focus:border-blue-500" : "focus:border-emerald-500"
+  }`;
 
   const baseFilteredProspects = React.useMemo(() => {
     if (user?.role !== "director") return prospects;
@@ -105,6 +137,11 @@ function ClientesAdminContent() {
   const [reassignTarget, setReassignTarget] = useState<Prospect | null>(null);
   const [reassignAllyId, setReassignAllyId] = useState<string>("");
   const [reassigning, setReassigning] = useState(false);
+
+  // Reasignar Account Manager: modal de confirmación (Sí/No) + toast de éxito arriba.
+  const [amReassignTarget, setAmReassignTarget] = useState<{ prospect: Prospect; newAmId: string } | null>(null);
+  const [amReassigning, setAmReassigning] = useState(false);
+  const [amSuccess, setAmSuccess] = useState<string | null>(null);
 
   // Aliados a los que se puede reasignar: director y AM pueden mover el proyecto a
   // CUALQUIER aliado del sistema (la "cartera" del AM ya no existe: el AM es por
@@ -241,6 +278,47 @@ function ClientesAdminContent() {
     })
     .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter);
 
+  // Account Managers disponibles para asignar (lista CRUDA `assignmentProfiles`, que
+  // incluye a los AMs) y helper para resolver el nombre del AM de un proyecto.
+  const accountManagers = React.useMemo(
+    () =>
+      assignmentProfiles
+        .filter((pr) => pr.role === "account_manager" && pr.is_active !== false)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    [assignmentProfiles]
+  );
+  const getAmName = React.useCallback(
+    (p: Prospect): string | null => {
+      if (!p.account_manager_id) return null;
+      return assignmentProfiles.find((pr) => pr.id === p.account_manager_id)?.full_name || "Account Manager";
+    },
+    [assignmentProfiles]
+  );
+
+  // Nombre legible de un AM por id (para el modal / toast). "" o null = Sin asignar.
+  const amNameById = (amId: string | null) =>
+    amId ? accountManagers.find((a) => a.id === amId)?.full_name || "Account Manager" : "Sin asignar";
+
+  // Confirma la reasignación del AM desde el modal. Al terminar: notifica al nuevo AM
+  // (dentro de reassignAccountManager) y muestra un toast de éxito arriba para el director.
+  const confirmAmReassign = async () => {
+    if (!amReassignTarget) return;
+    const { prospect, newAmId } = amReassignTarget;
+    const target = newAmId || null;
+    setAmReassigning(true);
+    try {
+      await reassignAccountManager(prospect.id, target);
+      setAmReassignTarget(null);
+      setAmSuccess(`Proyecto de ${prospect.full_name} reasignado con éxito a ${amNameById(target)}.`);
+      window.setTimeout(() => setAmSuccess(null), 5000);
+    } catch (e) {
+      console.error("Error reasignando AM:", e);
+      alert("No se pudo reasignar el Account Manager.");
+    } finally {
+      setAmReassigning(false);
+    }
+  };
+
   // Sorting — active list and trash each get their own sort state/controls.
   const sortA = useSortable<Prospect>(
     filteredProspects,
@@ -249,6 +327,7 @@ function ClientesAdminContent() {
       nombre: (p) => p.full_name,
       tipo: (p) => p.tipo_financiamiento || "",
       aliado: (p) => p.aliado_name || "",
+      am: (p) => getAmName(p) || "",
       etapa: (p) => stageIndex(p.status),
       expediente: (p) => p.documents.length,
     },
@@ -271,6 +350,7 @@ function ClientesAdminContent() {
     { id: "nombre", label: "Nombre" },
     { id: "tipo", label: "Tipo de financiamiento" },
     { id: "aliado", label: "Aliado" },
+    { id: "am", label: "Account Manager" },
     { id: "etapa", label: "Etapa" },
     { id: "expediente", label: "Documentos" },
   ];
@@ -318,15 +398,108 @@ function ClientesAdminContent() {
     <>
       <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
 
-        {/* Barra de acción: subir un nuevo proyecto (director / account manager) */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Pipeline de expedientes</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Sube un nuevo proyecto o gestiona los expedientes existentes.</p>
+        {/* Barra compacta de filtros (formato clásico) + acción Subir Proyecto */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm px-3 py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 pr-0.5">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filtros
+            </span>
+
+            {/* Asignación / Aliado comercial (mismo filtro): buscador multi-selección */}
+            {!isAM && (
+              <AliadoPicker
+                profiles={profiles}
+                selected={selectedEntities}
+                onChange={setSelectedEntities}
+                accent="emerald"
+              />
+            )}
+
+            {/* Etapa */}
+            <select
+              value={stageFilter}
+              onChange={(e) => {
+                const v = e.target.value;
+                updateParams((p) => {
+                  if (v === "all") p.delete("etapa");
+                  else p.set("etapa", v);
+                  p.delete("subetapa"); // al cambiar de etapa se limpia la subetapa
+                });
+              }}
+              className={topSelectCls}
+              title="Etapa"
+            >
+              <option value="all">Todas las etapas</option>
+              {STAGES_LIST.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Subetapa (dependiente de la etapa) */}
+            <select
+              value={subStageFilter}
+              disabled={topSubStages.length === 0}
+              onChange={(e) =>
+                updateParams((p) => (e.target.value === "all" ? p.delete("subetapa") : p.set("subetapa", e.target.value)))
+              }
+              className={`${topSelectCls} disabled:opacity-40 disabled:cursor-not-allowed`}
+              title="Subetapa"
+            >
+              <option value="all">Todas las subetapas</option>
+              {topSubStages.map((sub) => (
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
+              ))}
+            </select>
+
+            {/* Modalidad / Financiamiento */}
+            <select
+              value={modalidadFilter}
+              onChange={(e) =>
+                updateParams((p) => (e.target.value === "all" ? p.delete("modalidad") : p.set("modalidad", e.target.value)))
+              }
+              className={topSelectCls}
+              title="Modalidad / Financiamiento"
+            >
+              <option value="all">Todas las modalidades</option>
+              <option value="40">Modalidad 40</option>
+              <option value="10">Modalidad 10</option>
+              <option value="cn">Crédito de nómina</option>
+            </select>
+
+            {/* Tipo de aliado: empresa vs. independiente */}
+            <select
+              value={origenFilter}
+              onChange={(e) =>
+                updateParams((p) => (e.target.value === "all" ? p.delete("origen") : p.set("origen", e.target.value)))
+              }
+              className={topSelectCls}
+              title="Tipo de aliado"
+            >
+              <option value="all">Empresa e independientes</option>
+              <option value="empresa">Empresa</option>
+              <option value="independiente">Independiente</option>
+            </select>
+
+            {anyTopFilterActive && (
+              <button
+                onClick={clearTopFilters}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                title="Limpiar filtros"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Limpiar
+              </button>
+            )}
           </div>
+
           <Link
             href="/admin/nuevo"
-            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 ${
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 ${
               isAM
                 ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/20"
                 : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
@@ -336,28 +509,6 @@ function ClientesAdminContent() {
             Subir Proyecto
           </Link>
         </div>
-
-        {/* Director Pipeline Assignment Filters */}
-        {!isAM && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/10">
-                <Users className="h-4 w-4" strokeWidth={2.2} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 dark:text-white">Filtro de Asignación / Origen</h4>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Selecciona uno o varios aliados y/o account managers para comparar sus gestiones.</p>
-              </div>
-            </div>
-
-            <AliadoPicker
-              profiles={profiles}
-              selected={selectedEntities}
-              onChange={setSelectedEntities}
-              accent="emerald"
-            />
-          </div>
-        )}
 
         {/* Kanban List Table */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -424,7 +575,7 @@ function ClientesAdminContent() {
                   <thead>
                     <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
                       <SortHeader col="nombre" label="Prospecto" sort={sortT} className="pl-5" />
-                      <SortHeader col="aliado" label="Asignación" sort={sortT} />
+                      <SortHeader col="aliado" label="Aliado" sort={sortT} />
                       <SortHeader col="eliminado" label="Eliminado · Vence" sort={sortT} />
                       <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                     </tr>
@@ -514,7 +665,8 @@ function ClientesAdminContent() {
                     <tr className="bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-150 dark:border-slate-800 text-left">
                       <SortHeader col="nombre" label="Prospecto" sort={sortA} className="pl-5" />
                       <SortHeader col="tipo" label="Tipo de financiamiento" sort={sortA} />
-                      <SortHeader col="aliado" label="Asignación" sort={sortA} />
+                      <SortHeader col="aliado" label="Aliado" sort={sortA} />
+                      <SortHeader col="am" label="Account Manager" sort={sortA} />
                       <SortHeader col="expediente" label="Expediente" sort={sortA} align="center" />
                       <SortHeader col="etapa" label="Etapa · Subetapa" sort={sortA} />
                       <SortHeader col="fecha" label="Registrado" sort={sortA} align="center" />
@@ -567,10 +719,31 @@ function ClientesAdminContent() {
                           <td className="px-4 py-2.5">
                             <TipoFinanciamientoBadge value={p.tipo_financiamiento} modalidad={p.modalidad} />
                           </td>
-                          {/* Asignación */}
+                          {/* Aliado */}
                           <td className="px-4 py-2.5">
                             <span className="font-semibold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
+                          </td>
+                          {/* Account Manager — editable (reasignar el dueño de la gestión) */}
+                          <td className="px-4 py-2.5">
+                            <select
+                              value={p.account_manager_id || ""}
+                              onChange={(e) => setAmReassignTarget({ prospect: p, newAmId: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Reasignar Account Manager"
+                              className={`min-w-[140px] max-w-[190px] px-2 py-1.5 border rounded-lg text-[11px] font-semibold outline-none transition-all cursor-pointer truncate ${
+                                p.account_manager_id
+                                  ? "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300"
+                                  : "bg-slate-50 dark:bg-slate-850/40 border-dashed border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500"
+                              } ${isAM ? "focus:border-blue-500" : "focus:border-emerald-500"}`}
+                            >
+                              <option value="">Sin asignar</option>
+                              {accountManagers.map((am) => (
+                                <option key={am.id} value={am.id}>
+                                  {am.full_name}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           {/* Expediente */}
                           <td className="px-4 py-2.5">
@@ -677,7 +850,7 @@ function ClientesAdminContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={7} className="px-6 pt-1 pb-6 border-b-0">
+                            <td colSpan={8} className="px-6 pt-1 pb-6 border-b-0">
                               <div className="max-w-3xl mx-auto">
                                 <div className="flex items-center gap-2 mb-5">
                                   <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
@@ -843,6 +1016,84 @@ function ClientesAdminContent() {
                 {reassigning ? "Reasignando..." : "Confirmar reasignación"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación — reasignar Account Manager (Sí / No) */}
+      {amReassignTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
+              <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40">
+                <UserCog className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Reasignar Account Manager</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                  ¿Confirmas que deseas reasignar este proyecto?
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-sm font-bold">
+                  {amReassignTarget.prospect.full_name.charAt(0)}
+                </div>
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block truncate">
+                  {amReassignTarget.prospect.full_name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-400 font-semibold truncate max-w-[42%]">
+                  {amNameById(amReassignTarget.prospect.account_manager_id || null)}
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 font-bold truncate max-w-[42%]">
+                  {amNameById(amReassignTarget.newAmId || null)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => setAmReassignTarget(null)}
+                disabled={amReassigning}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                No
+              </button>
+              <button
+                onClick={confirmAmReassign}
+                disabled={amReassigning}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                {amReassigning ? "Reasignando..." : "Sí, reasignar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de éxito (arriba) — confirma al director que la reasignación se logró */}
+      {amSuccess && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[calc(100%-2rem)] animate-fade-in">
+          <div className="flex items-start gap-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 rounded-2xl shadow-2xl px-4 py-3.5">
+            <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Reasignación exitosa ✅</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{amSuccess}</p>
+            </div>
+            <button
+              onClick={() => setAmSuccess(null)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}
