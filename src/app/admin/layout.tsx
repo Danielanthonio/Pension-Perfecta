@@ -26,6 +26,9 @@ import {
   FileBarChart,
   LayoutDashboard,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CornerDownRight,
   Sun,
   Moon,
   Building2,
@@ -83,208 +86,368 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   );
 }
 
+// Botonera de filtros del sidebar: el PERÍODO se elige con botones de mes
+// (rejilla 3×4) + "Todo el año" + "Rango…" (abre Desde/Hasta), y los filtros
+// generales (Etapa/Subetapa/Modalidad) son chips. El Aliado sigue como buscador
+// porque no escala a botones. Todo aplica al instante (escribe en la URL);
+// "Rango…" es la única entrada con Aplicar propio.
+const FILTER_MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const monthRange = (year: number, m: number) => {
+  const lastDay = new Date(year, m + 1, 0).getDate();
+  return { desde: `${year}-${pad2(m + 1)}-01`, hasta: `${year}-${pad2(m + 1)}-${pad2(lastDay)}` };
+};
+
+// Estilos compartidos de los botones de la botonera.
+const PILL_BASE = "rounded-xl py-2.5 text-xs font-bold transition-all active:scale-[0.97]";
+const PILL_ON = "bg-gradient-to-br from-emerald-400 to-teal-500 text-emerald-950 shadow-md shadow-emerald-500/20 font-extrabold";
+const PILL_OFF = "bg-slate-900/60 border border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white";
+const CHIP_BASE = "rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-[0.97]";
+const CHIP_ON = "bg-gradient-to-br from-emerald-400 to-teal-500 text-emerald-950 shadow shadow-emerald-500/20";
+const CHIP_OFF = "bg-slate-900/60 border border-slate-800 text-slate-350 hover:border-slate-700 hover:text-white";
+
 function SidebarFilters({ collapsed }: { collapsed?: boolean }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const { profiles, user } = useApp();
 
-  // Local states for sidebar filters
+  const desdeParam = searchParams.get("desde") || "";
+  const hastaParam = searchParams.get("hasta") || "";
+  const etapaParam = searchParams.get("etapa") || "all";
+  const subParam = searchParams.get("subetapa") || "all";
+  const aliadoParam = searchParams.get("aliado") || "all";
+  const modalidadParam = searchParams.get("modalidad") || "all";
+  const origenParam = searchParams.get("origen") || "all"; // all | empresa | independiente
+
+  // El año que muestran los botones de mes. Arranca del año de `desde` (si lo hay)
+  // o del año actual; se puede mover con las flechas ‹ › sin tocar la URL.
+  const [displayYear, setDisplayYear] = useState<number>(() =>
+    /^\d{4}-/.test(desdeParam) ? parseInt(desdeParam.slice(0, 4), 10) : new Date().getFullYear()
+  );
+  const [showRange, setShowRange] = useState(false);
   const [localStartDate, setLocalStartDate] = useState("");
   const [localEndDate, setLocalEndDate] = useState("");
-  const [localStageFilter, setLocalStageFilter] = useState("all");
-  const [localSubStageFilter, setLocalSubStageFilter] = useState("all");
-  const [localAllyFilter, setLocalAllyFilter] = useState("all");
-  const [localModalidadFilter, setLocalModalidadFilter] = useState("all");
 
-  // Sync filters from URL query parameters
+  // Sincroniza los inputs del panel "Rango…" y el año mostrado desde la URL.
   useEffect(() => {
-    setLocalStartDate(searchParams.get("desde") || "");
-    setLocalEndDate(searchParams.get("hasta") || "");
-    setLocalStageFilter(searchParams.get("etapa") || "all");
-    setLocalSubStageFilter(searchParams.get("subetapa") || "all");
-    setLocalAllyFilter(searchParams.get("aliado") || "all");
-    setLocalModalidadFilter(searchParams.get("modalidad") || "all");
+    setLocalStartDate(desdeParam);
+    setLocalEndDate(hastaParam);
+    if (/^\d{4}-/.test(desdeParam)) setDisplayYear(parseInt(desdeParam.slice(0, 4), 10));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  const handleApplyFilters = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    if (localStartDate) params.set("desde", localStartDate);
-    else params.delete("desde");
-
-    if (localEndDate) params.set("hasta", localEndDate);
-    else params.delete("hasta");
-
-    if (localStageFilter !== "all") params.set("etapa", localStageFilter);
-    else params.delete("etapa");
-
-    if (localSubStageFilter !== "all") params.set("subetapa", localSubStageFilter);
-    else params.delete("subetapa");
-
-    if (localAllyFilter !== "all") params.set("aliado", localAllyFilter);
-    else params.delete("aliado");
-
-    if (localModalidadFilter !== "all") params.set("modalidad", localModalidadFilter);
-    else params.delete("modalidad");
-
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const handleClearFilters = () => {
-    setLocalStartDate("");
-    setLocalEndDate("");
-    setLocalStageFilter("all");
-    setLocalSubStageFilter("all");
-    setLocalAllyFilter("all");
-    setLocalModalidadFilter("all");
-
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("desde");
-    params.delete("hasta");
-    params.delete("etapa");
-    params.delete("subetapa");
-    params.delete("aliado");
-    params.delete("modalidad");
-
-    router.push(`${pathname}?${params.toString()}`);
-  };
 
   const cleanPath = pathname.replace(/\/$/, "");
   const isAdminRoot = cleanPath === "/admin";
   const isClientes = cleanPath === "/admin/clientes";
   if (!isAdminRoot && !isClientes) return null;
 
-  const isAM = user?.role === "account_manager";
-  const subStagesList = localStageFilter !== "all" ? (SUB_STAGES_BY_STAGE[localStageFilter] || []) : [];
+  const applyParams = (mutate: (p: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString());
+    mutate(params);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const selectMonth = (m: number) => {
+    const { desde, hasta } = monthRange(displayYear, m);
+    applyParams((p) => {
+      p.set("desde", desde);
+      p.set("hasta", hasta);
+    });
+    setShowRange(false);
+  };
+
+  const selectFullYear = () => {
+    applyParams((p) => {
+      p.set("desde", `${displayYear}-01-01`);
+      p.set("hasta", `${displayYear}-12-31`);
+    });
+    setShowRange(false);
+  };
+
+  const applyRange = () => {
+    applyParams((p) => {
+      if (localStartDate) p.set("desde", localStartDate);
+      else p.delete("desde");
+      if (localEndDate) p.set("hasta", localEndDate);
+      else p.delete("hasta");
+    });
+  };
+
+  const setEtapa = (id: string) =>
+    applyParams((p) => {
+      if (id === "all") {
+        p.delete("etapa");
+        p.delete("subetapa");
+      } else {
+        p.set("etapa", id);
+        p.delete("subetapa"); // al cambiar de etapa se limpia la subetapa
+      }
+    });
+  const setSub = (s: string) => applyParams((p) => (s === "all" ? p.delete("subetapa") : p.set("subetapa", s)));
+  const setModalidad = (v: string) => applyParams((p) => (v === "all" ? p.delete("modalidad") : p.set("modalidad", v)));
+  const setOrigen = (v: string) => applyParams((p) => (v === "all" ? p.delete("origen") : p.set("origen", v)));
+  const setAliado = (v: string) => applyParams((p) => (v === "all" ? p.delete("aliado") : p.set("aliado", v)));
+  const clearAll = () => {
+    setShowRange(false);
+    applyParams((p) => ["desde", "hasta", "etapa", "subetapa", "aliado", "modalidad", "origen"].forEach((k) => p.delete(k)));
+  };
+
+  // ¿Qué botón de período está activo? Se deriva de la URL, no del estado local.
+  let activeMonth: number | null = null;
+  for (let m = 0; m < 12; m++) {
+    const r = monthRange(displayYear, m);
+    if (r.desde === desdeParam && r.hasta === hastaParam) {
+      activeMonth = m;
+      break;
+    }
+  }
+  const hasRange = !!desdeParam || !!hastaParam;
+  const isFullYear = desdeParam === `${displayYear}-01-01` && hastaParam === `${displayYear}-12-31`;
+  const isCustomRange = hasRange && activeMonth === null && !isFullYear;
+  const rangeOpen = showRange || isCustomRange;
+
+  const subStagesList = etapaParam !== "all" ? (SUB_STAGES_BY_STAGE[etapaParam] || []) : [];
+  const activeStageLabel = STAGES_LIST.find((s) => s.id === etapaParam)?.label || "";
   // Con el AM por PROYECTO, `profiles` (exposedProfiles) del AM ya viene acotado a
   // los aliados dueños de sus proyectos: no hace falta filtrar por cartera.
   const uniqueAllies = profiles.filter((p) => p.role === "aliado" && p.is_active);
+  const anyFilterActive =
+    hasRange ||
+    etapaParam !== "all" ||
+    subParam !== "all" ||
+    aliadoParam !== "all" ||
+    modalidadParam !== "all" ||
+    origenParam !== "all";
+
+  const modalidadOptions = [
+    { v: "all", l: "Todas" },
+    { v: "40", l: "Mod 40" },
+    { v: "10", l: "Mod 10" },
+    { v: "cn", l: "Créd. nómina" },
+  ];
+
+  const origenOptions = [
+    { v: "all", l: "Todos" },
+    { v: "empresa", l: "Empresa" },
+    { v: "independiente", l: "Independiente" },
+  ];
 
   return (
-    <div className={`pt-8 border-t border-slate-800/55 mt-6 space-y-4 ${collapsed ? "md:hidden" : ""}`}>
+    <div className={`pt-8 border-t border-slate-800/55 mt-6 space-y-5 ${collapsed ? "md:hidden" : ""}`}>
       <div className="flex items-center gap-2 px-4">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">
-          FILTRAR
-        </span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 shrink-0">FILTRAR</span>
         <div className="h-px bg-slate-850 flex-1"></div>
       </div>
 
-      <div className="px-4 space-y-3">
-        <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
-          <Calendar className="h-3.5 w-3.5 text-indigo-400" />
-          <span>Rango de fechas</span>
+      {/* PERÍODO — botones de mes + año + rango */}
+      <div className="px-4 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            Período · {displayYear}
+          </span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setDisplayYear((y) => y - 1)}
+              className="p-1 rounded-md text-slate-500 hover:text-white hover:bg-slate-800/60 transition-colors"
+              title={`${displayYear - 1}`}
+              aria-label="Año anterior"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setDisplayYear((y) => y + 1)}
+              className="p-1 rounded-md text-slate-500 hover:text-white hover:bg-slate-800/60 transition-colors"
+              title={`${displayYear + 1}`}
+              aria-label="Año siguiente"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-        
-        <div className="space-y-2.5">
-          <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Desde</label>
-            <input
-              type="date"
-              value={localStartDate}
-              onChange={(e) => setLocalStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
-            <input
-              type="date"
-              value={localEndDate}
-              onChange={(e) => setLocalEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all"
-            />
-          </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {FILTER_MONTHS.map((label, m) => (
+            <button
+              key={label}
+              onClick={() => selectMonth(m)}
+              className={`${PILL_BASE} ${activeMonth === m ? PILL_ON : PILL_OFF}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {isClientes && (
-          <div className="space-y-2.5 pt-2">
-            <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Etapa</label>
-              <select
-                value={localStageFilter}
-                onChange={(e) => {
-                  setLocalStageFilter(e.target.value);
-                  setLocalSubStageFilter("all");
-                }}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
-              >
-                <option value="all">Todas las Etapas</option>
-                {STAGES_LIST.map((stage) => (
-                  <option key={stage.id} value={stage.id} className="bg-slate-900 text-slate-200">
-                    {stage.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Subetapa</label>
-              <select
-                value={localSubStageFilter}
-                onChange={(e) => setLocalSubStageFilter(e.target.value)}
-                disabled={localStageFilter === "all"}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <option value="all">Todas las Subetapas</option>
-                {subStagesList.map((sub) => (
-                  <option key={sub} value={sub} className="bg-slate-900 text-slate-200">
-                    {sub}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Allied Dropdown filter */}
-            <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Aliado Comercial</label>
-              <select
-                value={localAllyFilter}
-                onChange={(e) => setLocalAllyFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
-              >
-                <option value="all">Todos los Aliados</option>
-                {uniqueAllies.map((ally) => (
-                  <option key={ally.id} value={ally.full_name} className="bg-slate-900 text-slate-200">
-                    {ally.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Modalidad de aprobación / tipo de financiamiento */}
-            <div>
-              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Modalidad / Financiamiento</label>
-              <select
-                value={localModalidadFilter}
-                onChange={(e) => setLocalModalidadFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all cursor-pointer"
-              >
-                <option value="all">Todas las Modalidades</option>
-                <option value="40" className="bg-slate-900 text-slate-200">Modalidad 40</option>
-                <option value="10" className="bg-slate-900 text-slate-200">Modalidad 10</option>
-                <option value="cn" className="bg-slate-900 text-slate-200">Crédito de nómina</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2 pt-4">
-          <button
-            onClick={handleApplyFilters}
-            className="w-full px-4 py-2.5 text-white rounded-xl text-xs font-bold hover:shadow-md transition-all active:scale-[0.98] transform flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
-          >
-            <Filter className="h-3.5 w-3.5" />
-            Aplicar Filtros
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={selectFullYear} className={`${PILL_BASE} ${isFullYear ? PILL_ON : PILL_OFF}`}>
+            Todo el año
           </button>
           <button
-            onClick={handleClearFilters}
+            onClick={() => setShowRange((v) => !v)}
+            className={`${PILL_BASE} flex items-center justify-center gap-1.5 ${rangeOpen ? PILL_ON : PILL_OFF}`}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            Rango…
+          </button>
+        </div>
+
+        {rangeOpen && (
+          <div className="space-y-2.5 rounded-xl bg-slate-900/40 border border-slate-800/70 p-3">
+            <div>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Desde</label>
+              <input
+                type="date"
+                value={localStartDate}
+                onChange={(e) => setLocalStartDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Hasta</label>
+              <input
+                type="date"
+                value={localEndDate}
+                onChange={(e) => setLocalEndDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-xs text-slate-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+              />
+            </div>
+            <button
+              onClick={applyRange}
+              className="w-full px-3 py-2 rounded-lg text-[11px] font-bold text-emerald-950 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+            >
+              <Filter className="h-3 w-3" />
+              Aplicar rango
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Filtros generales — solo en Gestión de Clientes */}
+      {isClientes && (
+        <div className="px-4 space-y-4">
+          {/* ETAPA — al elegir una etapa con subetapas, éstas se despliegan justo debajo */}
+          <div className="space-y-2">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">Etapa</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setEtapa("all")}
+                className={`${CHIP_BASE} ${etapaParam === "all" ? CHIP_ON : CHIP_OFF}`}
+              >
+                Todas
+              </button>
+              {STAGES_LIST.map((stage) => {
+                const isActive = etapaParam === stage.id;
+                const hasSubs = (SUB_STAGES_BY_STAGE[stage.id] || []).length > 0;
+                return (
+                  <button
+                    key={stage.id}
+                    onClick={() => setEtapa(stage.id)}
+                    className={`${CHIP_BASE} inline-flex items-center gap-1 ${isActive ? CHIP_ON : CHIP_OFF}`}
+                  >
+                    {stage.label}
+                    {hasSubs && (
+                      <ChevronDown
+                        className={`h-3 w-3 transition-transform ${isActive ? "rotate-180 text-emerald-900/70" : "text-slate-500"}`}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Subetapa desplegada de la etapa elegida (acordeón anidado) */}
+            {subStagesList.length > 0 && (
+              <div className="mt-2.5 ml-1 pl-3 border-l-2 border-emerald-500/40 space-y-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  <CornerDownRight className="h-3 w-3 text-emerald-500/70" />
+                  Subetapa{activeStageLabel ? ` · ${activeStageLabel}` : ""}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSub("all")}
+                    className={`${CHIP_BASE} ${subParam === "all" ? CHIP_ON : CHIP_OFF}`}
+                  >
+                    Todas
+                  </button>
+                  {subStagesList.map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setSub(sub)}
+                      className={`${CHIP_BASE} ${subParam === sub ? CHIP_ON : CHIP_OFF}`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* MODALIDAD / FINANCIAMIENTO */}
+          <div className="space-y-2">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Modalidad / Financiamiento
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {modalidadOptions.map((o) => (
+                <button
+                  key={o.v}
+                  onClick={() => setModalidad(o.v)}
+                  className={`${CHIP_BASE} ${modalidadParam === o.v ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* TIPO DE ALIADO — empresa multialiado vs. aliado independiente */}
+          <div className="space-y-2">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">Tipo de aliado</span>
+            <div className="flex flex-wrap gap-1.5">
+              {origenOptions.map((o) => (
+                <button
+                  key={o.v}
+                  onClick={() => setOrigen(o.v)}
+                  className={`${CHIP_BASE} ${origenParam === o.v ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ALIADO — buscador (no escala a botones) */}
+          <div className="space-y-2">
+            <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">Aliado Comercial</span>
+            <select
+              value={aliadoParam}
+              onChange={(e) => setAliado(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-350 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer"
+            >
+              <option value="all">Todos los Aliados</option>
+              {uniqueAllies.map((ally) => (
+                <option key={ally.id} value={ally.full_name} className="bg-slate-900 text-slate-200">
+                  {ally.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Limpiar */}
+      {anyFilterActive && (
+        <div className="px-4">
+          <button
+            onClick={clearAll}
             className="w-full py-2 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Limpiar filtros
           </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

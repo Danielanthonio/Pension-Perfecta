@@ -62,6 +62,22 @@ function ClientesAdminContent() {
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
   const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
+  // Filtro por origen del aliado: "empresa" (pertenece a una empresa multialiado) vs
+  // "independiente" (sin empresa). Se controla desde el panel izquierdo (FILTRAR) vía URL.
+  const origenFilter = searchParams.get("origen") || "all"; // all | empresa | independiente
+
+  // Clasifica un prospecto según el aliado dueño: si el aliado pertenece a una empresa
+  // multialiado -> "empresa", si no -> "independiente". Se prefiere la empresa ACTUAL del
+  // perfil dueño (fuente de verdad de la Asignación Multialiado) y, si no está el perfil,
+  // se usa la empresa que quedó guardada en el propio prospecto al capturarlo.
+  const getProspectOrigen = React.useCallback(
+    (p: Prospect): "empresa" | "independiente" => {
+      const owner = profiles.find((pr) => pr.id === p.aliado_id);
+      const empresaId = owner ? owner.empresa_multialiado_id ?? null : p.empresa_multialiado_id ?? null;
+      return empresaId ? "empresa" : "independiente";
+    },
+    [profiles]
+  );
 
   const baseFilteredProspects = React.useMemo(() => {
     if (user?.role !== "director") return prospects;
@@ -199,7 +215,8 @@ function ClientesAdminContent() {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
     })
-    .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter));
+    .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter))
+    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter);
 
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;
@@ -221,7 +238,8 @@ function ClientesAdminContent() {
     .filter((p) => {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
-    });
+    })
+    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter);
 
   // Sorting — active list and trash each get their own sort state/controls.
   const sortA = useSortable<Prospect>(
