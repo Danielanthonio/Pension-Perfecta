@@ -311,7 +311,10 @@ interface AppContextType {
   scheduleAssessment: (id: string, date: string, time: string) => Promise<void>;
   generateInvitationCode: () => Promise<InvitationCode>;
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
-  deleteProfile: (id: string) => Promise<void>;
+  deleteProfile: (
+    id: string,
+    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null }
+  ) => Promise<void>;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
   changeAllyType: (allyId: string, tipo: "aliado" | "lider", empresaMultialiadoId?: string | null) => Promise<void>;
   assignAllyToLider: (allyId: string, liderIds: string[]) => Promise<void>;
@@ -3761,11 +3764,38 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const deleteProfile = async (id: string): Promise<void> => {
+  const deleteProfile = async (
+    id: string,
+    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null }
+  ): Promise<void> => {
+    const reassignToAliadoId = options?.reassignToAliadoId || null;
+    const reassignToAmId = options?.reassignToAmId || null;
     const profile = profiles.find((p) => p.id === id);
     if (!profile) return;
 
     if (isDemoMode || isProvisionalSession || !supabase) {
+      // Reasigna localmente los proyectos del aliado y/o del AM (si se indicó).
+      if (reassignToAliadoId || reassignToAmId) {
+        const destAliado = reassignToAliadoId ? profiles.find((p) => p.id === reassignToAliadoId) : null;
+        const reassigned = prospects.map((p) => {
+          let next = p;
+          if (reassignToAliadoId && p.aliado_id === id) {
+            next = {
+              ...next,
+              aliado_id: reassignToAliadoId,
+              aliado_name: destAliado?.full_name || next.aliado_name,
+              empresa_multialiado_id: destAliado?.empresa_multialiado_id || null,
+            };
+          }
+          if (reassignToAmId && p.account_manager_id === id) {
+            next = { ...next, account_manager_id: reassignToAmId };
+          }
+          return next;
+        });
+        setProspects(reassigned);
+        saveToStorage("pensionflow_prospects", reassigned);
+      }
+
       // Filter profiles
       const updatedProfiles = profiles.filter((p) => p.id !== id);
       setProfiles(updatedProfiles);
@@ -3792,36 +3822,63 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       setNotifications([newNotif, ...notifications]);
       saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
     } else {
-      // In Supabase mode:
-      try {
-        // Delete invitation code used by this user (if any)
-        if (profile.invitation_code_used) {
-          await supabase.from("invitation_codes").delete().eq("code", profile.invitation_code_used);
-        }
-        await supabase.from("invitation_codes").delete().eq("used_by", id);
-
-        // Delete profile from DB (deleting from profiles table is enough to revoke access)
-        await supabase.from("profiles").delete().eq("id", id);
-
-        setProfiles((prev) => prev.filter((p) => p.id !== id));
-        
-        if (profile.invitation_code_used) {
-          setInvitationCodes((prev) => prev.filter((c) => c.code !== profile.invitation_code_used && c.used_by !== id));
-        } else {
-          setInvitationCodes((prev) => prev.filter((c) => c.used_by !== id));
-        }
-
-        // Insert notification
-        await supabase.from("notifications").insert({
-          user_id: user?.id,
-          title: "Usuario Eliminado 👤❌",
-          message: `El perfil de ${profile.full_name} (${profile.email}) fue eliminado del sistema.`,
-          type: "warning",
-          read: false,
-        });
-      } catch (err) {
-        console.error("Error deleting profile:", err);
+      // Borrado PERMANENTE real vía endpoint de servidor. El cliente no puede
+      // borrar de verdad (RLS sin política DELETE, FK bloqueantes y la cuenta
+      // de auth.users sobreviviría); el endpoint usa la service_role para
+      // reasignar proyectos, desligar códigos y eliminar la cuenta de auth.
+      // Barra final: el proyecto usa `trailingSlash: true`, así el POST pega
+      // directo al route handler sin pasar por una redirección 308.
+      const res = await fetch("/api/admin/delete-user/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: id,
+          reassignToAliadoId: reassignToAliadoId || null,
+          reassignToAmId: reassignToAmId || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        // Propaga el error (incl. needsReassign) para que la UI lo muestre.
+        const err: any = new Error(data?.error || "No se pudo eliminar el usuario.");
+        err.needsReassign = data?.needsReassign;
+        err.projectCount = data?.projectCount;
+        throw err;
       }
+
+      // Sincroniza el estado local: quita el perfil, reasigna sus proyectos
+      // (como aliado y/o como AM) y olvida los códigos que usó ese usuario.
+      setProfiles((prev) => prev.filter((p) => p.id !== id));
+      if (reassignToAliadoId || reassignToAmId) {
+        const destAliado = reassignToAliadoId ? profiles.find((p) => p.id === reassignToAliadoId) : null;
+        setProspects((prev) =>
+          prev.map((p) => {
+            let next = p;
+            if (reassignToAliadoId && p.aliado_id === id) {
+              next = {
+                ...next,
+                aliado_id: reassignToAliadoId,
+                aliado_name: destAliado?.full_name || next.aliado_name,
+                empresa_multialiado_id: destAliado?.empresa_multialiado_id || null,
+              };
+            }
+            if (reassignToAmId && p.account_manager_id === id) {
+              next = { ...next, account_manager_id: reassignToAmId };
+            }
+            return next;
+          })
+        );
+      }
+      setInvitationCodes((prev) => prev.filter((c) => c.used_by !== id));
+
+      // Notificación local para el director.
+      await supabase.from("notifications").insert({
+        user_id: user?.id,
+        title: "Usuario Eliminado 👤❌",
+        message: `El perfil de ${profile.full_name} (${profile.email}) fue eliminado permanentemente del sistema.`,
+        type: "warning",
+        read: false,
+      });
     }
   };
 

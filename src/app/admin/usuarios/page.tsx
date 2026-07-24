@@ -45,6 +45,7 @@ export default function GestionUsuarios() {
   const {
     user,
     profiles,
+    prospects,
     createProfile,
     deleteProfile,
     updateProfileAdmin,
@@ -91,6 +92,38 @@ export default function GestionUsuarios() {
   // Deletion Modal States
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Destinos a los que se moverán los proyectos del usuario a eliminar.
+  const [reassignAliadoId, setReassignAliadoId] = useState("");
+  const [reassignAmId, setReassignAmId] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+
+  // Cierra el modal de borrado y limpia su estado.
+  const closeDeleteModal = () => {
+    setDeleteTarget(null);
+    setReassignAliadoId("");
+    setReassignAmId("");
+    setDeleteError("");
+  };
+
+  // Proyectos donde el usuario es el ALIADO dueño (orfanarlos rompe las vistas
+  // por aliado → reasignar es OBLIGATORIO).
+  const deleteTargetProjectCount = deleteTarget
+    ? prospects.filter((p) => p.aliado_id === deleteTarget.id).length
+    : 0;
+  const deleteNeedsReassign = deleteTargetProjectCount > 0;
+  const reassignableAliados = deleteTarget
+    ? profiles.filter((p) => p.role === "aliado" && p.id !== deleteTarget.id)
+    : [];
+
+  // Proyectos donde el usuario es el ACCOUNT MANAGER (su cartera). Se transfiere
+  // a otro AM; si es el único AM, quedan sin AM (estado válido, reasignable luego).
+  const deleteTargetAmProjectCount = deleteTarget
+    ? prospects.filter((p) => p.account_manager_id === deleteTarget.id).length
+    : 0;
+  const deleteAmNeedsReassign = deleteTargetAmProjectCount > 0;
+  const reassignableAms = deleteTarget
+    ? profiles.filter((p) => p.role === "account_manager" && p.id !== deleteTarget.id)
+    : [];
 
   // Collapsible panel for the secondary widgets (latest registrations + codes)
   const [showExtras, setShowExtras] = useState(false);
@@ -1167,19 +1200,93 @@ export default function GestionUsuarios() {
               </div>
               <div>
                 <h3 className="text-sm font-black text-slate-800 dark:text-white">Eliminar Colaborador</h3>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">Esta acción revocará accesos y eliminará su código de invitación.</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">Se eliminará permanentemente su cuenta de acceso y su perfil.</p>
               </div>
             </div>
 
             <div className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-medium">
-              ¿Estás seguro de que deseas eliminar permanentemente a <strong>{deleteTarget.full_name}</strong> ({deleteTarget.email})? 
+              ¿Estás seguro de que deseas eliminar permanentemente a <strong>{deleteTarget.full_name}</strong> ({deleteTarget.email})?
               <br/><br/>
-              Esta acción no se puede deshacer y también eliminará del sistema el código de invitación asociado a este perfil.
+              Esta acción <strong>no se puede deshacer</strong>: borra su cuenta de acceso y su perfil del sistema.
             </div>
+
+            {/* Reasignación obligatoria de la cartera del aliado */}
+            {deleteNeedsReassign && (
+              <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-3.5 space-y-2">
+                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
+                  Este aliado tiene <strong>{deleteTargetProjectCount}</strong> proyecto(s) asignado(s). Elige a qué aliado se moverán antes de eliminarlo.
+                </p>
+                <label className="block text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                  Mover sus proyectos a
+                </label>
+                <select
+                  value={reassignAliadoId}
+                  onChange={(e) => {
+                    setReassignAliadoId(e.target.value);
+                    setDeleteError("");
+                  }}
+                  disabled={deleting}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+                >
+                  <option value="">Selecciona un aliado…</option>
+                  {reassignableAliados.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.full_name} ({a.email})
+                    </option>
+                  ))}
+                </select>
+                {reassignableAliados.length === 0 && (
+                  <p className="text-[10px] font-semibold text-rose-500 dark:text-rose-400">
+                    No hay otro aliado disponible para recibir los proyectos. Crea uno o reasigna manualmente antes de eliminar.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Transferencia obligatoria de la cartera del Account Manager */}
+            {deleteAmNeedsReassign && (
+              <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 p-3.5 space-y-2">
+                <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                  Este Account Manager tiene <strong>{deleteTargetAmProjectCount}</strong> proyecto(s) en su cartera.
+                  {reassignableAms.length > 0
+                    ? " Elige a qué Account Manager se transfieren antes de eliminarlo."
+                    : " No hay otro Account Manager disponible: al eliminarlo, esos proyectos quedarán sin AM (podrás reasignarlos después)."}
+                </p>
+                {reassignableAms.length > 0 && (
+                  <>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">
+                      Transferir cartera a
+                    </label>
+                    <select
+                      value={reassignAmId}
+                      onChange={(e) => {
+                        setReassignAmId(e.target.value);
+                        setDeleteError("");
+                      }}
+                      disabled={deleting}
+                      className="w-full px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-400/40"
+                    >
+                      <option value="">Selecciona un Account Manager…</option>
+                      {reassignableAms.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.full_name} ({a.email})
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            )}
+
+            {deleteError && (
+              <div className="rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 px-3 py-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                {deleteError}
+              </div>
+            )}
 
             <div className="flex items-center gap-3 pt-2">
               <button
-                onClick={() => setDeleteTarget(null)}
+                onClick={closeDeleteModal}
                 className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-all active:scale-95 transform"
                 disabled={deleting}
               >
@@ -1187,13 +1294,31 @@ export default function GestionUsuarios() {
               </button>
               <button
                 onClick={async () => {
+                  if (deleteNeedsReassign && !reassignAliadoId) {
+                    setDeleteError("Selecciona el aliado que recibirá los proyectos.");
+                    return;
+                  }
+                  if (deleteAmNeedsReassign && reassignableAms.length > 0 && !reassignAmId) {
+                    setDeleteError("Selecciona el Account Manager que recibirá la cartera.");
+                    return;
+                  }
                   setDeleting(true);
-                  await deleteProfile(deleteTarget.id);
-                  setDeleting(false);
-                  setDeleteTarget(null);
+                  setDeleteError("");
+                  try {
+                    await deleteProfile(deleteTarget.id, {
+                      reassignToAliadoId: deleteNeedsReassign ? reassignAliadoId : null,
+                      reassignToAmId:
+                        deleteAmNeedsReassign && reassignableAms.length > 0 ? reassignAmId : null,
+                    });
+                    closeDeleteModal();
+                  } catch (err: any) {
+                    setDeleteError(err?.message || "No se pudo eliminar el usuario.");
+                  } finally {
+                    setDeleting(false);
+                  }
                 }}
-                className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform active:scale-95"
-                disabled={deleting}
+                className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white font-bold rounded-xl text-xs shadow-md shadow-red-500/10 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={deleting || (deleteNeedsReassign && reassignableAliados.length === 0)}
               >
                 {deleting ? "Eliminando..." : "Eliminar Colaborador"}
               </button>
