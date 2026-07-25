@@ -3,11 +3,11 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient();
-    const relationId = params.id;
+    const supabase = await createClient();
+    const relationId = (await params).id;
 
     // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();

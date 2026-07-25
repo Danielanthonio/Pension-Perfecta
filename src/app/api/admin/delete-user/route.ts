@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   // --- 3. Autenticar al solicitante ---
-  const userClient = createUserClient();
+  const userClient = await createUserClient();
   const {
     data: { user: caller },
     error: authError,

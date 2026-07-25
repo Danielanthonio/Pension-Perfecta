@@ -3,11 +3,11 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { lider_id: string } }
+  { params }: { params: Promise<{ lider_id: string }> }
 ) {
   try {
-    const supabase = createClient();
-    const liderId = params.lider_id;
+    const supabase = await createClient();
+    const liderId = (await params).lider_id;
 
     // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();

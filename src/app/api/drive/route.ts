@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     // Require an authenticated session. This endpoint operates on the company's
     // Google Drive through a service account (createFolder / uploadFile /
     // downloadFile / deleteFile / scanOcr), so it must never be publicly callable.
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
