@@ -656,10 +656,12 @@ function ClientesContent() {
                     
                     {/* Header Details in Horizontal Grid */}
                     <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                      {/* Campos pegados: cada uno ocupa lo que necesita (no columnas iguales),
-                          así NSS/CURP nunca se cortan y en pantallas chicas el bloque envuelve. */}
+                      {/* Campos repartidos a lo largo del renglón: cada celda arranca del ancho
+                          de su contenido (NSS/CURP nunca se cortan) y crece con `flex-auto` para
+                          ocupar el espacio libre hasta el bloque de crédito. En pantallas chicas
+                          el bloque envuelve en vez de truncar. */}
                       <div className="flex flex-wrap items-start gap-x-3 gap-y-3 flex-1 min-w-0">
-                        <div className="min-w-0 max-w-[140px]">
+                        <div className="flex-auto min-w-0 max-w-[140px]">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Cliente</span>
                           <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight mt-0.5 flex items-start gap-1.5 min-w-0">
                             <span className="break-words">{p.full_name}</span>
@@ -670,15 +672,15 @@ function ClientesContent() {
                             )}
                           </span>
                         </div>
-                        <div className="shrink-0">
+                        <div className="flex-auto shrink-0">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">NSS</span>
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 whitespace-nowrap">{p.nss}</span>
                         </div>
-                        <div className="shrink-0">
+                        <div className="flex-auto shrink-0">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">CURP</span>
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 uppercase whitespace-nowrap tracking-tight">{p.curp}</span>
                         </div>
-                        <div className="min-w-0 max-w-[140px]">
+                        <div className="flex-auto min-w-0 max-w-[140px]">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Aliado</span>
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 leading-tight break-words">
                             {p.aliado_name || "—"}
@@ -686,7 +688,7 @@ function ClientesContent() {
                         </div>
                         {/* Etapa y subetapa comparten celda (apiladas), igual que la columna
                             "Etapa · Subetapa" de Gestión de Clientes: ocupa la mitad de ancho. */}
-                        <div className="shrink-0 max-w-[130px]">
+                        <div className="flex-auto shrink-0 max-w-[130px]">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Etapa · Subetapa</span>
                           <div className="mt-1 flex flex-col items-start gap-1">
                             <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
@@ -697,7 +699,7 @@ function ClientesContent() {
                             </span>
                           </div>
                         </div>
-                        <div className="min-w-0 max-w-[105px]">
+                        <div className="flex-auto min-w-0 max-w-[110px]">
                           <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tight whitespace-nowrap">Account Manager</span>
                           {(() => {
                             const am = resolveAccountManager(p);
