@@ -21,6 +21,7 @@ import {
   RotateCcw,
   CheckCircle,
   UserCog,
+  Building2,
   X,
 } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -47,6 +48,7 @@ function ClientesAdminContent() {
     isProspectDeleted,
     isProspectPurged,
     getProspectDeletedAt,
+    empresasMultialiado,
     isDemoMode,
   } = useApp();
 
@@ -72,18 +74,25 @@ function ClientesAdminContent() {
   // Filtro por origen del aliado: "empresa" (pertenece a una empresa multialiado) vs
   // "independiente" (sin empresa). Se controla desde la barra de filtros superior vía URL.
   const origenFilter = searchParams.get("origen") || "all"; // all | empresa | independiente
+  // Empresa multialiado concreta — solo aplica cuando el origen es "empresa".
+  const empresaFilter = searchParams.get("empresa") || "all";
 
-  // Clasifica un prospecto según el aliado dueño: si el aliado pertenece a una empresa
-  // multialiado -> "empresa", si no -> "independiente". Se prefiere la empresa ACTUAL del
-  // perfil dueño (fuente de verdad de la Asignación Multialiado) y, si no está el perfil,
+  // Empresa multialiado del prospecto según el aliado dueño: se prefiere la empresa ACTUAL
+  // del perfil dueño (fuente de verdad de la Asignación Multialiado) y, si no está el perfil,
   // se usa la empresa que quedó guardada en el propio prospecto al capturarlo.
-  const getProspectOrigen = React.useCallback(
-    (p: Prospect): "empresa" | "independiente" => {
+  const getProspectEmpresaId = React.useCallback(
+    (p: Prospect): string | null => {
       const owner = profiles.find((pr) => pr.id === p.aliado_id);
-      const empresaId = owner ? owner.empresa_multialiado_id ?? null : p.empresa_multialiado_id ?? null;
-      return empresaId ? "empresa" : "independiente";
+      return (owner ? owner.empresa_multialiado_id ?? null : p.empresa_multialiado_id ?? null) || null;
     },
     [profiles]
+  );
+
+  // Clasifica un prospecto: si el aliado dueño pertenece a una empresa multialiado ->
+  // "empresa", si no -> "independiente".
+  const getProspectOrigen = React.useCallback(
+    (p: Prospect): "empresa" | "independiente" => (getProspectEmpresaId(p) ? "empresa" : "independiente"),
+    [getProspectEmpresaId]
   );
 
   // Barra de filtros superior (formato clásico, dropdowns): escribe los mismos
@@ -96,7 +105,7 @@ function ClientesAdminContent() {
   };
   const clearTopFilters = () => {
     setSelectedEntities([]);
-    updateParams((p) => ["etapa", "subetapa", "modalidad", "origen"].forEach((k) => p.delete(k)));
+    updateParams((p) => ["etapa", "subetapa", "modalidad", "origen", "empresa"].forEach((k) => p.delete(k)));
   };
   // Subetapas disponibles para la etapa elegida (dropdown dependiente).
   const topSubStages = stageFilter !== "all" ? SUB_STAGES_BY_STAGE[stageFilter] || [] : [];
@@ -105,6 +114,7 @@ function ClientesAdminContent() {
     subStageFilter !== "all" ||
     modalidadFilter !== "all" ||
     origenFilter !== "all" ||
+    empresaFilter !== "all" ||
     selectedEntities.length > 0;
   // Estilo compartido de los <select> clásicos de la barra superior.
   const topSelectCls = `px-2.5 py-1.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-300 outline-none transition-all cursor-pointer ${
@@ -256,9 +266,9 @@ function ClientesAdminContent() {
     })
     .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter));
 
-  const filteredProspects = activeBeforeOrigen.filter(
-    (p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter
-  );
+  const filteredProspects = activeBeforeOrigen
+    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter)
+    .filter((p) => empresaFilter === "all" || getProspectEmpresaId(p) === empresaFilter);
 
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;
@@ -282,18 +292,37 @@ function ClientesAdminContent() {
       return p.aliado_name === selectedAlly;
     });
 
-  const filteredDeletedProspects = deletedBeforeOrigen.filter(
-    (p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter
-  );
+  const filteredDeletedProspects = deletedBeforeOrigen
+    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter)
+    .filter((p) => empresaFilter === "all" || getProspectEmpresaId(p) === empresaFilter);
 
   // Contadores del selector de origen: se calculan sobre la pestaña visible (Activos o
-  // Papelera) ignorando el propio filtro de origen, para que las 3 opciones sean legibles.
+  // Papelera) ignorando los filtros de origen/empresa, para que las 3 opciones sean legibles.
   const origenCountSource = activeTab === "papelera" ? deletedBeforeOrigen : activeBeforeOrigen;
   const origenCounts = React.useMemo(() => {
     let empresa = 0;
     for (const p of origenCountSource) if (getProspectOrigen(p) === "empresa") empresa += 1;
     return { all: origenCountSource.length, empresa, independiente: origenCountSource.length - empresa };
   }, [origenCountSource, getProspectOrigen]);
+
+  // Empresas con proyectos en la pestaña visible (con su conteo) para el selector que
+  // aparece al elegir "Empresa". Se listan solo las que tienen proyectos, ordenadas por
+  // nombre; si una empresa ya no existe en el catálogo se muestra como "Empresa sin nombre"
+  // para que sus proyectos sigan siendo alcanzables.
+  const empresaOptions = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of origenCountSource) {
+      const id = getProspectEmpresaId(p);
+      if (id) counts.set(id, (counts.get(id) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([id, count]) => ({
+        id,
+        count,
+        nombre: empresasMultialiado.find((e) => e.id === id)?.nombre || "Empresa sin nombre",
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [origenCountSource, getProspectEmpresaId, empresasMultialiado]);
 
   // Account Managers disponibles para asignar (lista CRUDA `assignmentProfiles`, que
   // incluye a los AMs) y helper para resolver el nombre del AM de un proyecto.
@@ -565,7 +594,12 @@ function ClientesAdminContent() {
                   <button
                     key={opt.id}
                     onClick={() =>
-                      updateParams((p) => (opt.id === "all" ? p.delete("origen") : p.set("origen", opt.id)))
+                      updateParams((p) => {
+                        if (opt.id === "all") p.delete("origen");
+                        else p.set("origen", opt.id);
+                        // La empresa concreta solo tiene sentido dentro de "Empresa".
+                        if (opt.id !== "empresa") p.delete("empresa");
+                      })
                     }
                     className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
                       origenFilter === opt.id
@@ -584,6 +618,36 @@ function ClientesAdminContent() {
                   </button>
                 ))}
               </div>
+
+              {/* Al elegir "Empresa" se despliega el selector de la empresa concreta. */}
+              {origenFilter === "empresa" && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Building2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  <select
+                    value={empresaFilter}
+                    onChange={(e) =>
+                      updateParams((p) =>
+                        e.target.value === "all" ? p.delete("empresa") : p.set("empresa", e.target.value)
+                      )
+                    }
+                    className={`px-2.5 py-1 bg-white dark:bg-slate-850 border rounded-lg text-[11px] font-semibold outline-none transition-all cursor-pointer max-w-[220px] ${
+                      empresaFilter === "all"
+                        ? "border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-300"
+                        : isAM
+                        ? "border-blue-400 text-blue-700 dark:text-blue-300"
+                        : "border-emerald-400 text-emerald-700 dark:text-emerald-300"
+                    } ${isAM ? "focus:border-blue-500" : "focus:border-emerald-500"}`}
+                    title="Empresa multialiado"
+                  >
+                    <option value="all">Todas las empresas ({origenCounts.empresa})</option>
+                    {empresaOptions.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nombre} ({e.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <SortControl
               options={activeTab === "papelera" ? sortOptionsTrash : sortOptionsActive}
