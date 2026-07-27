@@ -656,62 +656,62 @@ function ClientesContent() {
                     
                     {/* Header Details in Horizontal Grid */}
                     <div className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 flex-1">
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
-                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight block mt-0.5 flex items-center gap-1.5">
-                            {p.full_name}
+                      {/* Campos pegados: cada uno ocupa lo que necesita (no columnas iguales),
+                          así NSS/CURP nunca se cortan y en pantallas chicas el bloque envuelve. */}
+                      <div className="flex flex-wrap items-start gap-x-3 gap-y-3 flex-1 min-w-0">
+                        <div className="min-w-0 max-w-[140px]">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Cliente</span>
+                          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-tight mt-0.5 flex items-start gap-1.5 min-w-0">
+                            <span className="break-words">{p.full_name}</span>
                             {isPaid && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-250 dark:border-amber-900/30 shrink-0">
                                 ★
                               </span>
                             )}
                           </span>
                         </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">NSS</span>
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.nss}</span>
+                        <div className="shrink-0">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">NSS</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 whitespace-nowrap">{p.nss}</span>
                         </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">CURP</span>
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 uppercase">{p.curp}</span>
+                        <div className="shrink-0">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">CURP</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 uppercase whitespace-nowrap tracking-tight">{p.curp}</span>
                         </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Teléfono</span>
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.phone}</span>
+                        <div className="min-w-0 max-w-[140px]">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Aliado</span>
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 leading-tight break-words">
+                            {p.aliado_name || "—"}
+                          </span>
                         </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Email</span>
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5">{p.email}</span>
-                        </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Etapa</span>
-                          <div className="mt-1">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
+                        {/* Etapa y subetapa comparten celda (apiladas), igual que la columna
+                            "Etapa · Subetapa" de Gestión de Clientes: ocupa la mitad de ancho. */}
+                        <div className="shrink-0 max-w-[130px]">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Etapa · Subetapa</span>
+                          <div className="mt-1 flex flex-col items-start gap-1">
+                            <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-bold border ${getStageBadgeColor(p.status)}`}>
                               {getStageLabel(p.status)}
                             </span>
-                          </div>
-                        </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Subetapa</span>
-                          <div className="mt-1">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
+                            <span className={`inline-flex items-center text-center leading-tight px-2 py-0.5 rounded-full text-[9px] font-bold border ${getSubStageBadgeColor(p.status)}`}>
                               {getSubStageLabel(p.status)}
                             </span>
                           </div>
                         </div>
-                        <div>
-                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Account Manager</span>
-                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 truncate">
-                            {(() => {
-                              const am = resolveAccountManager(p);
-                              return am === null ? "—" : am === AM_NONE ? "En mesa de dirección" : am;
-                            })()}
-                          </span>
+                        <div className="min-w-0 max-w-[105px]">
+                          <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-tight whitespace-nowrap">Account Manager</span>
+                          {(() => {
+                            const am = resolveAccountManager(p);
+                            const label = am === null ? "—" : am === AM_NONE ? "En mesa de dirección" : am;
+                            return (
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-350 block mt-0.5 leading-tight break-words">
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between xl:justify-end gap-6 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between xl:justify-end gap-4 border-t xl:border-t-0 pt-3 xl:pt-0 border-slate-100 dark:border-slate-800">
                         {p.simulation && (
                           <div className="text-left xl:text-right xl:border-r xl:pr-4 xl:border-slate-100 dark:xl:border-slate-800">
                             <span className="block text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Crédito Total</span>

@@ -229,7 +229,9 @@ function ClientesAdminContent() {
     }
   };
 
-  const filteredProspects = filteredByDate
+  // Lista activa con TODOS los filtros menos el de origen: sirve para pintar los
+  // contadores del selector Empresa / Independiente (que vive junto a Activos/Papelera).
+  const activeBeforeOrigen = filteredByDate
     .filter((p) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -252,8 +254,11 @@ function ClientesAdminContent() {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
     })
-    .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter))
-    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter);
+    .filter((p) => prospectMatchesModalidadFilter(p, modalidadFilter));
+
+  const filteredProspects = activeBeforeOrigen.filter(
+    (p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter
+  );
 
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;
@@ -263,7 +268,7 @@ function ClientesAdminContent() {
     return true;
   });
 
-  const filteredDeletedProspects = deletedByDate
+  const deletedBeforeOrigen = deletedByDate
     .filter((p) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -275,8 +280,20 @@ function ClientesAdminContent() {
     .filter((p) => {
       if (selectedAlly === "all") return true;
       return p.aliado_name === selectedAlly;
-    })
-    .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter);
+    });
+
+  const filteredDeletedProspects = deletedBeforeOrigen.filter(
+    (p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter
+  );
+
+  // Contadores del selector de origen: se calculan sobre la pestaña visible (Activos o
+  // Papelera) ignorando el propio filtro de origen, para que las 3 opciones sean legibles.
+  const origenCountSource = activeTab === "papelera" ? deletedBeforeOrigen : activeBeforeOrigen;
+  const origenCounts = React.useMemo(() => {
+    let empresa = 0;
+    for (const p of origenCountSource) if (getProspectOrigen(p) === "empresa") empresa += 1;
+    return { all: origenCountSource.length, empresa, independiente: origenCountSource.length - empresa };
+  }, [origenCountSource, getProspectOrigen]);
 
   // Account Managers disponibles para asignar (lista CRUDA `assignmentProfiles`, que
   // incluye a los AMs) y helper para resolver el nombre del AM de un proyecto.
@@ -471,20 +488,6 @@ function ClientesAdminContent() {
               <option value="cn">Crédito de nómina</option>
             </select>
 
-            {/* Tipo de aliado: empresa vs. independiente */}
-            <select
-              value={origenFilter}
-              onChange={(e) =>
-                updateParams((p) => (e.target.value === "all" ? p.delete("origen") : p.set("origen", e.target.value)))
-              }
-              className={topSelectCls}
-              title="Tipo de aliado"
-            >
-              <option value="all">Empresa e independientes</option>
-              <option value="empresa">Empresa</option>
-              <option value="independiente">Independiente</option>
-            </select>
-
             {anyTopFilterActive && (
               <button
                 onClick={clearTopFilters}
@@ -513,7 +516,7 @@ function ClientesAdminContent() {
         {/* Kanban List Table */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="px-3 py-2.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-            <div className="flex flex-1 items-center gap-2.5 min-w-0">
+            <div className="flex flex-1 flex-wrap items-center gap-2.5 min-w-0">
               <div className="relative w-full max-w-[280px]">
                 <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
                   <Search className="h-3.5 w-3.5" />
@@ -549,6 +552,37 @@ function ClientesAdminContent() {
                 >
                   Papelera <span className="tabular-nums opacity-70">({filteredDeletedProspects.length})</span>
                 </button>
+              </div>
+
+              {/* Tipo de aliado: empresa (pertenece a una empresa multialiado) vs. independiente.
+                  Escribe el mismo param `origen` de la URL que usaba el dropdown superior. */}
+              <div className="bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 shrink-0">
+                {([
+                  { id: "all", label: "Todos", count: origenCounts.all },
+                  { id: "empresa", label: "Empresa", count: origenCounts.empresa },
+                  { id: "independiente", label: "Independiente", count: origenCounts.independiente },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() =>
+                      updateParams((p) => (opt.id === "all" ? p.delete("origen") : p.set("origen", opt.id)))
+                    }
+                    className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                      origenFilter === opt.id
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                    }`}
+                    title={
+                      opt.id === "empresa"
+                        ? "Solo aliados de una empresa multialiado"
+                        : opt.id === "independiente"
+                        ? "Solo aliados independientes"
+                        : "Empresa e independientes"
+                    }
+                  >
+                    {opt.label} <span className="tabular-nums opacity-70">({opt.count})</span>
+                  </button>
+                ))}
               </div>
             </div>
             <SortControl
