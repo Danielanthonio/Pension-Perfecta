@@ -280,10 +280,15 @@ function ReportesContent() {
 
   // ── Aprobados por línea de tiempo (breakdown) ─────────────────────────────────
   const breakdownRows = useMemo(() => {
-    const rows = [
-      { status: "aprobado_listo", label: "Aprobado · sin agendar", bar: "bg-slate-400" },
-      ...STEP_STATUSES.map((s, i) => ({ status: s, label: STEP_DEFS[i].label, bar: ["bg-sky-500", "bg-blue-500", "bg-indigo-500", "bg-violet-500", "bg-emerald-500", "bg-teal-500"][i] })),
-    ];
+    // Este desglose es del pipeline APROBADO, así que arranca en "Listo para Presentar"
+    // (índice 1) y se salta "Proyecto creado", que aún no tiene dictamen. `aprobado_listo`
+    // ya es uno de los hitos: no se añade aparte, o se contaría dos veces.
+    const BARS = ["bg-slate-400", "bg-sky-500", "bg-blue-500", "bg-indigo-500", "bg-violet-500", "bg-emerald-500", "bg-teal-500"];
+    const rows = STEP_STATUSES.slice(1).map((s, i) => ({
+      status: s,
+      label: STEP_DEFS[i + 1].label,
+      bar: BARS[i] ?? "bg-slate-400",
+    }));
     return rows.map((r) => ({ ...r, count: filteredByDate.filter((p) => p.status === r.status).length }));
   }, [filteredByDate]);
   const maxBreak = Math.max(...breakdownRows.map((r) => r.count), 1);

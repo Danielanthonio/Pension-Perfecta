@@ -4775,11 +4775,31 @@ export const SUB_STAGES_BY_STAGE: Record<string, string[]> = {
   evaluacion_pendiente: [],
   rechazado: ["No aplica"],
   condicionado: ["Aportación", "Falta detallado de semanas", "Falta estado cuenta afore", "Posible simulación laboral", "Agenda futura"],
-  aprobado: ["Agenda Asesoria", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato"],
-  // "Fin. Otorgado": el financiamiento ya se otorga/ejecuta. "Esperando líneas de captura"
-  // = firma_programada (se ejecutan las líneas de captura); "Pagado cerrado" = pagado_comision.
-  otorgado: ["Esperando líneas de captura", "Pagado cerrado"],
+  // "Listo para Presentar" es lo que deja Dirección/AM al aprobar. "Agenda de Asesoría"
+  // NO se elige a mano: se alcanza solo cuando alguien graba la fecha de la reunión
+  // (ver EDITABLE_SUB_STAGES_BY_STAGE y scheduleAssessment).
+  aprobado: ["Listo para Presentar", "Agenda de Asesoría", "Firma Carta Compromiso", "Analisis de Riesgo", "Firma de Contrato"],
+  // "Fin. Otorgado": el financiamiento ya se otorga/ejecuta. "Cerrada Ganada" =
+  // firma_programada (se ejecutan las líneas de captura); "Pagada Cerrada" = pagado_comision.
+  // Etiquetas legacy: "Esperando líneas de captura" y "Pagado cerrado".
+  otorgado: ["Cerrada Ganada", "Pagada Cerrada"],
   cerrado_perdido: ["Análisis de riesgo rechazado", "Desiste"]
+};
+
+// Subetapa que NO se elige a mano: el proyecto llega a "Agenda de Asesoría" únicamente
+// cuando quien atiende al cliente graba la fecha de la reunión, así que la etapa nunca
+// miente (si dice "agendada", hay fecha). Sigue existiendo en SUB_STAGES_BY_STAGE para
+// poder filtrarla y mostrarla.
+export const AGENDA_SUB_STAGE = "Agenda de Asesoría";
+
+/**
+ * Subetapas seleccionables en los desplegables de edición (expediente y tabla de
+ * Gestión de Clientes). Es SUB_STAGES_BY_STAGE menos las que fija el sistema.
+ * Para filtros y para mostrar la subetapa actual, usar SUB_STAGES_BY_STAGE.
+ */
+export const EDITABLE_SUB_STAGES_BY_STAGE: Record<string, string[]> = {
+  ...SUB_STAGES_BY_STAGE,
+  aprobado: SUB_STAGES_BY_STAGE.aprobado.filter((s) => s !== AGENDA_SUB_STAGE),
 };
 
 export function getStageAndSubStage(status: string): { stage: string; subStage: string } {
@@ -4805,7 +4825,7 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
     case "agenda_futura":
       return { stage: "condicionado", subStage: "Agenda futura" };
     case "asesoria_agendada":
-      return { stage: "aprobado", subStage: "Agenda Asesoria" };
+      return { stage: "aprobado", subStage: "Agenda de Asesoría" };
     case "doc_proceso":
       return { stage: "aprobado", subStage: "Firma Carta Compromiso" };
     case "analisis_riesgo":
@@ -4813,11 +4833,11 @@ export function getStageAndSubStage(status: string): { stage: string; subStage: 
     case "firma_contrato":
       return { stage: "aprobado", subStage: "Firma de Contrato" };
     case "firma_programada":
-      return { stage: "otorgado", subStage: "Esperando líneas de captura" };
+      return { stage: "otorgado", subStage: "Cerrada Ganada" };
     case "pagado_comision":
-      return { stage: "otorgado", subStage: "Pagado cerrado" };
+      return { stage: "otorgado", subStage: "Pagada Cerrada" };
     case "aprobado_listo":
-      return { stage: "aprobado", subStage: "" };
+      return { stage: "aprobado", subStage: "Listo para Presentar" };
     case "cerrado_riesgo":
       return { stage: "cerrado_perdido", subStage: "Análisis de riesgo rechazado" };
     case "cerrado_desiste":
@@ -4849,15 +4869,17 @@ export function getStatusFromStageAndSubStage(stage: string, subStage: string): 
     return "aportacion";
   }
   if (stage === "aprobado") {
-    if (subStage === "Agenda Asesoria") return "asesoria_agendada";
+    // "Agenda Asesoria" es la etiqueta legacy de la misma subetapa.
+    if (subStage === "Agenda de Asesoría" || subStage === "Agenda Asesoria") return "asesoria_agendada";
+    if (subStage === "Listo para Presentar") return "aprobado_listo";
     if (subStage === "Firma Carta Compromiso") return "doc_proceso";
     if (subStage === "Analisis de Riesgo") return "analisis_riesgo";
     if (subStage === "Firma de Contrato") return "firma_contrato";
     return "aprobado_listo";
   }
   if (stage === "otorgado") {
-    if (subStage === "Esperando líneas de captura") return "firma_programada";
-    if (subStage === "Pagado cerrado") return "pagado_comision";
+    if (subStage === "Cerrada Ganada" || subStage === "Esperando líneas de captura") return "firma_programada";
+    if (subStage === "Pagada Cerrada" || subStage === "Pagado cerrado") return "pagado_comision";
     return "firma_programada";
   }
   if (stage === "cerrado_perdido") {

@@ -7,7 +7,6 @@ import {
   getStageAndSubStage,
   STAGES_LIST,
   SUB_STAGES_BY_STAGE,
-  isLostStatus,
 } from "@/utils/context/AppContext";
 import {
   Search,
@@ -23,7 +22,6 @@ import {
   Trash2,
   X,
   AlertCircle,
-  Layers,
   XCircle,
   MinusCircle,
 } from "lucide-react";
@@ -34,6 +32,8 @@ import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStep
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
+import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
+import { PipelineTabs } from "@/components/ui/pipelineTabs";
 
 function ClientesContent() {
   const {
@@ -71,7 +71,7 @@ function ClientesContent() {
   const [searchTerm, setSearchTerm] = useState("");
   // Filtro por modalidad de aprobación — lo controla el panel izquierdo (FILTRAR) vía URL.
   const modalidadFilter = (searchParams.get("modalidad") || "all") as ModalidadFilterValue;
-  const [activeTab, setActiveTab] = useState<"evaluacion" | "listo" | "activos" | "rechazados" | "cerrados" | "papelera">("evaluacion");
+  const [activeTab, setActiveTab] = useState<ClientTabId>("evaluacion_pendiente");
 
   // States for Scheduling Modal
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -192,35 +192,36 @@ function ClientesContent() {
     return true;
   });
 
-  // Tab grouping
-  // "En Evaluación": prospectos aún en evaluación técnica o condicionados (incl. aportación).
-  // Los condicionados NO están aprobados, por eso viven aquí y no en "Listo para Presentar".
-  const enEvaluacion = filteredActive.filter((p) =>
-    ["evaluacion_pendiente", "falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
-  );
+  // Clasificación por hito de la línea de tiempo — vive en components/ui/clientTabs
+  // para que el aliado, el AM y el director vean exactamente el mismo recorrido.
+  const tabCounts: Record<string, number> = { papelera: filteredDeleted.length };
+  for (const p of filteredActive) {
+    const tab = classifyProspect(p);
+    if (tab) tabCounts[tab] = (tabCounts[tab] || 0) + 1;
+  }
 
-  // "Listo para Presentar": el aliado solo ve al cliente aquí cuando está en etapa APROBADO.
-  const listoPresentar = filteredActive.filter((p) =>
-    p.status === "aprobado_listo" ||
-    (p.status === "asesoria_agendada" && !p.notes_aliado?.includes("Asesoría agendada"))
-  );
+  // Clientes de la pestaña abierta.
+  const tabProspects = filteredActive.filter((p) => prospectMatchesTab(p, activeTab));
 
-  const activeStatuses = [
-    "doc_proceso",
-    "analisis_riesgo",
-    "firma_contrato",
-    "firma_programada",
-    "pagado_comision",
-  ];
-  const proyectosActivos = filteredActive.filter((p) =>
-    activeStatuses.includes(p.status) ||
-    (p.status === "asesoria_agendada" && p.notes_aliado?.includes("Asesoría agendada"))
-  );
-
-  const rechazados = filteredActive.filter((p) => p.status === "rechazado");
-
-  // "Cerrado perdido" no es un rechazo: es solo un estado del cliente. Va en su propia pestaña.
-  const cerradosPerdidos = filteredActive.filter((p) => isLostStatus(p.status));
+  // Qué panel se pinta para cada hito: antes del dictamen, la tabla de evaluación;
+  // en "Listo para Presentar", la tabla con crédito y el botón de agendar; del
+  // agendado en adelante, las tarjetas con línea de tiempo.
+  const PANEL_BY_TAB: Record<string, "evaluacion" | "listo" | "activos" | "rechazados" | "cerrados" | "papelera"> = {
+    evaluacion_pendiente: "evaluacion",
+    condicionado: "evaluacion",
+    aprobado_listo: "listo",
+    asesoria_agendada: "activos",
+    doc_proceso: "activos",
+    analisis_riesgo: "activos",
+    firma_contrato: "activos",
+    firma_programada: "activos",
+    pagado_comision: "activos",
+    rechazados: "rechazados",
+    cerrados: "cerrados",
+    papelera: "papelera",
+  };
+  const panel = PANEL_BY_TAB[activeTab] ?? "evaluacion";
+  const proyectosActivos = panel === "activos" ? tabProspects : [];
 
   // Los hitos del pipeline y su formato de fecha viven en el componente compartido
   // ProjectStepper (src/components/ui/projectStepper) para que aliado y dirección
@@ -293,7 +294,7 @@ function ClientesContent() {
     if (!selectedProspect || !selectedDate || !selectedTime) return;
     await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
     setSelectedProspect(null);
-    setActiveTab("activos"); // Switch tab to see active projects
+    setActiveTab("asesoria_agendada"); // el proyecto queda justo en el hito que acaba de alcanzar
   };
 
   // Shared executive table cells — keep every tab consistent and scroll-free
@@ -397,49 +398,14 @@ function ClientesContent() {
         </div>
       )}
 
-      {/* Tab select and action button row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Colored pill tabs — semantic per stage */}
-        <div className="flex flex-wrap items-center gap-2 flex-1">
-          {[
-            { id: "evaluacion", label: "En Evaluación", count: enEvaluacion.length, Icon: Layers,
-              active: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:ring-blue-900/50",
-              badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300", dot: "bg-blue-500" },
-            { id: "listo", label: "Listo para Presentar", count: listoPresentar.length, Icon: CheckSquare,
-              active: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50",
-              badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300", dot: "bg-emerald-500" },
-            { id: "activos", label: "Proyectos Activos", count: proyectosActivos.length, Icon: Folder,
-              active: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:ring-indigo-900/50",
-              badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300", dot: "bg-indigo-500" },
-            { id: "rechazados", label: "Rechazados", count: rechazados.length, Icon: XCircle,
-              active: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:ring-rose-900/50",
-              badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300", dot: "bg-rose-500" },
-            { id: "cerrados", label: "Cerrados Perdidos", count: cerradosPerdidos.length, Icon: MinusCircle,
-              active: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/50",
-              badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300", dot: "bg-amber-500" },
-            { id: "papelera", label: "Papelera", count: filteredDeleted.length, Icon: Trash2,
-              active: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
-              badge: "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200", dot: "bg-slate-400" },
-          ].filter((t) => canDelete || t.id !== "papelera").map(({ id, label, count, Icon, active, badge, dot }) => {
-            const on = activeTab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id as typeof activeTab)}
-                className={`inline-flex items-center gap-2 pl-3 pr-2.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-[0.97] ${
-                  on ? `${active} shadow-sm` : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 ring-1 ring-inset ring-transparent"
-                }`}
-              >
-                <Icon className={`h-3.5 w-3.5 ${on ? "" : "opacity-70"}`} />
-                <span>{label}</span>
-                <span className={`min-w-[20px] text-center px-1.5 py-0.5 rounded-lg text-[10px] font-black tabular-nums ${on ? badge : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      {/* La línea de tiempo del proyecto, hecha botonera: cada hito dice cuántos clientes
+          están parados ahí y al apretarlo se despliegan. Es el mismo recorrido que ven el
+          account manager y el director, y el que dibuja el stepper del expediente. */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm px-4 pt-3 pb-2.5">
+        <PipelineTabs counts={tabCounts} activeTab={activeTab} onChange={setActiveTab} isAdmin={canDelete} />
+      </div>
 
+      <div className="flex justify-end">
         <Link
           href="/dashboard/nuevo"
           className="inline-flex items-center justify-center px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-500/10 hover:scale-[1.02] active:scale-[0.98] text-sm shrink-0"
@@ -467,18 +433,20 @@ function ClientesContent() {
       <div className="space-y-6">
         
         {/* TAB 1: EVALUADOS */}
-        {activeTab === "evaluacion" && (
+        {panel === "evaluacion" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Prospectos En Evaluación</h3>
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{getTabMeta(activeTab).label}</h3>
             </div>
 
-            {enEvaluacion.length === 0 ? (
+            {tabProspects.length === 0 ? (
               <div className="py-16 text-center">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm">
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos en evaluación</h4>
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">{getTabMeta(activeTab).empty}</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
-                  Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación.
+                  {activeTab === "condicionado"
+                    ? "Aquí caen los proyectos que Dirección condicionó: en cuanto se resuelva el pendiente, vuelven a la línea."
+                    : "Cuando registres un prospecto y subas sus archivos, aparecerá aquí durante su validación."}
                 </p>
                 </div>
               </div>
@@ -496,7 +464,7 @@ function ClientesContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {enEvaluacion.map((p) => {
+                    {tabProspects.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
@@ -541,18 +509,18 @@ function ClientesContent() {
         )}
 
         {/* TAB 2: LISTO PARA PRESENTAR */}
-        {activeTab === "listo" && (
+        {panel === "listo" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Dictámenes Listos para Presentar</h3>
             </div>
 
-            {listoPresentar.length === 0 ? (
+            {tabProspects.length === 0 ? (
               <div className="py-16 text-center">
                 <CheckSquare className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Ninguna simulación aprobada aún</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
-                  Una vez que el Director de Operaciones analice los casos y emita el dictamen Ley 73, aparecerán listos aquí.
+                  Cuando Dirección o el Account Manager aprueben un caso, lo dejarán en “Listo para Presentar” y aparecerá aquí para que agendes la asesoría.
                 </p>
               </div>
             ) : (
@@ -569,7 +537,7 @@ function ClientesContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {listoPresentar.map((p) => {
+                    {tabProspects.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
@@ -637,14 +605,16 @@ function ClientesContent() {
         )}
 
         {/* TAB 3: PROYECTOS ACTIVOS */}
-        {activeTab === "activos" && (
+        {panel === "activos" && (
           <div className="space-y-6">
             {proyectosActivos.length === 0 ? (
               <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm py-16 text-center">
                 <Folder className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-650" />
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">Sin proyectos activos en curso</h4>
+                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">{getTabMeta(activeTab).empty}</h4>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
-                  Una vez que agendes la reunión de presentación de simulación, el caso se moverá automáticamente aquí para seguimiento.
+                  {activeTab === "asesoria_agendada"
+                    ? "En cuanto grabes la fecha de la reunión con el cliente, el proyecto llegará a este hito."
+                    : "Los proyectos van llegando a este hito conforme avanzan por la línea de tiempo."}
                 </p>
               </div>
             ) : (
@@ -746,7 +716,7 @@ function ClientesContent() {
 
                     {/* Barra de progreso del pipeline (componente compartido) */}
                     <div className="space-y-4 pt-2">
-                      <ProjectStepper activeIndex={activeIndex} dates={statusDates[p.id]} />
+                      <ProjectStepper activeIndex={activeIndex} dates={statusDates[p.id]} createdAt={p.created_at} />
                     </div>
 
                     {/* Congratulations Banner / Commission status */}
@@ -773,7 +743,7 @@ function ClientesContent() {
         )}
 
         {/* TAB 4: PAPELERA (oculta para aliados: no pueden eliminar ni gestionar la papelera) */}
-        {canDelete && activeTab === "papelera" && (
+        {canDelete && panel === "papelera" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
@@ -851,7 +821,7 @@ function ClientesContent() {
         )}
 
         {/* TAB 4: RECHAZADOS */}
-        {activeTab === "rechazados" && (
+        {panel === "rechazados" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
@@ -859,7 +829,7 @@ function ClientesContent() {
               </h3>
             </div>
 
-            {rechazados.length === 0 ? (
+            {tabProspects.length === 0 ? (
               <div className="py-16 text-center">
                 <XCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay prospectos rechazados</h4>
@@ -881,7 +851,7 @@ function ClientesContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {rechazados.map((p) => {
+                    {tabProspects.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
@@ -926,7 +896,7 @@ function ClientesContent() {
         )}
 
         {/* TAB 5: CERRADOS PERDIDOS */}
-        {activeTab === "cerrados" && (
+        {panel === "cerrados" && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
@@ -934,7 +904,7 @@ function ClientesContent() {
               </h3>
             </div>
 
-            {cerradosPerdidos.length === 0 ? (
+            {tabProspects.length === 0 ? (
               <div className="py-16 text-center">
                 <MinusCircle className="mx-auto h-12 w-12 text-slate-350 dark:text-slate-650" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-3">No hay clientes cerrados perdidos</h4>
@@ -956,7 +926,7 @@ function ClientesContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {cerradosPerdidos.map((p) => {
+                    {tabProspects.map((p) => {
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>

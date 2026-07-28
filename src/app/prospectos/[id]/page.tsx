@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, getCalcValidUntil, STAGES_LIST, SUB_STAGES_BY_STAGE, isLostStatus } from "@/utils/context/AppContext";
+import { useApp, Prospect, Simulation, DocumentItem, getStageAndSubStage, getStatusFromStageAndSubStage, getCalcValidUntil, STAGES_LIST, SUB_STAGES_BY_STAGE, EDITABLE_SUB_STAGES_BY_STAGE, isLostStatus } from "@/utils/context/AppContext";
 import { createClient } from "@/utils/supabase/client";
 import {
   ArrowLeft,
@@ -41,7 +41,7 @@ import {
 import UserSettingsModal from "@/components/UserSettingsModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
-import { getActiveStageIndex } from "@/components/ui/projectStepper";
+import { getActiveStageIndex, STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
 
 function CopyButton({ text }: { text: string }) {
@@ -598,28 +598,22 @@ export default function ProspectoDetalle() {
   // pagada/cerrada) tomadas del historial de estados. Reutilizado por aliado, AM y director.
   const renderKeyDates = (variant: "vertical" | "horizontal" = "vertical", bare = false) => {
     if (!prospect) return null;
-    const milestones = [
-      { status: "asesoria_agendada", label: "Agenda del proyecto" },
-      { status: "doc_proceso", label: "Firma carta de compromiso" },
-      { status: "analisis_riesgo", label: "Análisis de riesgo" },
-      { status: "firma_contrato", label: "Firma de contrato" },
-      { status: "firma_programada", label: "Cerrada ganada" },
-      { status: "pagado_comision", label: "Pagada / cerrada" },
-    ];
     const fmt = (t?: number) => t ? new Date(t).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
     // Puntero al hito en curso (mismo criterio que el stepper). Se oculta en estados
     // terminales, donde no hay un "siguiente paso" real.
     const activeIndex = getActiveStageIndex(prospect.status);
     const terminal = prospect.status === "rechazado" || isLostStatus(prospect.status);
     type RowState = "done" | "current" | "pending";
-    const rows: { label: string; date: string | null; state: RowState }[] = [
-      { label: "Proyecto creado", date: fmt(new Date(prospect.created_at).getTime()), state: "done" },
-      ...milestones.map((m, idx) => {
-        const date = fmt(statusDates[m.status]);
-        const state: RowState = date ? "done" : (!terminal && idx === activeIndex ? "current" : "pending");
-        return { label: m.label, date, state };
-      }),
-    ];
+    // Los hitos salen de STEP_STATUSES/STEP_DEFS: misma línea de tiempo que la botonera
+    // de Mis Clientes y que el stepper, así que los índices cuadran siempre.
+    const rows: { label: string; date: string | null; state: RowState }[] = STEP_STATUSES.map((status, idx) => {
+      // "Proyecto creado" fecha con created_at: el historial solo guarda CAMBIOS de
+      // estado, así que un proyecto recién capturado no tiene fila propia.
+      const ts = statusDates[status] ?? (idx === 0 ? new Date(prospect.created_at).getTime() : undefined);
+      const date = fmt(ts);
+      const state: RowState = date ? "done" : (!terminal && idx === activeIndex ? "current" : "pending");
+      return { label: STEP_DEFS[idx].label, date, state };
+    });
     const N = rows.length;
     // Índice más avanzado alcanzado (done o en curso), para el largo de la barra de progreso.
     const reached = rows.reduce((acc, r, i) => (r.state !== "pending" ? i : acc), 0);
@@ -1798,7 +1792,7 @@ export default function ProspectoDetalle() {
       setShowLostModal(true);
       return;
     }
-    const defaultSubStage = SUB_STAGES_BY_STAGE[newStageId]?.[0] || "";
+    const defaultSubStage = EDITABLE_SUB_STAGES_BY_STAGE[newStageId]?.[0] || "";
     const newStatus = getStatusFromStageAndSubStage(newStageId, defaultSubStage);
     await updateProspectStatus(prospect.id, newStatus as any, `Etapa cambiada a ${newStageId}`);
   };
@@ -2150,9 +2144,27 @@ export default function ProspectoDetalle() {
                   className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl py-1.5 px-3 text-xs font-bold outline-none transition-colors cursor-pointer"
                 >
                   <option value="">Ninguna</option>
-                  {(SUB_STAGES_BY_STAGE[currentStage.stage] || []).map((sub) => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
+                  {(() => {
+                    const selectable = EDITABLE_SUB_STAGES_BY_STAGE[currentStage.stage] || [];
+                    // "Agenda de Asesoría" no se elige a mano (la fija la fecha de la reunión):
+                    // si el proyecto está ahí se muestra, pero deshabilitada.
+                    const fixed =
+                      currentStage.subStage && !selectable.includes(currentStage.subStage)
+                        ? currentStage.subStage
+                        : null;
+                    return (
+                      <>
+                        {fixed && (
+                          <option value={fixed} disabled>
+                            {fixed} (la fija la fecha)
+                          </option>
+                        )}
+                        {selectable.map((sub) => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </select>
               ) : (
                 <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-full text-[10px] font-black uppercase tracking-wider">
@@ -3313,11 +3325,14 @@ export default function ProspectoDetalle() {
             <div className="space-y-3">
               {[
                 {
-                  id: "asesoria_agendada",
-                  label: "Agenda Asesoria",
-                  desc: "Asesoría agendada para presentar propuesta",
-                  iconColor: "text-purple-500",
-                  icon: Calendar,
+                  // Destino normal de una aprobación: el proyecto queda listo para que el
+                  // aliado lo presente. "Agenda de Asesoría" ya NO se elige aquí — a ese
+                  // hito se llega solo al grabar la fecha de la reunión con el cliente.
+                  id: "aprobado_listo",
+                  label: "Listo para Presentar",
+                  desc: "Aprobado: se puede presentar la propuesta al cliente",
+                  iconColor: "text-emerald-500",
+                  icon: CheckCircle,
                 },
                 {
                   id: "doc_proceso",
@@ -3342,14 +3357,14 @@ export default function ProspectoDetalle() {
                 },
                 {
                   id: "firma_programada",
-                  label: "Esperando líneas de captura",
+                  label: "Cerrada Ganada",
                   desc: "Fin. Otorgado: se ejecutan las líneas de captura",
                   iconColor: "text-indigo-500",
                   icon: CheckCircle,
                 },
                 {
                   id: "pagado_comision",
-                  label: "Pagado cerrado",
+                  label: "Pagada Cerrada",
                   desc: "Comisión liberada y cobrada",
                   iconColor: "text-emerald-500",
                   icon: DollarSign,

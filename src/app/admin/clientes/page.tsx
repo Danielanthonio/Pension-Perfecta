@@ -8,6 +8,7 @@ import {
   getStatusFromStageAndSubStage,
   STAGES_LIST,
   SUB_STAGES_BY_STAGE,
+  EDITABLE_SUB_STAGES_BY_STAGE,
 } from "@/utils/context/AppContext";
 import {
   Search,
@@ -30,6 +31,8 @@ import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/componen
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
+import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
+import { PipelineTabs } from "@/components/ui/pipelineTabs";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 
@@ -57,7 +60,9 @@ function ClientesAdminContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const [activeTab, setActiveTab] = useState<"activos" | "papelera">("activos");
+  // Pestañas de pipeline (las mismas del portal aliado) + "Todos" y "Papelera".
+  // Abre en "Todos" para no perder la vista global de la cartera.
+  const [activeTab, setActiveTab] = useState<ClientTabId>("todos");
   const [searchTerm, setSearchTerm] = useState("");
 
   const startDate = searchParams.get("desde") || "";
@@ -270,6 +275,10 @@ function ClientesAdminContent() {
     .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter)
     .filter((p) => empresaFilter === "all" || getProspectEmpresaId(p) === empresaFilter);
 
+  // Filas visibles: lo anterior, acotado a la pestaña de pipeline elegida.
+  // "Todos" no descarta nada (y es la red de seguridad de cualquier estado sin grupo).
+  const tabProspects = filteredProspects.filter((p) => prospectMatchesTab(p, activeTab));
+
   const deletedByDate = deletedProspects.filter((p) => {
     if (!p.created_at) return true;
     const createdDateStr = p.created_at.substring(0, 10);
@@ -296,9 +305,23 @@ function ClientesAdminContent() {
     .filter((p) => origenFilter === "all" || getProspectOrigen(p) === origenFilter)
     .filter((p) => empresaFilter === "all" || getProspectEmpresaId(p) === empresaFilter);
 
-  // Contadores del selector de origen: se calculan sobre la pestaña visible (Activos o
-  // Papelera) ignorando los filtros de origen/empresa, para que las 3 opciones sean legibles.
-  const origenCountSource = activeTab === "papelera" ? deletedBeforeOrigen : activeBeforeOrigen;
+  // Contadores de las píldoras de pipeline: se calculan sobre la lista ya filtrada
+  // (búsqueda, fechas, etapa, aliado, origen/empresa…) para que cuadren con lo que se ve.
+  const tabCounts: Record<string, number> = {
+    todos: filteredProspects.length,
+    papelera: filteredDeletedProspects.length,
+  };
+  for (const p of filteredProspects) {
+    const tab = classifyProspect(p);
+    if (tab) tabCounts[tab] = (tabCounts[tab] || 0) + 1;
+  }
+
+  // Contadores del selector de origen: se calculan sobre la pestaña visible ignorando
+  // los filtros de origen/empresa, para que las 3 opciones sean legibles.
+  const origenCountSource =
+    activeTab === "papelera"
+      ? deletedBeforeOrigen
+      : activeBeforeOrigen.filter((p) => prospectMatchesTab(p, activeTab));
   const origenCounts = React.useMemo(() => {
     let empresa = 0;
     for (const p of origenCountSource) if (getProspectOrigen(p) === "empresa") empresa += 1;
@@ -367,7 +390,7 @@ function ClientesAdminContent() {
 
   // Sorting — active list and trash each get their own sort state/controls.
   const sortA = useSortable<Prospect>(
-    filteredProspects,
+    tabProspects,
     {
       fecha: (p) => p.created_at || "",
       nombre: (p) => p.full_name,
@@ -443,6 +466,13 @@ function ClientesAdminContent() {
   return (
     <>
       <div className="space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+
+        {/* La línea de tiempo del proyecto, hecha botonera: cada hito muestra cuántos
+            clientes están parados ahí y al apretarlo se despliegan. Misma línea que ve
+            el aliado y que dibuja el stepper del expediente. */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm px-4 pt-3 pb-2.5">
+          <PipelineTabs counts={tabCounts} activeTab={activeTab} onChange={setActiveTab} isAdmin />
+        </div>
 
         {/* Barra compacta de filtros (formato clásico) + acción Subir Proyecto */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm px-3 py-2.5 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
@@ -560,29 +590,6 @@ function ClientesAdminContent() {
                   }`}
                 />
               </div>
-              <div className="bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 shrink-0">
-                <button
-                  onClick={() => setActiveTab("activos")}
-                  className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
-                    activeTab === "activos"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-                  }`}
-                >
-                  Activos <span className="tabular-nums opacity-70">({filteredProspects.length})</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab("papelera")}
-                  className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
-                    activeTab === "papelera"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
-                  }`}
-                >
-                  Papelera <span className="tabular-nums opacity-70">({filteredDeletedProspects.length})</span>
-                </button>
-              </div>
-
               {/* Tipo de aliado: empresa (pertenece a una empresa multialiado) vs. independiente.
                   Escribe el mismo param `origen` de la URL que usaba el dropdown superior. */}
               <div className="bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg flex ring-1 ring-inset ring-slate-200/70 dark:ring-slate-800 shrink-0">
@@ -746,14 +753,18 @@ function ClientesAdminContent() {
               </div>
             )
           ) : (
-            filteredProspects.length === 0 ? (
+            tabProspects.length === 0 ? (
               <div className="py-16 text-center space-y-3 bg-white dark:bg-slate-900">
                 <div className="h-11 w-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto">
                   <FolderKanban className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Sin prospectos en este estado</h4>
-                  <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">Prueba ajustando los filtros de etapas o del asesor que capturó el caso.</p>
+                  <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                    {getTabMeta(activeTab).label}
+                  </h4>
+                  <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 max-w-[280px] mx-auto">
+                    {getTabMeta(activeTab).empty}
+                  </p>
                 </div>
               </div>
             ) : (
@@ -861,7 +872,7 @@ function ClientesAdminContent() {
                                 value={getStageAndSubStage(p.status).stage}
                                 onChange={async (e) => {
                                   const newStage = e.target.value;
-                                  const defaultSubStage = SUB_STAGES_BY_STAGE[newStage]?.[0] || "";
+                                  const defaultSubStage = EDITABLE_SUB_STAGES_BY_STAGE[newStage]?.[0] || "";
                                   const newStatus = getStatusFromStageAndSubStage(newStage, defaultSubStage);
                                   await handleStageChange(p.id, newStatus as any);
                                 }}
@@ -886,9 +897,26 @@ function ClientesAdminContent() {
                                   }`}
                                 >
                                   <option value="" className="dark:bg-slate-900">Ninguna</option>
-                                  {(SUB_STAGES_BY_STAGE[getStageAndSubStage(p.status).stage] || []).map((sub) => (
-                                    <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
-                                  ))}
+                                  {(() => {
+                                    const { stage, subStage } = getStageAndSubStage(p.status);
+                                    const selectable = EDITABLE_SUB_STAGES_BY_STAGE[stage] || [];
+                                    // "Agenda de Asesoría" no se elige a mano (la fija la fecha de la
+                                    // reunión), pero si el proyecto está ahí hay que poder mostrarla:
+                                    // se pinta como opción deshabilitada.
+                                    const fixed = subStage && !selectable.includes(subStage) ? subStage : null;
+                                    return (
+                                      <>
+                                        {fixed && (
+                                          <option value={fixed} disabled className="dark:bg-slate-900">
+                                            {fixed} (la fija la fecha)
+                                          </option>
+                                        )}
+                                        {selectable.map((sub) => (
+                                          <option key={sub} value={sub} className="dark:bg-slate-900">{sub}</option>
+                                        ))}
+                                      </>
+                                    );
+                                  })()}
                                 </select>
                               )}
                             </div>
@@ -958,7 +986,7 @@ function ClientesAdminContent() {
                                     · las fechas se registran solas al avanzar de etapa
                                   </span>
                                 </div>
-                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} />
+                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} createdAt={p.created_at} />
                               </div>
                             </td>
                           </tr>
