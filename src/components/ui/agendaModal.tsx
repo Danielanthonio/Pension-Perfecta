@@ -16,6 +16,137 @@ export function agendaInputsFor(p: Prospect): { date: string; time: string } {
   return m ? { date: m[1], time: m[2].padStart(5, "0") } : { date: "", time: "" };
 }
 
+// ---------------------------------------------------------------------------
+// Reloj de 12 horas
+// ---------------------------------------------------------------------------
+// El <input type="time"> del navegador se pinta en 12 o 24 horas según el idioma
+// de la máquina, así que no se puede garantizar AM/PM. Este selector propio sí:
+// por fuera sigue hablando en "HH:MM" de 24 horas (lo que espera la base), pero
+// por dentro y en pantalla siempre es 12 horas con AM/PM.
+
+const MINUTOS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+type Meridiano = "" | "AM" | "PM";
+
+// "14:30" -> { hora: "2", minuto: "30", meridiano: "PM" }
+function split12h(t: string): { hora: string; minuto: string; meridiano: Meridiano } {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t || "");
+  if (!m) return { hora: "", minuto: "00", meridiano: "" };
+  const h24 = Number(m[1]);
+  if (h24 > 23) return { hora: "", minuto: "00", meridiano: "" };
+  return {
+    hora: String(h24 % 12 === 0 ? 12 : h24 % 12),
+    minuto: m[2],
+    meridiano: h24 >= 12 ? "PM" : "AM",
+  };
+}
+
+// { 2, "30", "PM" } -> "14:30". Sin hora o sin AM/PM todavía no hay valor válido.
+function join24h(hora: string, minuto: string, meridiano: Meridiano): string {
+  if (!hora || !meridiano) return "";
+  const h = (Number(hora) % 12) + (meridiano === "PM" ? 12 : 0);
+  return `${String(h).padStart(2, "0")}:${minuto || "00"}`;
+}
+
+function TimePicker12h({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [hora, setHora] = useState("");
+  const [minuto, setMinuto] = useState("00");
+  const [meridiano, setMeridiano] = useState<Meridiano>("");
+
+  // Solo se resincroniza cuando el valor viene de fuera (al abrir el modal con una
+  // cita ya grabada). Mientras el usuario está a medio elegir, el valor de fuera es
+  // "" y hay que conservar lo que ya escogió.
+  useEffect(() => {
+    if (join24h(hora, minuto, meridiano) === value) return;
+    const p = split12h(value);
+    setHora(p.hora);
+    setMinuto(p.minuto);
+    setMeridiano(p.meridiano);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const emitir = (h: string, m: string, mer: Meridiano) => {
+    setHora(h);
+    setMinuto(m);
+    setMeridiano(mer);
+    onChange(join24h(h, m, mer));
+  };
+
+  // Una cita vieja pudo grabarse en un minuto fuera de la rejilla (p. ej. 11:47);
+  // se agrega a la lista para no perderlo al reabrir el modal.
+  const minutos = MINUTOS.includes(minuto) ? MINUTOS : [...MINUTOS, minuto].sort();
+
+  const selectCls =
+    "bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-2.5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer tabular-nums";
+
+  return (
+    // `items-stretch` para que AM/PM tengan exactamente el alto de los selectores.
+    <div className="flex items-stretch gap-2">
+      <select
+        value={hora}
+        onChange={(e) => {
+          const h = e.target.value;
+          // Al elegir la hora sin haber tocado AM/PM se propone el turno más
+          // probable (8–11 por la mañana, el resto por la tarde). Queda marcado a
+          // la vista y se cambia con un clic.
+          const mer: Meridiano = meridiano || (Number(h) >= 8 && Number(h) <= 11 ? "AM" : "PM");
+          emitir(h, minuto, h ? mer : "");
+        }}
+        className={selectCls}
+        aria-label="Hora"
+      >
+        <option value="">--</option>
+        {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      <span className="flex items-center text-sm font-black text-slate-400 dark:text-slate-500">:</span>
+      <select
+        value={minuto}
+        onChange={(e) => emitir(hora, e.target.value, meridiano)}
+        className={selectCls}
+        aria-label="Minutos"
+      >
+        {minutos.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center gap-1 ml-1">
+        {(["AM", "PM"] as const).map((op) => (
+          <button
+            key={op}
+            type="button"
+            onClick={() => emitir(hora, minuto, op)}
+            className={`px-3 rounded-xl text-[11px] font-black border transition-all active:scale-95 ${
+              meridiano === op
+                ? "bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-500/20"
+                : "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+            }`}
+          >
+            {op}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Lo que va a quedar grabado, en palabras, para que un AM/PM mal elegido salte a
+// la vista antes de confirmar. Se ancla a CDMX igual que al guardar.
+function previewCita(date: string, time: string): string | null {
+  if (!date || !time) return null;
+  const d = new Date(`${date}T${time}:00-06:00`);
+  if (isNaN(d.getTime())) return null;
+  const tz = { timeZone: "America/Mexico_City" } as const;
+  const dia = d.toLocaleDateString("es-MX", { ...tz, weekday: "long", day: "numeric", month: "long" });
+  const hora = d.toLocaleTimeString("es-MX", { ...tz, hour: "numeric", minute: "2-digit", hour12: true });
+  return `${dia} a las ${hora}`;
+}
+
 interface AgendaAsesoriaModalProps {
   /** Proyecto a agendar; null cierra el modal. */
   prospect: Prospect | null;
@@ -51,6 +182,7 @@ export function AgendaAsesoriaModal({
   if (!prospect) return null;
 
   const citaActual = formatCita(prospect.asesoria_at);
+  const preview = previewCita(date, time);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
@@ -88,7 +220,7 @@ export function AgendaAsesoriaModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div>
             <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
               Fecha
@@ -107,13 +239,14 @@ export function AgendaAsesoriaModal({
             <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
               Hora
             </label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
-            />
+            <TimePicker12h value={time} onChange={setTime} />
           </div>
+          {preview && (
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              Quedará agendada el{" "}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{preview}</span>
+            </p>
+          )}
         </div>
 
         {meetingLink ? (

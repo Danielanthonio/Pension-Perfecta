@@ -16,7 +16,6 @@ import {
   FolderKanban,
   ArrowRight,
   ArrowLeftRight,
-  ChevronDown,
   Plus,
   SlidersHorizontal,
   RotateCcw,
@@ -33,7 +32,7 @@ import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
-import { ProjectStepper, getActiveStageIndex, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
+import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
@@ -860,8 +859,9 @@ function ClientesAdminContent() {
                       const allyProfile = profiles.find((prof) => prof.id === p.aliado_id);
                       const leaders = allyProfile ? profiles.filter((prof) => allyProfile.lider_ids?.includes(prof.id)) : [];
                       const leaderNames = leaders.length > 0 ? leaders.map((prof) => prof.full_name).join(", ") : "Sin líder";
-                      // La línea de tiempo solo aplica a proyectos aprobados (o más adelante
-                      // en el pipeline de cierre). Antes del dictamen de aprobación no se muestra.
+                      // La línea de tiempo arranca al CREARSE el proyecto: la tiene todo
+                      // proyecto vivo. Solo se cae en los desenlaces (rechazado / cerrado
+                      // perdido), donde ya no hay recorrido que dibujar.
                       const showTimeline = hasProjectTimeline(p.status);
                       const isExpanded = expandedId === p.id && showTimeline;
                       // Agendar la asesoría: mismos dos gestos que hace el aliado en su
@@ -1009,19 +1009,7 @@ function ClientesAdminContent() {
                           <td className="px-5 py-2.5">
                             <div className="flex items-center justify-end gap-2">
                               {showTimeline && (
-                              <button
-                                onClick={() => toggleTimeline(p.id)}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border transition-all active:scale-95 ${
-                                  isExpanded
-                                    ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
-                                    : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-750 hover:bg-slate-50 dark:hover:bg-slate-850"
-                                }`}
-                                title="Ver línea de tiempo del aliado"
-                                aria-expanded={isExpanded}
-                              >
-                                Línea de tiempo
-                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                              </button>
+                                <TimelineToggleButton expanded={isExpanded} onClick={() => toggleTimeline(p.id)} />
                               )}
                               {canSchedule && (
                               /* Los dos mismos controles que tiene el aliado, en su
@@ -1086,17 +1074,13 @@ function ClientesAdminContent() {
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
                             <td colSpan={8} className="px-6 pt-1 pb-6 border-b-0">
-                              <div className="max-w-3xl mx-auto">
-                                <div className="flex items-center gap-2 mb-5">
-                                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
-                                    Línea de tiempo · {p.aliado_name || "Asesor Comercial"}
-                                  </span>
-                                  <span className="text-[9px] font-semibold text-slate-350 dark:text-slate-600">
-                                    · se registran solas al avanzar de etapa · la asesoría muestra la fecha de la reunión
-                                  </span>
-                                </div>
-                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} createdAt={p.created_at} asesoriaAt={p.asesoria_at} />
-                              </div>
+                              <TimelinePanel
+                                status={p.status}
+                                dates={statusDates[p.id]}
+                                createdAt={p.created_at}
+                                asesoriaAt={p.asesoria_at}
+                                caption={`Línea de tiempo · ${p.aliado_name || "Asesor Comercial"}`}
+                              />
                             </td>
                           </tr>
                         )}

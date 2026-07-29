@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Waypoints } from "lucide-react";
 
 // Fuente única de verdad del pipeline comercial. Las fechas de cada hito NO se
 // capturan a mano: el sistema las registra al cambiar de estado (trigger en BD,
@@ -104,6 +104,71 @@ export const citaInputs = (iso?: string | null): { date: string; time: string } 
   const shifted = new Date(t - 6 * 60 * 60 * 1000).toISOString();
   return { date: shifted.slice(0, 10), time: shifted.slice(11, 16) };
 };
+
+// Botón que despliega la línea de tiempo dentro de una fila de tabla. Es un icono
+// y no un botón con texto: la columna de acciones ya carga varios controles y la
+// fila se lee mucho más ordenada. Lo usan Gestión de Clientes (director / AM) y el
+// portal del aliado, para que el gesto sea el mismo en los tres roles.
+export function TimelineToggleButton({
+  expanded,
+  onClick,
+  className = "",
+}: {
+  expanded: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={expanded}
+      aria-label="Línea de tiempo del proyecto"
+      title={expanded ? "Ocultar la línea de tiempo" : "Ver la línea de tiempo del proyecto"}
+      className={`inline-flex items-center justify-center h-8 w-8 rounded-lg border transition-all active:scale-95 ${
+        expanded
+          ? "bg-slate-800 dark:bg-slate-200 border-slate-800 dark:border-slate-200 text-white dark:text-slate-900"
+          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-750 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-850"
+      } ${className}`}
+    >
+      <Waypoints className="h-4 w-4" />
+    </button>
+  );
+}
+
+// Contenido de la fila desplegada: encabezado + stepper. Vive aquí para que el
+// director, el account manager y el aliado vean exactamente el mismo bloque.
+export function TimelinePanel({
+  status,
+  dates,
+  createdAt,
+  asesoriaAt,
+  caption,
+}: {
+  status: string;
+  dates?: Record<string, number>;
+  createdAt?: string | null;
+  asesoriaAt?: string | null;
+  caption: string;
+}) {
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center gap-2 mb-5">
+        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
+          {caption}
+        </span>
+        <span className="text-[9px] font-semibold text-slate-350 dark:text-slate-600">
+          · se registran solas al avanzar de etapa · la asesoría muestra la fecha de la reunión
+        </span>
+      </div>
+      <ProjectStepper
+        activeIndex={getActiveStageIndex(status)}
+        dates={dates}
+        createdAt={createdAt}
+        asesoriaAt={asesoriaAt}
+      />
+    </div>
+  );
+}
 
 interface ProjectStepperProps {
   /** Índice del hito activo (usar getActiveStageIndex). */

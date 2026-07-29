@@ -26,7 +26,14 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { ProjectStepper, getActiveStageIndex, formatCita } from "@/components/ui/projectStepper";
+import {
+  ProjectStepper,
+  getActiveStageIndex,
+  formatCita,
+  hasProjectTimeline,
+  TimelineToggleButton,
+  TimelinePanel,
+} from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
@@ -80,6 +87,35 @@ function ClientesContent() {
   // Fechas por etapa desde prospect_status_history: prospectId -> (status -> primer timestamp ms).
   // El sistema las registra automáticamente en cada cambio de estado (trigger en BD).
   const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
+
+  // Fila desplegada con la línea de tiempo en las tablas (evaluación y listo para
+  // presentar). En las tarjetas de proyectos activos el stepper ya va siempre visible.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Se carga bajo demanda al desplegar, igual que en Gestión de Clientes.
+  const toggleTimeline = async (id: string) => {
+    const next = expandedId === id ? null : id;
+    setExpandedId(next);
+    if (!next || statusDates[next] || isDemoMode) return;
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("prospect_status_history")
+        .select("status, changed_at")
+        .eq("prospect_id", next)
+        .order("changed_at", { ascending: true });
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => {
+        const t = new Date(r.changed_at).getTime();
+        if (map[r.status] === undefined || t < map[r.status]) map[r.status] = t;
+      });
+      setStatusDates((prev) => ({ ...prev, [next]: map }));
+    } catch {
+      // Tabla no migrada aún o error transitorio — se muestra sin fechas.
+      setStatusDates((prev) => ({ ...prev, [next]: {} }));
+    }
+  };
 
   // Get stage label
   const getStageLabel = (status: Prospect["status"]) => {
@@ -412,7 +448,15 @@ function ClientesContent() {
           están parados ahí y al apretarlo se despliegan. Es el mismo recorrido que ven el
           account manager y el director, y el que dibuja el stepper del expediente. */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm px-4 pt-3 pb-2.5">
-        <PipelineTabs counts={tabCounts} activeTab={activeTab} onChange={setActiveTab} isAdmin={canDelete} />
+        <PipelineTabs
+          counts={tabCounts}
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab);
+            setExpandedId(null);
+          }}
+          isAdmin={canDelete}
+        />
       </div>
 
       <div className="flex justify-end">
@@ -475,8 +519,10 @@ function ClientesContent() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {tabProspects.map((p) => {
+                      const isExpanded = expandedId === p.id && hasProjectTimeline(p.status);
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                        <React.Fragment key={p.id}>
+                        <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
@@ -486,6 +532,10 @@ function ClientesContent() {
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {/* La línea de tiempo existe desde que se crea el proyecto. */}
+                              {hasProjectTimeline(p.status) && (
+                                <TimelineToggleButton expanded={isExpanded} onClick={() => toggleTimeline(p.id)} />
+                              )}
                               <Link
                                 href={`/prospectos/${p.id}`}
                                 className="inline-flex p-2 bg-slate-100 dark:bg-slate-800 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-950/20 text-slate-550 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 rounded-xl transition-all border border-slate-200/60 dark:border-slate-700"
@@ -509,6 +559,20 @@ function ClientesContent() {
                             </div>
                           </td>
                         </tr>
+                        {isExpanded && (
+                          <tr className="bg-slate-50/50 dark:bg-slate-900/30">
+                            <td colSpan={6} className="px-6 pt-1 pb-6">
+                              <TimelinePanel
+                                status={p.status}
+                                dates={statusDates[p.id]}
+                                createdAt={p.created_at}
+                                asesoriaAt={p.asesoria_at}
+                                caption={`Línea de tiempo · ${p.full_name}`}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
@@ -548,8 +612,10 @@ function ClientesContent() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {tabProspects.map((p) => {
+                      const isExpanded = expandedId === p.id && hasProjectTimeline(p.status);
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
+                        <React.Fragment key={p.id}>
+                        <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-850/10 transition-colors group">
                           <td className="px-5 py-3.5">{renderProspectoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderContactoCell(p)}</td>
                           <td className="px-4 py-3.5">{renderAccountManagerCell(p)}</td>
@@ -568,6 +634,10 @@ function ClientesContent() {
                           <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
+                              {/* La línea de tiempo existe desde que se crea el proyecto. */}
+                              {hasProjectTimeline(p.status) && (
+                                <TimelineToggleButton expanded={isExpanded} onClick={() => toggleTimeline(p.id)} />
+                              )}
                               <Link
                                 href={`/prospectos/${p.id}`}
                                 className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl transition-colors border border-slate-200/60 dark:border-slate-700"
@@ -621,6 +691,20 @@ function ClientesContent() {
                             </div>
                           </td>
                         </tr>
+                        {isExpanded && (
+                          <tr className="bg-slate-50/50 dark:bg-slate-900/30">
+                            <td colSpan={6} className="px-6 pt-1 pb-6">
+                              <TimelinePanel
+                                status={p.status}
+                                dates={statusDates[p.id]}
+                                createdAt={p.created_at}
+                                asesoriaAt={p.asesoria_at}
+                                caption={`Línea de tiempo · ${p.full_name}`}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
