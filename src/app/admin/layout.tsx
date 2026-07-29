@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   RotateCcw,
   Calendar,
+  CalendarClock,
   Contact,
   Filter,
   FileBarChart,
@@ -48,6 +49,7 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
     { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
     { href: `/admin/reportes${qs}`, active: cleanPath === "/admin/reportes", Icon: FileBarChart, label: "Reportes" },
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
+    { href: `/admin/agenda-futura${qs}`, active: cleanPath === "/admin/agenda-futura", Icon: CalendarClock, label: "Agenda Futura" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
@@ -401,6 +403,12 @@ export default function AdminLayout({
       return {
         title: "Gestión de Clientes",
         subtitle: "Visualiza, audita y gestiona el pipeline de expedientes comerciales y prospectos.",
+      };
+    }
+    if (cleanPath === "/admin/agenda-futura") {
+      return {
+        title: "Agenda Futura",
+        subtitle: "Expedientes pospuestos para una nueva evaluación: cuándo toca reevaluar cada uno.",
       };
     }
     if (cleanPath === "/admin/nuevo") {
