@@ -24,6 +24,7 @@ import {
   UserCog,
   Building2,
   Calendar,
+  CheckSquare,
   ExternalLink,
   X,
 } from "lucide-react";
@@ -32,7 +33,8 @@ import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
-import { ProjectStepper, getActiveStageIndex, hasProjectTimeline } from "@/components/ui/projectStepper";
+import { ProjectStepper, getActiveStageIndex, hasProjectTimeline, formatCita, citaInputs } from "@/components/ui/projectStepper";
+import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
 import { PipelineTabs } from "@/components/ui/pipelineTabs";
 import { createClient } from "@/utils/supabase/client";
@@ -43,13 +45,15 @@ import Link from "next/link";
 // devolvería un hito atrás. En `asesoria_agendada` sí se permite: es reagendar.
 const SCHEDULABLE_STATUSES = ["aprobado_listo", "asesoria_agendada"];
 
-// La cita queda escrita en `notes_aliado` ("Asesoría agendada para el día
-// AAAA-MM-DD a las HH:MM hrs."). Se relee para precargar el modal al reagendar;
-// si el formato no coincide (o se agendó vía LeadConnector) se abre en blanco.
-function parseAgendaFromNotes(notes?: string | null): { date: string; time: string } | null {
-  const m = notes?.match(/día (\d{4}-\d{2}-\d{2}) a las (\d{1,2}:\d{2})/);
-  if (!m) return null;
-  return { date: m[1], time: m[2].padStart(5, "0") };
+// Con qué valores abre el modal al reagendar: la cita grabada en `asesoria_at` y,
+// como respaldo para los proyectos anteriores a esa columna, el texto de la nota
+// ("Asesoría agendada para el día AAAA-MM-DD a las HH:MM hrs."). Si no hay ninguna
+// de las dos (o se agendó vía LeadConnector), abre en blanco.
+function agendaInputsFor(p: Prospect): { date: string; time: string } {
+  const grabada = citaInputs(p.asesoria_at);
+  if (grabada) return grabada;
+  const m = p.notes_aliado?.match(/día (\d{4}-\d{2}-\d{2}) a las (\d{1,2}:\d{2})/);
+  return m ? { date: m[1], time: m[2].padStart(5, "0") } : { date: "", time: "" };
 }
 
 function ClientesAdminContent() {
@@ -191,11 +195,28 @@ function ClientesAdminContent() {
   const [scheduling, setScheduling] = useState(false);
 
   const openScheduleModal = (prospect: Prospect) => {
-    const previa = parseAgendaFromNotes(prospect.notes_aliado);
+    const previa = agendaInputsFor(prospect);
     setScheduleTarget(prospect);
-    setScheduleDate(previa?.date || "");
-    setScheduleTime(previa?.time || "");
+    setScheduleDate(previa.date);
+    setScheduleTime(previa.time);
     setScheduling(false);
+  };
+
+  // Abrir la agenda oficial: la de la modalidad que fijó Dirección al aprobar y, si
+  // el proyecto todavía no tiene modalidad, el selector 40/10 (igual que el aliado).
+  const [modalityOpen, setModalityOpen] = useState(false);
+
+  const handleOpenAgenda = (prospect: Prospect) => {
+    if (!prospect.modalidad) {
+      setModalityOpen(true);
+      return;
+    }
+    const url = meetingLinkFor(prospect);
+    if (!url) {
+      alert(`Aún no está configurado el link de Modalidad ${prospect.modalidad}. Se define en Gestión de Usuarios.`);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const handleConfirmSchedule = async () => {
@@ -858,9 +879,11 @@ function ClientesAdminContent() {
                       // en el pipeline de cierre). Antes del dictamen de aprobación no se muestra.
                       const showTimeline = hasProjectTimeline(p.status);
                       const isExpanded = expandedId === p.id && showTimeline;
-                      // Agendar la asesoría: mismo gesto que hace el aliado en su portal.
-                      const yaAgendado = p.status === "asesoria_agendada";
+                      // Agendar la asesoría: mismos dos gestos que hace el aliado en su
+                      // portal. Van en rojo hasta que haya una fecha de reunión grabada.
                       const canSchedule = SCHEDULABLE_STATUSES.includes(p.status);
+                      const citaGrabada = formatCita(p.asesoria_at);
+                      const sinFecha = !citaGrabada;
                       return (
                         <React.Fragment key={p.id}>
                         <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
@@ -1016,18 +1039,37 @@ function ClientesAdminContent() {
                               </button>
                               )}
                               {canSchedule && (
-                              <button
-                                onClick={() => openScheduleModal(p)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all active:scale-95"
-                                title={
-                                  yaAgendado
-                                    ? "Cambiar la fecha de la asesoría"
-                                    : "Grabar la fecha de la asesoría (avanza al hito Agenda de Asesoría)"
-                                }
-                              >
-                                <Calendar className="h-3.5 w-3.5" />
-                                {yaAgendado ? "Reagendar" : "Agendar"}
-                              </button>
+                              /* Los dos mismos controles que tiene el aliado, en su
+                                 propio grupo: abrir la agenda y grabar la fecha. En
+                                 rojo mientras no haya fecha grabada. */
+                              <div className="flex items-center gap-1.5 mr-1 pr-2.5 border-r border-slate-200 dark:border-slate-750">
+                                <button
+                                  onClick={() => handleOpenAgenda(p)}
+                                  className={`p-1.5 rounded-xl text-white shadow border transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center ${
+                                    sinFecha
+                                      ? "bg-gradient-to-r from-red-600 to-rose-650 hover:from-red-550 hover:to-rose-550 border-red-450"
+                                      : "bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 border-emerald-450"
+                                  }`}
+                                  title={p.modalidad ? `Abrir agenda de Modalidad ${p.modalidad}` : "Abrir agenda de asesoría"}
+                                >
+                                  <Calendar className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => openScheduleModal(p)}
+                                  className={`p-1.5 rounded-xl transition-all border flex items-center justify-center ${
+                                    sinFecha
+                                      ? "bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 border-red-250/60 dark:border-red-800/40"
+                                      : "bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-250/60 dark:border-emerald-800/40"
+                                  }`}
+                                  title={
+                                    citaGrabada
+                                      ? `Cambiar la fecha · cita actual ${citaGrabada}`
+                                      : "Grabar la fecha de la asesoría (avanza al hito Agenda de Asesoría)"
+                                  }
+                                >
+                                  <CheckSquare className="h-4 w-4" />
+                                </button>
+                              </div>
                               )}
                               <Link
                                 href={`/prospectos/${p.id}`}
@@ -1065,10 +1107,10 @@ function ClientesAdminContent() {
                                     Línea de tiempo · {p.aliado_name || "Asesor Comercial"}
                                   </span>
                                   <span className="text-[9px] font-semibold text-slate-350 dark:text-slate-600">
-                                    · las fechas se registran solas al avanzar de etapa
+                                    · se registran solas al avanzar de etapa · la asesoría muestra la fecha de la reunión
                                   </span>
                                 </div>
-                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} createdAt={p.created_at} />
+                                <ProjectStepper activeIndex={getActiveStageIndex(p.status)} dates={statusDates[p.id]} createdAt={p.created_at} asesoriaAt={p.asesoria_at} />
                               </div>
                             </td>
                           </tr>
@@ -1084,6 +1126,9 @@ function ClientesAdminContent() {
         </div>
       </div>
 
+      {/* Selector 40/10 para abrir la agenda cuando el proyecto no tiene modalidad */}
+      <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
+
       {/* Agenda de Asesoría — grabar la fecha de la reunión con el cliente */}
       {scheduleTarget && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
@@ -1094,12 +1139,10 @@ function ClientesAdminContent() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-white">
-                  {scheduleTarget.status === "asesoria_agendada" ? "Cambiar fecha de la asesoría" : "Agendar asesoría"}
+                  {formatCita(scheduleTarget.asesoria_at) ? "Cambiar fecha de la asesoría" : "Agendar asesoría"}
                 </h3>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-                  {scheduleTarget.status === "asesoria_agendada"
-                    ? "Actualiza la cita para presentar el dictamen Ley 73."
-                    : "Al guardar la cita el proyecto avanza al hito “Agenda de Asesoría”."}
+                  Es la fecha de la reunión con el cliente: la misma que aparece en la línea de tiempo.
                 </p>
               </div>
             </div>
@@ -1114,6 +1157,11 @@ function ClientesAdminContent() {
                   <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tabular-nums">
                     NSS: {scheduleTarget.nss} · Aliado: {scheduleTarget.aliado_name || "Asesor Comercial"}
                   </span>
+                  {formatCita(scheduleTarget.asesoria_at) && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
+                      Cita actual: {formatCita(scheduleTarget.asesoria_at)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

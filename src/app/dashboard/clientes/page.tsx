@@ -28,7 +28,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { ProjectStepper, getActiveStageIndex } from "@/components/ui/projectStepper";
+import { ProjectStepper, getActiveStageIndex, formatCita, citaInputs } from "@/components/ui/projectStepper";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
@@ -268,9 +268,11 @@ function ClientesContent() {
   }, [activeIdsKey, isDemoMode]);
 
   const handleOpenSchedule = (prospect: Prospect) => {
+    // Si ya hay cita grabada, el modal abre con ella (reagendar, no recapturar).
+    const previa = citaInputs(prospect.asesoria_at);
     setSelectedProspect(prospect);
-    setSelectedDate("");
-    setSelectedTime("");
+    setSelectedDate(previa?.date || "");
+    setSelectedTime(previa?.time || "");
     setSchedulingStep("datetime");
   };
 
@@ -292,9 +294,14 @@ function ClientesContent() {
 
   const handleConfirmSchedule = async () => {
     if (!selectedProspect || !selectedDate || !selectedTime) return;
-    await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
-    setSelectedProspect(null);
-    setActiveTab("asesoria_agendada"); // el proyecto queda justo en el hito que acaba de alcanzar
+    try {
+      await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
+      setSelectedProspect(null);
+      setActiveTab("asesoria_agendada"); // el proyecto queda justo en el hito que acaba de alcanzar
+    } catch (err) {
+      console.error("Error al agendar la asesoría:", err);
+      alert("No se pudo guardar la cita. Intenta de nuevo.");
+    }
   };
 
   // Shared executive table cells — keep every tab consistent and scroll-free
@@ -565,20 +572,36 @@ function ClientesContent() {
                               >
                                 <FileText className="h-4 w-4" />
                               </Link>
-                              <button
-                                onClick={() => handleOpenAgenda(p)}
-                                className="p-1.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 text-white rounded-xl shadow border border-emerald-450 transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center"
-                                title={p.modalidad ? `Agendar Asesoría (Modalidad ${p.modalidad})` : "Agendar Asesoría"}
-                              >
-                                <Calendar className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenSchedule(p)}
-                                className="p-1.5 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all border border-emerald-250/60 dark:border-emerald-800/40 flex items-center justify-center"
-                                title="Confirmar Agendado (Avanzar a Activos)"
-                              >
-                                <CheckSquare className="h-4 w-4" />
-                              </button>
+                              {/* Abrir la agenda y grabar la fecha. En rojo mientras el
+                                  proyecto no tenga una fecha de reunión grabada. */}
+                              <div className="flex items-center gap-1.5 ml-1 pl-2.5 border-l border-slate-200 dark:border-slate-750">
+                                <button
+                                  onClick={() => handleOpenAgenda(p)}
+                                  className={`p-1.5 rounded-xl text-white shadow border transition-all hover:scale-105 active:scale-[0.95] flex items-center justify-center ${
+                                    p.asesoria_at
+                                      ? "bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-550 hover:to-teal-550 border-emerald-450"
+                                      : "bg-gradient-to-r from-red-600 to-rose-650 hover:from-red-550 hover:to-rose-550 border-red-450"
+                                  }`}
+                                  title={p.modalidad ? `Abrir agenda de Modalidad ${p.modalidad}` : "Abrir agenda de asesoría"}
+                                >
+                                  <Calendar className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenSchedule(p)}
+                                  className={`p-1.5 rounded-xl transition-all border flex items-center justify-center ${
+                                    p.asesoria_at
+                                      ? "bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-250/60 dark:border-emerald-800/40"
+                                      : "bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 border-red-250/60 dark:border-red-800/40"
+                                  }`}
+                                  title={
+                                    formatCita(p.asesoria_at)
+                                      ? `Cambiar la fecha · cita actual ${formatCita(p.asesoria_at)}`
+                                      : "Grabar la fecha de la asesoría (avanza al hito Agenda de Asesoría)"
+                                  }
+                                >
+                                  <CheckSquare className="h-4 w-4" />
+                                </button>
+                              </div>
                               {canDelete && (
                                 <button
                                   onClick={async () => {
@@ -716,7 +739,7 @@ function ClientesContent() {
 
                     {/* Barra de progreso del pipeline (componente compartido) */}
                     <div className="space-y-4 pt-2">
-                      <ProjectStepper activeIndex={activeIndex} dates={statusDates[p.id]} createdAt={p.created_at} />
+                      <ProjectStepper activeIndex={activeIndex} dates={statusDates[p.id]} createdAt={p.created_at} asesoriaAt={p.asesoria_at} />
                     </div>
 
                     {/* Congratulations Banner / Commission status */}

@@ -35,6 +35,15 @@ export interface UserProfile {
   auto_assign_enabled?: boolean;
 }
 
+// Convierte la fecha y hora tecleadas al agendar ("2026-08-15" + "15:30") en un
+// timestamp con zona. Devuelve null cuando no hay cita concreta (LeadConnector) o
+// si el dato viene incompleto, para no grabar una fecha inventada.
+export function buildAsesoriaTimestamp(date: string, time: string): string | null {
+  if (!date || !time || date === "LeadConnector") return null;
+  const d = new Date(`${date}T${time}:00-06:00`);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 // Elige al azar un Account Manager que participe en la ruleta de asignación
 // automática (activo + interruptor encendido). Devuelve null si no hay ninguno,
 // en cuyo caso el PROYECTO queda sin AM (mesa del director). Se usa en modo
@@ -171,6 +180,10 @@ export interface Prospect {
   // Fecha de nueva evaluación agendada cuando el expediente se condiciona como
   // "Agenda futura" (subetapa de Condicionado). Nullable mientras no aplique.
   reeval_date?: string | null;
+  // Fecha y hora de la REUNIÓN de asesoría con el cliente, tal como la teclea
+  // quien agenda. Es la que muestra el hito "Agenda de Asesoría": el historial
+  // de estados solo sabe cuándo se capturó la cita, no cuándo es.
+  asesoria_at?: string | null;
   // Account Manager asignado al PROYECTO (no al aliado): lo sortea la ruleta al
   // capturar el aliado su propio proyecto; si lo captura un AM, queda de ese AM;
   // si lo captura Dirección, queda null (gestión directa / mesa de dirección).
@@ -761,6 +774,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       modalidad: dbProspect.modalidad || null,
       tipo_financiamiento: dbProspect.tipo_financiamiento || null,
       reeval_date: dbProspect.reeval_date || null,
+      asesoria_at: dbProspect.asesoria_at || null,
       account_manager_id: dbProspect.account_manager_id ?? null,
       simulation: hasSimulation ? {
         semanas,
@@ -3253,6 +3267,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     // fecha desde Gestión de Clientes. La notificación nombra a quien lo hizo.
     const quienAgenda = user?.full_name || "El equipo";
 
+    // Fecha REAL de la reunión, que es distinta del momento en que se captura (eso
+    // lo registra solo el historial de estados). Se ancla a CDMX en vez de usar la
+    // zona de la laptop: México no aplica horario de verano desde 2022, así que
+    // -06:00 es fijo y la hora tecleada se conserva agende quien agende.
+    const asesoriaAt = buildAsesoriaTimestamp(date, time);
+
     if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
@@ -3260,6 +3280,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             ...p,
             status: "asesoria_agendada" as const,
             notes_aliado: notesText,
+            asesoria_at: asesoriaAt,
             updated_at: new Date().toISOString(),
           };
         }
@@ -3299,13 +3320,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           .update({
             status: "asesoria_agendada",
             notes_aliado: notesText,
+            asesoria_at: asesoriaAt,
           })
           .eq("id", id);
-          
+
         if (error) throw error;
 
         setProspects((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: "asesoria_agendada" as const, notes_aliado: notesText } : p))
+          prev.map((p) =>
+            p.id === id
+              ? { ...p, status: "asesoria_agendada" as const, notes_aliado: notesText, asesoria_at: asesoriaAt }
+              : p
+          )
         );
 
         const target = prospects.find((p) => p.id === id);
@@ -3333,7 +3359,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           );
         }
       } catch (error) {
+        // Se relanza a propósito: si el guardado falla (RLS, columna faltante, red)
+        // quien agenda tiene que enterarse. Tragarse el error dejaba la pantalla
+        // como si la cita hubiera quedado grabada.
         console.error("Error scheduling assessment in Supabase:", error);
+        throw error;
       }
     }
   };

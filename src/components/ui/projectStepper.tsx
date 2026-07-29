@@ -52,6 +52,29 @@ export function getActiveStageIndex(status: string): number {
   return idx >= 0 ? idx : STEP_CREATED_INDEX;
 }
 
+// Fecha (ms) que le toca a cada hito, resolviendo las dos excepciones al historial:
+//  · "Proyecto creado" usa `created_at` (el historial solo registra CAMBIOS, así que
+//    un proyecto recién capturado no tiene fila propia de `evaluacion_pendiente`).
+//  · "Agenda de Asesoría" usa `asesoria_at`, la fecha de la REUNIÓN. El historial
+//    solo sabe cuándo se capturó la cita, que casi nunca es el día de la reunión.
+// Compartido con "Fechas clave del proyecto" del expediente para que no diverjan.
+export function resolveStepDates(
+  dates?: Record<string, number>,
+  createdAt?: string | null,
+  asesoriaAt?: string | null
+): Record<string, number | undefined> {
+  const ts = (v?: string | null) => {
+    if (!v) return undefined;
+    const t = new Date(v).getTime();
+    return isNaN(t) ? undefined : t;
+  };
+  return {
+    ...dates,
+    evaluacion_pendiente: dates?.evaluacion_pendiente ?? ts(createdAt),
+    asesoria_agendada: ts(asesoriaAt) ?? dates?.asesoria_agendada,
+  };
+}
+
 // Fecha y hora en Ciudad de México, tal como quedó registrada al cambiar de estado.
 export const fmtStepDateTime = (t?: number): string | null =>
   t
@@ -64,6 +87,24 @@ export const fmtStepDateTime = (t?: number): string | null =>
       })
     : null;
 
+// Cita de asesoría (`asesoria_at`) lista para leerse: "15 ago, 15:30" en CDMX.
+export const formatCita = (iso?: string | null): string | null => {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return isNaN(t) ? null : fmtStepDateTime(t);
+};
+
+// La misma cita partida en los valores que esperan los <input type="date"|"time">.
+// CDMX es UTC-6 fijo (México no aplica horario de verano desde 2022), así que basta
+// correr el instante y leer los campos UTC: se recupera la hora que se tecleó.
+export const citaInputs = (iso?: string | null): { date: string; time: string } | null => {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return null;
+  const shifted = new Date(t - 6 * 60 * 60 * 1000).toISOString();
+  return { date: shifted.slice(0, 10), time: shifted.slice(11, 16) };
+};
+
 interface ProjectStepperProps {
   /** Índice del hito activo (usar getActiveStageIndex). */
   activeIndex: number;
@@ -75,12 +116,18 @@ interface ProjectStepperProps {
    * capturado no tiene fila propia de `evaluacion_pendiente`.
    */
   createdAt?: string | null;
+  /**
+   * Fecha de la REUNIÓN de asesoría (prospects.asesoria_at). Manda sobre el
+   * historial en ese hito: el historial dice cuándo se capturó la cita, y lo que
+   * interesa ver es cuándo es la reunión con el cliente.
+   */
+  asesoriaAt?: string | null;
   className?: string;
 }
 
 // Barra de progreso horizontal del pipeline (nodos + línea + fecha por hito).
-export function ProjectStepper({ activeIndex, dates, createdAt, className = "" }: ProjectStepperProps) {
-  const createdTs = createdAt ? new Date(createdAt).getTime() : undefined;
+export function ProjectStepper({ activeIndex, dates, createdAt, asesoriaAt, className = "" }: ProjectStepperProps) {
+  const stepDates = resolveStepDates(dates, createdAt, asesoriaAt);
   return (
     <div className={`relative ${className}`}>
       <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -97,8 +144,7 @@ export function ProjectStepper({ activeIndex, dates, createdAt, className = "" }
         {STEP_DEFS.map((step, idx) => {
           const isCompleted = idx < activeIndex;
           const isActive = idx === activeIndex;
-          const raw = dates?.[STEP_STATUSES[idx]] ?? (idx === STEP_CREATED_INDEX ? createdTs : undefined);
-          const dt = fmtStepDateTime(raw);
+          const dt = fmtStepDateTime(stepDates[STEP_STATUSES[idx]]);
           return (
             <div key={idx} className="flex flex-col items-center group relative">
               <div

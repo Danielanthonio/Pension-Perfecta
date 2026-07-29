@@ -41,7 +41,7 @@ import {
 import UserSettingsModal from "@/components/UserSettingsModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
-import { getActiveStageIndex, STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
+import { getActiveStageIndex, STEP_STATUSES, STEP_DEFS, resolveStepDates } from "@/components/ui/projectStepper";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
 
 function CopyButton({ text }: { text: string }) {
@@ -225,8 +225,13 @@ export default function ProspectoDetalle() {
   const handleConfirmScheduleDetail = async () => {
     if (prospect) {
       if (confirm(`¿Confirmar que ya agendaste la asesoría para ${prospect.full_name}?`)) {
-        await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
-        router.push(backPath);
+        try {
+          await scheduleAssessment(prospect.id, "LeadConnector", "Enlace Directo");
+          router.push(backPath);
+        } catch (err) {
+          console.error("Error al agendar la asesoría:", err);
+          alert("No se pudo guardar la cita. Intenta de nuevo.");
+        }
       }
     }
   };
@@ -307,7 +312,9 @@ export default function ProspectoDetalle() {
   const [uploadingType, setUploadingType] = useState<"AFORE" | "IMSS" | "OTROS" | "RESOLUCION" | "INE" | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const canDeleteDoc = user?.role === "director" || user?.role === "account_manager" || (prospect && prospect.aliado_id === user?.id);
+  // Quién puede tocar el expediente (borrar y reemplazar archivos): Dirección y el
+  // Account Manager sobre cualquier proyecto, y el aliado dueño sobre el suyo.
+  const canManageDocs = user?.role === "director" || user?.role === "account_manager" || (prospect && prospect.aliado_id === user?.id);
 
   const handleDeleteSelectedDoc = async () => {
     if (!prospect || !selectedDoc) return;
@@ -373,16 +380,24 @@ export default function ProspectoDetalle() {
     setUploadingType(type);
     setUploadProgress(10);
 
+    // El input se limpia al terminar: si no, volver a elegir el MISMO archivo
+    // (caso típico al reemplazar) no dispara onChange y parece que no pasa nada.
+    const inputEl = e.target;
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64Data = event.target?.result as string;
-      if (!base64Data) return;
+      if (!base64Data) {
+        inputEl.value = "";
+        setUploadingType(null);
+        setUploadProgress(0);
+        return;
+      }
 
       setUploadProgress(30);
       try {
         const existingDoc = prospect.documents.find((d) => d.file_type === type);
         if (existingDoc) {
-          if (!canDeleteDoc) {
+          if (!canManageDocs) {
             alert("No tienes permisos para reemplazar documentos existentes.");
             setUploadingType(null);
             setUploadProgress(0);
@@ -418,6 +433,7 @@ export default function ProspectoDetalle() {
         console.error(err);
         alert("Error al subir el archivo.");
       } finally {
+        inputEl.value = "";
         setTimeout(() => {
           setUploadingType(null);
           setUploadProgress(0);
@@ -606,11 +622,11 @@ export default function ProspectoDetalle() {
     type RowState = "done" | "current" | "pending";
     // Los hitos salen de STEP_STATUSES/STEP_DEFS: misma línea de tiempo que la botonera
     // de Mis Clientes y que el stepper, así que los índices cuadran siempre.
+    // Mismas excepciones al historial que aplica el stepper: "Proyecto creado" fecha
+    // con created_at y "Agenda de Asesoría" con la fecha de la REUNIÓN.
+    const stepDates = resolveStepDates(statusDates, prospect.created_at, prospect.asesoria_at);
     const rows: { label: string; date: string | null; state: RowState }[] = STEP_STATUSES.map((status, idx) => {
-      // "Proyecto creado" fecha con created_at: el historial solo guarda CAMBIOS de
-      // estado, así que un proyecto recién capturado no tiene fila propia.
-      const ts = statusDates[status] ?? (idx === 0 ? new Date(prospect.created_at).getTime() : undefined);
-      const date = fmt(ts);
+      const date = fmt(stepDates[status]);
       const state: RowState = date ? "done" : (!terminal && idx === activeIndex ? "current" : "pending");
       return { label: STEP_DEFS[idx].label, date, state };
     });
@@ -625,7 +641,7 @@ export default function ProspectoDetalle() {
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Fechas clave del proyecto</h3>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Se registran solas al avanzar de etapa</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-1 leading-none">Se registran solas al avanzar de etapa · la asesoría muestra la fecha de la reunión</p>
         </div>
       </div>
     );
@@ -2346,47 +2362,134 @@ export default function ProspectoDetalle() {
                 </span>
                 {prospect.documents.map((doc) => {
                   const isActive = selectedDoc?.id === doc.id;
+                  const isUploading = uploadingType === doc.file_type;
                   return (
-                    <button
+                    <div
                       key={doc.id}
-                      onClick={() => {
-                        setSelectedDoc(doc);
-                        setSelectedDocType(doc.file_type as any);
-                        setSelectedDocName(doc.file_name);
-                      }}
-                      className={`w-full text-left p-3.5 rounded-2xl border transition-all flex flex-col gap-1.5 active:scale-[0.97] transform ${
+                      className={`w-full rounded-2xl border transition-all overflow-hidden ${
                         isActive
                           ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/10"
-                          : "bg-white dark:bg-slate-850/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          : "bg-white dark:bg-slate-850/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <FileText className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
-                        <span className="text-[9px] font-black uppercase tracking-wider">
-                          Expediente {getDocTypeLabel(doc.file_type)}
+                      <button
+                        onClick={() => {
+                          setSelectedDoc(doc);
+                          setSelectedDocType(doc.file_type as any);
+                          setSelectedDocName(doc.file_name);
+                        }}
+                        className={`w-full text-left p-3.5 flex flex-col gap-1.5 transition-colors ${
+                          isActive ? "" : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+                          <span className="text-[9px] font-black uppercase tracking-wider">
+                            Expediente {getDocTypeLabel(doc.file_type)}
+                          </span>
+                        </div>
+                        <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
+                          {doc.file_name}
                         </span>
-                      </div>
-                      <span className={`text-[9px] truncate w-full font-semibold leading-none ${isActive ? "text-white/80" : "text-slate-400"}`}>
-                        {doc.file_name}
-                      </span>
-                      <div className="flex flex-col gap-0.5 mt-1 border-t border-white/10 pt-1.5 w-full text-left">
-                        <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
-                          Por: {(() => {
-                            const uploader = profiles.find(p => p.id === doc.uploaded_by);
-                            if (uploader) return uploader.full_name;
-                            return doc.uploaded_by === user?.id ? user?.full_name : "Sistema";
-                          })()}
-                        </span>
-                        <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
-                          Subido: {new Date(doc.uploaded_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </button>
+                        <div className="flex flex-col gap-0.5 mt-1 border-t border-white/10 pt-1.5 w-full text-left">
+                          <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                            Por: {(() => {
+                              const uploader = profiles.find(p => p.id === doc.uploaded_by);
+                              if (uploader) return uploader.full_name;
+                              return doc.uploaded_by === user?.id ? user?.full_name : "Sistema";
+                            })()}
+                          </span>
+                          <span className={`text-[8px] leading-none font-bold ${isActive ? "text-white/70" : "text-slate-400"}`}>
+                            Subido: {new Date(doc.uploaded_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Reemplazo del archivo sin salir del visor: sube el nuevo y borra el
+                          anterior de Drive (lo resuelve handleDocumentUpload). */}
+                      {canManageDocs && (
+                        <div className="px-3.5 pb-3">
+                          <input
+                            type="file"
+                            id={`file-admin-${doc.file_type}`}
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={(e) => handleDocumentUpload(doc.file_type as any, e)}
+                          />
+                          <button
+                            disabled={isUploading}
+                            onClick={() => document.getElementById(`file-admin-${doc.file_type}`)?.click()}
+                            className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all disabled:opacity-60 ${
+                              isActive
+                                ? "bg-white/15 hover:bg-white/25 text-white border border-white/20"
+                                : "bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                            }`}
+                          >
+                            <Upload className="h-3 w-3" />
+                            {isUploading ? "Subiendo..." : "Reemplazar"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
+
+                {/* Slots del expediente que aún no llegan: Dirección y el AM también
+                    pueden cargarlos desde aquí, no sólo el aliado. */}
+                {canManageDocs &&
+                  getExpedienteDocSlots(prospect.tipo_financiamiento)
+                    .filter((slot) => !prospect.documents.some((d) => d.file_type === slot.fileType))
+                    .map((slot) => {
+                      const isUploading = uploadingType === slot.fileType;
+                      return (
+                        <div
+                          key={slot.fileType}
+                          className="w-full rounded-2xl border border-dashed border-slate-250 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 p-3.5 space-y-2"
+                        >
+                          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                            <FileText className="h-4 w-4" />
+                            <span className="text-[9px] font-black uppercase tracking-wider">
+                              {slot.shortLabel} pendiente
+                            </span>
+                          </div>
+                          <input
+                            type="file"
+                            id={`file-admin-${slot.fileType}`}
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={(e) => handleDocumentUpload(slot.fileType, e)}
+                          />
+                          <button
+                            disabled={isUploading}
+                            onClick={() => document.getElementById(`file-admin-${slot.fileType}`)?.click()}
+                            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white transition-all disabled:opacity-60"
+                          >
+                            <Upload className="h-3 w-3" />
+                            {isUploading ? "Subiendo..." : `Subir ${slot.shortLabel}`}
+                          </button>
+                        </div>
+                      );
+                    })}
+
                 {prospect.documents.length === 0 && (
                   <div className="text-center py-8 text-slate-400 text-xs font-semibold">
                     No se adjuntaron expedientes.
+                  </div>
+                )}
+
+                {/* Barra de progreso mientras se sube/reemplaza */}
+                {uploadingType && (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-2">
+                    <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 dark:text-slate-400 leading-none">
+                      <span>Subiendo {getDocTypeLabel(uploadingType)}...</span>
+                      <span className="tabular-nums">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-indigo-500 to-blue-500 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
                   </div>
                 )}
             </div>
@@ -2458,7 +2561,17 @@ export default function ProspectoDetalle() {
                         <span>{auditLoading ? "Auditando..." : "Auditar Semanas"}</span>
                       </button>
                     )}
-                    {canDeleteDoc && (
+                    {canManageDocs && selectedDoc && (
+                      <button
+                        onClick={() => document.getElementById(`file-admin-${selectedDoc.file_type}`)?.click()}
+                        disabled={uploadingType === selectedDoc.file_type}
+                        className="p-1.5 hover:bg-slate-700 hover:text-indigo-300 rounded transition-colors text-slate-350 disabled:opacity-40"
+                        title="Reemplazar Expediente"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageDocs && (
                       <button
                         onClick={handleDeleteSelectedDoc}
                         className="p-1.5 hover:bg-slate-700 hover:text-red-400 rounded transition-colors text-slate-350"
