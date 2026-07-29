@@ -23,6 +23,8 @@ import {
   CheckCircle,
   UserCog,
   Building2,
+  Calendar,
+  ExternalLink,
   X,
 } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -35,6 +37,20 @@ import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@
 import { PipelineTabs } from "@/components/ui/pipelineTabs";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
+
+// Estados en los que tiene sentido agendar. Antes de aprobar no hay propuesta que
+// presentar; después de la reunión el proyecto ya avanzó y regrabar la fecha lo
+// devolvería un hito atrás. En `asesoria_agendada` sí se permite: es reagendar.
+const SCHEDULABLE_STATUSES = ["aprobado_listo", "asesoria_agendada"];
+
+// La cita queda escrita en `notes_aliado` ("Asesoría agendada para el día
+// AAAA-MM-DD a las HH:MM hrs."). Se relee para precargar el modal al reagendar;
+// si el formato no coincide (o se agendó vía LeadConnector) se abre en blanco.
+function parseAgendaFromNotes(notes?: string | null): { date: string; time: string } | null {
+  const m = notes?.match(/día (\d{4}-\d{2}-\d{2}) a las (\d{1,2}:\d{2})/);
+  if (!m) return null;
+  return { date: m[1], time: m[2].padStart(5, "0") };
+}
 
 function ClientesAdminContent() {
   const {
@@ -52,6 +68,8 @@ function ClientesAdminContent() {
     isProspectPurged,
     getProspectDeletedAt,
     empresasMultialiado,
+    scheduleAssessment,
+    appSettings,
     isDemoMode,
   } = useApp();
 
@@ -156,7 +174,55 @@ function ClientesAdminContent() {
   // Reasignar Account Manager: modal de confirmación (Sí/No) + toast de éxito arriba.
   const [amReassignTarget, setAmReassignTarget] = useState<{ prospect: Prospect; newAmId: string } | null>(null);
   const [amReassigning, setAmReassigning] = useState(false);
-  const [amSuccess, setAmSuccess] = useState<string | null>(null);
+  // Toast de éxito compartido (reasignación de AM, agenda de asesoría...).
+  const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
+
+  const showToast = (title: string, message: string) => {
+    setToast({ title, message });
+    window.setTimeout(() => setToast(null), 5000);
+  };
+
+  // Agenda de asesoría — la graban por igual el aliado, el AM y el director. Grabar
+  // la fecha es el ÚNICO camino al hito "Agenda de Asesoría" (la subetapa no se
+  // puede elegir a mano, ver EDITABLE_SUB_STAGES_BY_STAGE).
+  const [scheduleTarget, setScheduleTarget] = useState<Prospect | null>(null);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduling, setScheduling] = useState(false);
+
+  const openScheduleModal = (prospect: Prospect) => {
+    const previa = parseAgendaFromNotes(prospect.notes_aliado);
+    setScheduleTarget(prospect);
+    setScheduleDate(previa?.date || "");
+    setScheduleTime(previa?.time || "");
+    setScheduling(false);
+  };
+
+  const handleConfirmSchedule = async () => {
+    if (!scheduleTarget || !scheduleDate || !scheduleTime) return;
+    setScheduling(true);
+    try {
+      await scheduleAssessment(scheduleTarget.id, scheduleDate, scheduleTime);
+      const nombre = scheduleTarget.full_name;
+      setScheduleTarget(null);
+      // Si estábamos parados en "Listo para Presentar" el proyecto acaba de salir de
+      // esa lista: mover la vista al hito que alcanzó para que se vea a dónde fue.
+      if (activeTab === "aprobado_listo") setActiveTab("asesoria_agendada");
+      showToast("Asesoría agendada 📅", `${nombre} avanzó al hito “Agenda de Asesoría” · ${scheduleDate} a las ${scheduleTime} hrs.`);
+    } catch (err) {
+      console.error("Error al agendar la asesoría:", err);
+      alert("No se pudo agendar la asesoría. Intenta de nuevo.");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  // Link de reunión que le toca según la modalidad que fijó Dirección al aprobar.
+  const meetingLinkFor = (prospect: Prospect): string | null => {
+    if (!prospect.modalidad) return null;
+    const url = prospect.modalidad === "40" ? appSettings.meeting_link_m40 : appSettings.meeting_link_m10;
+    return url && url.trim() ? url : null;
+  };
 
   // Aliados a los que se puede reasignar: director y AM pueden mover el proyecto a
   // CUALQUIER aliado del sistema (la "cartera" del AM ya no existe: el AM es por
@@ -378,8 +444,7 @@ function ClientesAdminContent() {
     try {
       await reassignAccountManager(prospect.id, target);
       setAmReassignTarget(null);
-      setAmSuccess(`Proyecto de ${prospect.full_name} reasignado con éxito a ${amNameById(target)}.`);
-      window.setTimeout(() => setAmSuccess(null), 5000);
+      showToast("Reasignación exitosa ✅", `Proyecto de ${prospect.full_name} reasignado con éxito a ${amNameById(target)}.`);
     } catch (e) {
       console.error("Error reasignando AM:", e);
       alert("No se pudo reasignar el Account Manager.");
@@ -793,6 +858,9 @@ function ClientesAdminContent() {
                       // en el pipeline de cierre). Antes del dictamen de aprobación no se muestra.
                       const showTimeline = hasProjectTimeline(p.status);
                       const isExpanded = expandedId === p.id && showTimeline;
+                      // Agendar la asesoría: mismo gesto que hace el aliado en su portal.
+                      const yaAgendado = p.status === "asesoria_agendada";
+                      const canSchedule = SCHEDULABLE_STATUSES.includes(p.status);
                       return (
                         <React.Fragment key={p.id}>
                         <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-850/20 transition-colors group">
@@ -947,6 +1015,20 @@ function ClientesAdminContent() {
                                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                               </button>
                               )}
+                              {canSchedule && (
+                              <button
+                                onClick={() => openScheduleModal(p)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all active:scale-95"
+                                title={
+                                  yaAgendado
+                                    ? "Cambiar la fecha de la asesoría"
+                                    : "Grabar la fecha de la asesoría (avanza al hito Agenda de Asesoría)"
+                                }
+                              >
+                                <Calendar className="h-3.5 w-3.5" />
+                                {yaAgendado ? "Reagendar" : "Agendar"}
+                              </button>
+                              )}
                               <Link
                                 href={`/prospectos/${p.id}`}
                                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
@@ -1001,6 +1083,107 @@ function ClientesAdminContent() {
           )}
         </div>
       </div>
+
+      {/* Agenda de Asesoría — grabar la fecha de la reunión con el cliente */}
+      {scheduleTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
+            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
+              <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                  {scheduleTarget.status === "asesoria_agendada" ? "Cambiar fecha de la asesoría" : "Agendar asesoría"}
+                </h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                  {scheduleTarget.status === "asesoria_agendada"
+                    ? "Actualiza la cita para presentar el dictamen Ley 73."
+                    : "Al guardar la cita el proyecto avanza al hito “Agenda de Asesoría”."}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold">
+                  {scheduleTarget.full_name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block truncate">{scheduleTarget.full_name}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tabular-nums">
+                    NSS: {scheduleTarget.nss} · Aliado: {scheduleTarget.aliado_name || "Asesor Comercial"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  Fecha
+                </label>
+                {/* Sin fecha mínima a propósito: Dirección/AM también registran citas
+                    que ya ocurrieron y el aliado no alcanzó a capturar. */}
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  Hora
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
+                />
+              </div>
+            </div>
+
+            {meetingLinkFor(scheduleTarget) ? (
+              <a
+                href={meetingLinkFor(scheduleTarget) as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Abrir agenda de Modalidad {scheduleTarget.modalidad}
+              </a>
+            ) : (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                {scheduleTarget.modalidad
+                  ? `Falta configurar el link de reunión de Modalidad ${scheduleTarget.modalidad} en Gestión de Usuarios.`
+                  : "Este proyecto aún no tiene modalidad definida, así que no hay link de reunión que abrir."}
+              </p>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => setScheduleTarget(null)}
+                disabled={scheduling}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmSchedule}
+                disabled={!scheduleDate || !scheduleTime || scheduling}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                {scheduling ? "Guardando..." : "Confirmar agenda"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
@@ -1203,19 +1386,19 @@ function ClientesAdminContent() {
         </div>
       )}
 
-      {/* Toast de éxito (arriba) — confirma al director que la reasignación se logró */}
-      {amSuccess && (
+      {/* Toast de éxito (arriba) — confirma al director que la acción se logró */}
+      {toast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[calc(100%-2rem)] animate-fade-in">
           <div className="flex items-start gap-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 rounded-2xl shadow-2xl px-4 py-3.5">
             <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/50">
               <CheckCircle className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Reasignación exitosa ✅</h4>
-              <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{amSuccess}</p>
+              <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400">{toast.title}</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{toast.message}</p>
             </div>
             <button
-              onClick={() => setAmSuccess(null)}
+              onClick={() => setToast(null)}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors shrink-0"
             >
               <X className="h-4 w-4" />

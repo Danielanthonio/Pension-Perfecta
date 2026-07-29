@@ -1050,7 +1050,7 @@ function ClientesContent() {
                   <div>
                     <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 font-black">¿Confirmar Fecha y Hora?</h4>
                     <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                      El caso avanzará a la etapa de &quot;Proyectos Activos&quot; tras guardar la cita.
+                      El proyecto avanzará al hito &quot;Agenda de Asesoría&quot; tras guardar la cita.
                     </p>
                   </div>
                 </div>

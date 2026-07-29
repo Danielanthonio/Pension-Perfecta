@@ -3249,6 +3249,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       ? "Asesoría agendada vía LeadConnector"
       : `Asesoría agendada para el día ${date} a las ${time} hrs.`;
 
+    // Agendar ya no es exclusivo del aliado: el director y el AM también graban la
+    // fecha desde Gestión de Clientes. La notificación nombra a quien lo hizo.
+    const quienAgenda = user?.full_name || "El equipo";
+
     if (isDemoMode || isProvisionalSession || !supabase) {
       const updated = prospects.map((p) => {
         if (p.id === id) {
@@ -3271,8 +3275,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           id: `notif-${Math.random().toString(36).substr(2, 9)}`,
           title: "Asesoría Agendada 📅",
           message: date === "LeadConnector"
-            ? `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
-            : `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+            ? `${quienAgenda} agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
+            : `${quienAgenda} agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
           type: "info",
           read: false,
           created_at: new Date().toISOString(),
@@ -3313,8 +3317,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               user_id: dir.id,
               title: "Asesoría Agendada 📅",
               message: date === "LeadConnector"
-                ? `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
-                : `El aliado Roberto agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
+                ? `${quienAgenda} agendó la asesoría de presentación para ${target.full_name} vía LeadConnector.`
+                : `${quienAgenda} agendó la asesoría de presentación para ${target.full_name} el día ${date} a las ${time} hrs.`,
               type: "info",
               read: false,
             });
