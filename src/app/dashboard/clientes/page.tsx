@@ -16,8 +16,6 @@ import {
   CheckSquare,
   FileText,
   ArrowUpRight,
-  CheckCircle2,
-  Clock,
   Folder,
   Trash2,
   X,
@@ -28,7 +26,8 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { ProjectStepper, getActiveStageIndex, formatCita, citaInputs } from "@/components/ui/projectStepper";
+import { ProjectStepper, getActiveStageIndex, formatCita } from "@/components/ui/projectStepper";
+import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
@@ -75,9 +74,7 @@ function ClientesContent() {
 
   // States for Scheduling Modal
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
-  const [schedulingStep, setSchedulingStep] = useState<"datetime" | "confirm">("datetime");
+  const [scheduling, setScheduling] = useState(false);
   const [modalityOpen, setModalityOpen] = useState(false);
 
   // Fechas por etapa desde prospect_status_history: prospectId -> (status -> primer timestamp ms).
@@ -267,40 +264,46 @@ function ClientesContent() {
     };
   }, [activeIdsKey, isDemoMode]);
 
+  // El modal precarga solo la cita que ya tenga el proyecto.
   const handleOpenSchedule = (prospect: Prospect) => {
-    // Si ya hay cita grabada, el modal abre con ella (reagendar, no recapturar).
-    const previa = citaInputs(prospect.asesoria_at);
     setSelectedProspect(prospect);
-    setSelectedDate(previa?.date || "");
-    setSelectedTime(previa?.time || "");
-    setSchedulingStep("datetime");
+    setScheduling(false);
+  };
+
+  // Link de la agenda según la modalidad que fijó Dirección al aprobar.
+  const meetingLinkFor = (prospect: Prospect): string | null => {
+    if (!prospect.modalidad) return null;
+    const url = prospect.modalidad === "40" ? appSettings.meeting_link_m40 : appSettings.meeting_link_m10;
+    return url && url.trim() ? url : null;
   };
 
   // El Director/AM define la modalidad al aprobar; el aliado solo abre esa agenda.
   // Si aún no está definida (casos previos), se le deja elegir (modal 40/10).
   const handleOpenAgenda = (prospect: Prospect) => {
-    const modalidad = prospect.modalidad;
-    if (modalidad) {
-      const url = modalidad === "40" ? appSettings.meeting_link_m40 : appSettings.meeting_link_m10;
-      if (!url || !url.trim()) {
-        alert(`El director aún no ha configurado el link de Modalidad ${modalidad}. Solicítalo a Dirección.`);
-        return;
-      }
-      window.open(url, "_blank", "noopener,noreferrer");
+    if (!prospect.modalidad) {
+      setModalityOpen(true);
       return;
     }
-    setModalityOpen(true);
+    const url = meetingLinkFor(prospect);
+    if (!url) {
+      alert(`El director aún no ha configurado el link de Modalidad ${prospect.modalidad}. Solicítalo a Dirección.`);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleConfirmSchedule = async () => {
-    if (!selectedProspect || !selectedDate || !selectedTime) return;
+  const handleConfirmSchedule = async (date: string, time: string) => {
+    if (!selectedProspect || !date || !time) return;
+    setScheduling(true);
     try {
-      await scheduleAssessment(selectedProspect.id, selectedDate, selectedTime);
+      await scheduleAssessment(selectedProspect.id, date, time);
       setSelectedProspect(null);
       setActiveTab("asesoria_agendada"); // el proyecto queda justo en el hito que acaba de alcanzar
     } catch (err) {
       console.error("Error al agendar la asesoría:", err);
       alert("No se pudo guardar la cita. Intenta de nuevo.");
+    } finally {
+      setScheduling(false);
     }
   };
 
@@ -997,123 +1000,14 @@ function ClientesContent() {
       {/* Selector de modalidad para agendar (abre el link configurado por Dirección) */}
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
 
-      {/* Scheduling Assessment Modal */}
-      {selectedProspect && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40 shadow-sm">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 dark:text-white">Agenda Reunión de Propuesta</h3>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
-                    Asigna fecha y hora para presentar el dictamen Ley 73.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedProspect(null)}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-
-            {/* Steps navigation */}
-            {schedulingStep === "datetime" ? (
-              <div className="space-y-4">
-                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Prospecto</span>
-                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block mt-0.5">{selectedProspect.full_name}</span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">NSS: {selectedProspect.nss}</span>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                      Fecha de Asesoría
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                      Hora de la Cita
-                    </label>
-                    <input
-                      type="time"
-                      value={selectedTime}
-                      onChange={(e) => setSelectedTime(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 focus:bg-white dark:focus:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 transition-all dark:text-slate-200"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  disabled={!selectedDate || !selectedTime}
-                  onClick={() => setSchedulingStep("confirm")}
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-650 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] transform flex items-center justify-center gap-1.5"
-                >
-                  Continuar
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl p-4 flex gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 font-black">¿Confirmar Fecha y Hora?</h4>
-                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                      El proyecto avanzará al hito &quot;Agenda de Asesoría&quot; tras guardar la cita.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-slate-55 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2">
-                  <div>
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Cliente</span>
-                    <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 block">{selectedProspect.full_name}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-850 pt-2">
-                    <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Fecha</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">{selectedDate}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Hora</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">{selectedTime} hs</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setSchedulingStep("datetime")}
-                    className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 transition-all"
-                  >
-                    Atrás
-                  </button>
-                  <button
-                    onClick={handleConfirmSchedule}
-                    className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-650 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all active:scale-[0.98] transform flex items-center justify-center gap-1.5"
-                  >
-                    Confirmar Agenda
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Agenda de Asesoría — misma pantalla que usan el director y el AM */}
+      <AgendaAsesoriaModal
+        prospect={selectedProspect}
+        meetingLink={selectedProspect ? meetingLinkFor(selectedProspect) : null}
+        saving={scheduling}
+        onClose={() => setSelectedProspect(null)}
+        onConfirm={handleConfirmSchedule}
+      />
     </div>
   );
 }

@@ -33,7 +33,8 @@ import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
-import { ProjectStepper, getActiveStageIndex, hasProjectTimeline, formatCita, citaInputs } from "@/components/ui/projectStepper";
+import { ProjectStepper, getActiveStageIndex, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
+import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
 import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
 import { PipelineTabs } from "@/components/ui/pipelineTabs";
@@ -44,17 +45,6 @@ import Link from "next/link";
 // presentar; después de la reunión el proyecto ya avanzó y regrabar la fecha lo
 // devolvería un hito atrás. En `asesoria_agendada` sí se permite: es reagendar.
 const SCHEDULABLE_STATUSES = ["aprobado_listo", "asesoria_agendada"];
-
-// Con qué valores abre el modal al reagendar: la cita grabada en `asesoria_at` y,
-// como respaldo para los proyectos anteriores a esa columna, el texto de la nota
-// ("Asesoría agendada para el día AAAA-MM-DD a las HH:MM hrs."). Si no hay ninguna
-// de las dos (o se agendó vía LeadConnector), abre en blanco.
-function agendaInputsFor(p: Prospect): { date: string; time: string } {
-  const grabada = citaInputs(p.asesoria_at);
-  if (grabada) return grabada;
-  const m = p.notes_aliado?.match(/día (\d{4}-\d{2}-\d{2}) a las (\d{1,2}:\d{2})/);
-  return m ? { date: m[1], time: m[2].padStart(5, "0") } : { date: "", time: "" };
-}
 
 function ClientesAdminContent() {
   const {
@@ -190,15 +180,10 @@ function ClientesAdminContent() {
   // la fecha es el ÚNICO camino al hito "Agenda de Asesoría" (la subetapa no se
   // puede elegir a mano, ver EDITABLE_SUB_STAGES_BY_STAGE).
   const [scheduleTarget, setScheduleTarget] = useState<Prospect | null>(null);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
   const [scheduling, setScheduling] = useState(false);
 
   const openScheduleModal = (prospect: Prospect) => {
-    const previa = agendaInputsFor(prospect);
     setScheduleTarget(prospect);
-    setScheduleDate(previa.date);
-    setScheduleTime(previa.time);
     setScheduling(false);
   };
 
@@ -219,17 +204,17 @@ function ClientesAdminContent() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleConfirmSchedule = async () => {
-    if (!scheduleTarget || !scheduleDate || !scheduleTime) return;
+  const handleConfirmSchedule = async (date: string, time: string) => {
+    if (!scheduleTarget || !date || !time) return;
     setScheduling(true);
     try {
-      await scheduleAssessment(scheduleTarget.id, scheduleDate, scheduleTime);
+      await scheduleAssessment(scheduleTarget.id, date, time);
       const nombre = scheduleTarget.full_name;
       setScheduleTarget(null);
       // Si estábamos parados en "Listo para Presentar" el proyecto acaba de salir de
       // esa lista: mover la vista al hito que alcanzó para que se vea a dónde fue.
       if (activeTab === "aprobado_listo") setActiveTab("asesoria_agendada");
-      showToast("Asesoría agendada 📅", `${nombre} avanzó al hito “Agenda de Asesoría” · ${scheduleDate} a las ${scheduleTime} hrs.`);
+      showToast("Asesoría agendada 📅", `${nombre} avanzó al hito “Agenda de Asesoría” · ${date} a las ${time} hrs.`);
     } catch (err) {
       console.error("Error al agendar la asesoría:", err);
       alert("No se pudo agendar la asesoría. Intenta de nuevo.");
@@ -1129,109 +1114,14 @@ function ClientesAdminContent() {
       {/* Selector 40/10 para abrir la agenda cuando el proyecto no tiene modalidad */}
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
 
-      {/* Agenda de Asesoría — grabar la fecha de la reunión con el cliente */}
-      {scheduleTarget && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
-            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
-              <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
-                  {formatCita(scheduleTarget.asesoria_at) ? "Cambiar fecha de la asesoría" : "Agendar asesoría"}
-                </h3>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-                  Es la fecha de la reunión con el cliente: la misma que aparece en la línea de tiempo.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-sm font-bold">
-                  {scheduleTarget.full_name.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block truncate">{scheduleTarget.full_name}</span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tabular-nums">
-                    NSS: {scheduleTarget.nss} · Aliado: {scheduleTarget.aliado_name || "Asesor Comercial"}
-                  </span>
-                  {formatCita(scheduleTarget.asesoria_at) && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
-                      Cita actual: {formatCita(scheduleTarget.asesoria_at)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                  Fecha
-                </label>
-                {/* Sin fecha mínima a propósito: Dirección/AM también registran citas
-                    que ya ocurrieron y el aliado no alcanzó a capturar. */}
-                <input
-                  type="date"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                  Hora
-                </label>
-                <input
-                  type="time"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 focus:border-emerald-500 outline-none rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors"
-                />
-              </div>
-            </div>
-
-            {meetingLinkFor(scheduleTarget) ? (
-              <a
-                href={meetingLinkFor(scheduleTarget) as string}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 transition-colors"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Abrir agenda de Modalidad {scheduleTarget.modalidad}
-              </a>
-            ) : (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                {scheduleTarget.modalidad
-                  ? `Falta configurar el link de reunión de Modalidad ${scheduleTarget.modalidad} en Gestión de Usuarios.`
-                  : "Este proyecto aún no tiene modalidad definida, así que no hay link de reunión que abrir."}
-              </p>
-            )}
-
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={() => setScheduleTarget(null)}
-                disabled={scheduling}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmSchedule}
-                disabled={!scheduleDate || !scheduleTime || scheduling}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-1.5"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                {scheduling ? "Guardando..." : "Confirmar agenda"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Agenda de Asesoría — misma pantalla que usa el aliado */}
+      <AgendaAsesoriaModal
+        prospect={scheduleTarget}
+        meetingLink={scheduleTarget ? meetingLinkFor(scheduleTarget) : null}
+        saving={scheduling}
+        onClose={() => setScheduleTarget(null)}
+        onConfirm={handleConfirmSchedule}
+      />
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
