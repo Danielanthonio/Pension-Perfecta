@@ -26,6 +26,7 @@ import {
   Sun,
   Moon,
   Users,
+  GraduationCap,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -43,6 +44,7 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   const items = [
     { href: `/dashboard${qs}`, active: cleanPath === "/dashboard", Icon: LayoutDashboard, label: "Dashboard" },
     { href: `/dashboard/clientes${qs}`, active: cleanPath === "/dashboard/clientes", Icon: Contact, label: "Mis Clientes" },
+    { href: `/dashboard/classroom${qs}`, active: cleanPath === "/dashboard/classroom", Icon: GraduationCap, label: "Classroom" },
     ...(isLeader
       ? [{ href: `/dashboard/aliados${qs}`, active: cleanPath === "/dashboard/aliados", Icon: Users, label: "Mis Aliados" }]
       : []),
@@ -377,6 +379,12 @@ export default function DashboardLayout({
       return {
         title: "Subir Prospecto",
         subtitle: "Registra un nuevo prospecto y adjunta su documentación.",
+      };
+    }
+    if (cleanPath === "/dashboard/classroom") {
+      return {
+        title: "Classroom",
+        subtitle: "Tu inducción: los conceptos, la lógica del sistema y cómo empezar desde cero.",
       };
     }
     return {

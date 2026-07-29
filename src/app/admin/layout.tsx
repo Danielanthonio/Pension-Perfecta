@@ -32,6 +32,7 @@ import {
   Sun,
   Moon,
   Building2,
+  GraduationCap,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -57,6 +58,7 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
       ? [{ href: `/admin/account-managers${qs}`, active: cleanPath === "/admin/account-managers", Icon: Users, label: "Gestión AMs" }]
       : []),
     { href: `/admin/usuarios${qs}`, active: cleanPath === "/admin/usuarios", Icon: UserPlus, label: "Gestión Usuarios" },
+    { href: `/admin/classroom${qs}`, active: cleanPath === "/admin/classroom", Icon: GraduationCap, label: "Classroom" },
   ];
 
   return (
@@ -445,6 +447,12 @@ export default function AdminLayout({
       return {
         title: "Empresas Multialiado",
         subtitle: "Administra las empresas que agrupan a tus líderes en la matriz de asignación.",
+      };
+    }
+    if (cleanPath === "/admin/classroom") {
+      return {
+        title: "Classroom",
+        subtitle: "Inducción, conceptos y material de apoyo para todo el equipo.",
       };
     }
     return {
