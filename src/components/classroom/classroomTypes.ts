@@ -198,8 +198,20 @@ const YT_ID = /^[\w-]{11}$/;
  * que la UI ofrezca abrirlo en una pestaña nueva en lugar de romperse.
  */
 export function resolveVideoEmbed(raw: string | null | undefined): VideoEmbed | null {
-  const url = (raw || "").trim();
+  let url = (raw || "").trim();
   if (!url) return null;
+
+  // En Loom el botón más visible es «Copy embed code», que devuelve un bloque
+  // <iframe …> completo, no un link. Si pegaron eso, sacamos el src en vez de
+  // fallar: es el error de captura más probable del día a día.
+  if (url.includes("<iframe")) {
+    const m = url.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    if (!m) return null;
+    url = m[1].trim();
+  }
+
+  // Pegar "www.loom.com/share/xxx" sin protocolo es común; new URL() lo rechaza.
+  if (!/^[a-z][\w+.-]*:/i.test(url)) url = `https://${url}`;
 
   let u: URL;
   try {
@@ -231,8 +243,15 @@ export function resolveVideoEmbed(raw: string | null | undefined): VideoEmbed | 
 
   // --- Loom ---
   if (host === "loom.com" || host.endsWith(".loom.com")) {
+    // /share/<id> y /embed/<id>. Se excluye `folder`: /share/folder/<id> es una
+    // carpeta del workspace, no un video, y embeberla da un reproductor vacío.
     const m = path.match(/^\/(?:share|embed)\/([\w-]+)/);
-    if (m) return { kind: "iframe", src: `https://www.loom.com/embed/${m[1]}`, provider: "Loom" };
+    if (m && m[1] !== "folder") {
+      // Loom admite ?t=<segundos> para arrancar en un punto concreto.
+      const t = u.searchParams.get("t") || "";
+      const qs = /^\d+$/.test(t) ? `?t=${t}` : "";
+      return { kind: "iframe", src: `https://www.loom.com/embed/${m[1]}${qs}`, provider: "Loom" };
+    }
   }
 
   // --- Google Drive ---
