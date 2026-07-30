@@ -36,6 +36,10 @@ yarn-error.log*
 scratch/
 architecture-output.md
 
+# fotos de referencia para generar portadas (personales — no van al repo).
+# Las portadas YA generadas sí se versionan, en public/classroom/.
+pic raul/
+
 # vercel
 .vercel
 
