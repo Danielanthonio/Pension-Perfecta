@@ -380,8 +380,21 @@ function CourseCard({
     >
       <CourseCover course={course} />
 
+      {/* Velo de "sin publicar". Solo lo ve la Dirección: para el aliado y el
+          account manager el curso no existe —ni su portada—, porque el RLS no
+          les devuelve la fila. Aquí el velo es una ayuda visual para saber de un
+          vistazo qué falta por soltar. */}
+      {isEditor && !course.is_published && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex aspect-video items-center justify-center bg-slate-950/70">
+          <span className="flex items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-950 shadow-lg">
+            <EyeOff className="h-3.5 w-3.5" />
+            Sin publicar
+          </span>
+        </div>
+      )}
+
       {isEditor && (
-        <div className="absolute left-2 top-2 flex items-center gap-1.5">
+        <div className="absolute left-2 top-2 z-20 flex items-center gap-1.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -392,12 +405,6 @@ function CourseCard({
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          {!course.is_published && (
-            <span className="flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-white">
-              <EyeOff className="h-3 w-3" />
-              Borrador
-            </span>
-          )}
           {course.audience !== "todos" && (
             <span className="rounded-lg bg-slate-900/70 px-2 py-1.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-sm">
               {course.audience === "aliados" ? "Aliados" : "Equipo"}
@@ -517,8 +524,16 @@ function CourseDetail({
       {/* Encabezado del curso */}
       <div className="overflow-hidden rounded-2xl border border-slate-200/70 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-          <div className="w-full shrink-0 overflow-hidden rounded-xl sm:w-56">
+          <div className="relative w-full shrink-0 overflow-hidden rounded-xl sm:w-56">
             <CourseCover course={course} compact />
+            {isEditor && !course.is_published && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70">
+                <span className="flex items-center gap-1.5 rounded-full bg-amber-400 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-amber-950 shadow-lg">
+                  <EyeOff className="h-3 w-3" />
+                  Sin publicar
+                </span>
+              </div>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
@@ -618,6 +633,17 @@ function CourseDetail({
 
               {selected && (
                 <div className="space-y-4 p-5">
+                  {/* Sin velo sobre el reproductor a propósito: la Dirección
+                      necesita poder ver el video en borrador para revisarlo
+                      antes de soltarlo. El aviso deja claro que nadie más lo ve. */}
+                  {isEditor && !selected.is_published && (
+                    <div className="flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 px-3 py-2.5">
+                      <EyeOff className="h-4 w-4 shrink-0 text-amber-500" />
+                      <span className="text-[11px] font-bold leading-snug text-amber-800 dark:text-amber-300">
+                        Sin publicar. Tú la ves para revisarla; el aliado y el account manager no la tienen en su Classroom.
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
@@ -718,6 +744,9 @@ function CourseDetail({
               {lessons.map((l, i) => {
                 const done = completed.has(l.id);
                 const active = l.id === selectedId;
+                // Solo la Dirección llega a ver una lección sin publicar: al
+                // aliado y al account manager el RLS ni se la devuelve.
+                const draft = isEditor && !l.is_published;
                 return (
                   <li key={l.id} className="flex items-center gap-1">
                     <button
@@ -725,19 +754,23 @@ function CourseDetail({
                       className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
                         active
                           ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-800/50"
-                          : "hover:bg-slate-50 dark:hover:bg-slate-850"
+                          : draft
+                            ? "bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-850"
                       }`}
                     >
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                          done
-                            ? "bg-emerald-500 text-white"
-                            : active
-                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                          draft
+                            ? "bg-amber-400 text-amber-950"
+                            : done
+                              ? "bg-emerald-500 text-white"
+                              : active
+                                ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
                         }`}
                       >
-                        {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                        {draft ? <EyeOff className="h-3 w-3" /> : done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span
@@ -748,12 +781,12 @@ function CourseDetail({
                           {l.title}
                         </span>
                         <span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                          {l.duration_min ? formatDuration(l.duration_min) : "Sin duración"}
-                          {isEditor && !l.is_published && (
-                            <span className="inline-flex items-center gap-0.5 text-amber-500">
-                              <EyeOff className="h-2.5 w-2.5" />
-                              borrador
+                          {draft ? (
+                            <span className="font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                              Sin publicar
                             </span>
+                          ) : (
+                            l.duration_min ? formatDuration(l.duration_min) : "Sin duración"
                           )}
                           {l.video_url && <Eye className="h-2.5 w-2.5" />}
                         </span>
