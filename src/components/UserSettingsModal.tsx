@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { useApp, getProfileCompletion } from "@/utils/context/AppContext";
+import { useApp, getProfileCompletion, getBankingCompletion } from "@/utils/context/AppContext";
+import BankingDataForm from "@/components/BankingDataForm";
 import {
   User,
   Mail,
@@ -18,18 +19,23 @@ import {
   MapPin,
   Fingerprint,
   BadgeCheck,
+  Landmark,
   Loader2,
 } from "lucide-react";
+
+type SettingsTab = "personal" | "banking" | "profile" | "display" | "help";
 
 interface UserSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Pestaña con la que abre el modal. Por defecto, "Datos Personales". */
+  initialTab?: SettingsTab;
 }
 
-export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModalProps) {
+export default function UserSettingsModal({ isOpen, onClose, initialTab }: UserSettingsModalProps) {
   const { user, updateUserProfile, uploadAvatar, triggerPushNotification } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"personal" | "profile" | "display" | "help">("personal");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || "personal");
 
   // Form states
   const [fullName, setFullName] = useState("");
@@ -64,6 +70,12 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
       setPais(user.pais || "México");
     }
   }, [user, isOpen]);
+
+  // Al reabrir el modal, respeta la pestaña con la que se pidió abrirlo (p. ej.
+  // el aviso del header lleva directo a "Datos Bancarios").
+  useEffect(() => {
+    if (isOpen) setActiveTab(initialTab || "personal");
+  }, [isOpen, initialTab]);
 
   // Load theme and language settings on mount
   useEffect(() => {
@@ -114,6 +126,9 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
   // Estado de completado del perfil (motivación, no limita nada).
   const completion = getProfileCompletion(user);
   const accentHex = isAM ? "#2563eb" : isDirector ? "#059669" : "#4f46e5";
+
+  // Datos de cobro: si faltan, la pestaña lleva un punto de aviso.
+  const banking = getBankingCompletion(user);
 
   const curpTrimmed = curp.trim().toUpperCase();
   const curpLooksValid = curpTrimmed === "" || /^[A-Z][AEIOUX][A-Z]{2}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curpTrimmed);
@@ -199,7 +214,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row overflow-hidden max-h-[90vh] md:h-[550px] transition-colors duration-200">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row overflow-hidden max-h-[92vh] md:h-[620px] transition-colors duration-200">
         
         {/* Left Side: Navigation Tabs */}
         <div className="w-full md:w-56 bg-slate-50 dark:bg-slate-950 p-6 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between shrink-0">
@@ -211,25 +226,32 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
             <nav className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
               {[
-                { id: "personal", label: "Datos Personales", icon: User },
-                { id: "profile", label: "Mi Perfil", icon: BadgeCheck },
-                { id: "display", label: "Pantalla e Idioma", icon: Globe },
-                { id: "help", label: "Ayuda y Soporte", icon: HelpCircle },
+                { id: "personal", label: "Datos Personales", icon: User, alert: false },
+                { id: "banking", label: "Datos Bancarios", icon: Landmark, alert: !banking.complete },
+                { id: "profile", label: "Mi Perfil", icon: BadgeCheck, alert: false },
+                { id: "display", label: "Pantalla e Idioma", icon: Globe, alert: false },
+                { id: "help", label: "Ayuda y Soporte", icon: HelpCircle, alert: false },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
+                    onClick={() => setActiveTab(tab.id as SettingsTab)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-bold rounded-xl transition-all whitespace-nowrap tracking-[0.01em] ${
                       isActive
                         ? activeTabClass
                         : "text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-850 hover:text-slate-800 dark:hover:text-white"
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
-                    {tab.label}
+                    <span className="flex-1 text-left">{tab.label}</span>
+                    {tab.alert && (
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${isActive ? "bg-white/90" : "bg-amber-500"}`}
+                        title="Te faltan datos de cobro"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -257,9 +279,10 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
         {/* Right Side: Tab content */}
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 overflow-y-auto">
           {/* Header Close button */}
-          <div className="p-6 pb-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-850 shrink-0">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+          <div className="p-6 pb-4 flex items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-850 shrink-0">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.14em] leading-none">
               {activeTab === "personal" && "Edición de perfil"}
+              {activeTab === "banking" && (banking.mode === "binance" ? "Cobro por Binance" : "Cuenta para depósitos")}
               {activeTab === "profile" && "Estado del perfil"}
               {activeTab === "display" && "Preferencias de interfaz"}
               {activeTab === "help" && "Canal de soporte B2B"}
@@ -277,7 +300,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
             
             {/* 1. Personal Data Tab */}
             {activeTab === "personal" && (
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <form onSubmit={handleUpdateProfile} className="space-y-5">
                 {/* Foto de perfil */}
                 <div className="flex items-center gap-4">
                   <div className="relative shrink-0">
@@ -309,51 +332,51 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Nombre Completo
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                        className={`w-full pl-11 pr-4 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-3 text-[13px] font-semibold leading-normal tracking-[0.01em] text-slate-800 dark:text-slate-100 placeholder:font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Teléfono
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Phone className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                        className={`w-full pl-11 pr-4 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-3 text-[13px] font-semibold leading-normal tracking-[0.01em] text-slate-800 dark:text-slate-100 placeholder:font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors`}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                     CURP
                   </label>
                   <div className="relative">
-                    <Fingerprint className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Fingerprint className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <input
                       type="text"
                       value={curp}
                       onChange={(e) => setCurp(e.target.value.toUpperCase())}
                       maxLength={18}
                       placeholder="18 caracteres — ej. GOVN680820HDFLNS02"
-                      className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors uppercase tracking-wide`}
+                      className={`w-full pl-11 pr-4 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-3 text-[13px] font-semibold leading-normal text-slate-800 dark:text-slate-100 placeholder:font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors uppercase font-mono tracking-[0.12em]`}
                     />
                   </div>
                   {!curpLooksValid && (
@@ -363,63 +386,63 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Ciudad
                     </label>
                     <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <MapPin className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={ciudad}
                         onChange={(e) => setCiudad(e.target.value)}
                         placeholder="Ej. Guadalajara"
-                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                        className={`w-full pl-11 pr-4 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-3 text-[13px] font-semibold leading-normal tracking-[0.01em] text-slate-800 dark:text-slate-100 placeholder:font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       País
                     </label>
                     <div className="relative">
-                      <Globe className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Globe className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={pais}
                         onChange={(e) => setPais(e.target.value)}
                         placeholder="México"
-                        className={`w-full pl-9.5 pr-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-2.5 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                        className={`w-full pl-11 pr-4 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl py-3 text-[13px] font-semibold leading-normal tracking-[0.01em] text-slate-800 dark:text-slate-100 placeholder:font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors`}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                     Correo Electrónico (No modificable)
                   </label>
                   <div className="relative opacity-65">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <input
                       type="email"
                       value={user.email}
                       disabled
-                      className="w-full pl-9.5 pr-3 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl py-2.5 text-xs font-bold text-slate-500 dark:text-slate-500 cursor-not-allowed"
+                      className="w-full pl-11 pr-4 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl py-3 text-[13px] font-semibold leading-normal tracking-[0.01em] text-slate-500 dark:text-slate-500 cursor-not-allowed"
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Perfil
                     </label>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
+                    <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
                       <Shield className={`h-4 w-4 shrink-0 ${textColor}`} />
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-350">
+                      <span className="text-[13px] font-semibold tracking-[0.01em] text-slate-700 dark:text-slate-300">
                         {user.role === "director" ? "Director de Operaciones" : user.role === "account_manager" ? "Account Manager" : "Aliado Comercial"}
                       </span>
                     </div>
@@ -448,7 +471,10 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               </form>
             )}
 
-            {/* 2. My Profile (completion) Tab */}
+            {/* 2. Datos Bancarios (cómo se le paga a este usuario) */}
+            {activeTab === "banking" && <BankingDataForm />}
+
+            {/* 3. My Profile (completion) Tab */}
             {activeTab === "profile" && (
               <div className="space-y-5">
                 {/* Hero: anillo de progreso + estado */}
@@ -536,13 +562,13 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               </div>
             )}
 
-            {/* 3. Display & Language Tab */}
+            {/* 4. Display & Language Tab */}
             {activeTab === "display" && (
               <div className="space-y-6">
                 
                 {/* Language selection */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-3 leading-none">
                     Idioma de la plataforma
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -574,7 +600,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
                 {/* Theme Selector */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-3 leading-none">
                     Ajustes de Pantalla (Tema)
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -619,7 +645,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
               </div>
             )}
 
-            {/* 4. Help & Support Tab */}
+            {/* 5. Help & Support Tab */}
             {activeTab === "help" && (
               <div className="space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 p-4.5 rounded-2xl flex items-center gap-3">
@@ -631,7 +657,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
 
                 <form onSubmit={handleSendHelp} className="space-y-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Asunto o Problema
                     </label>
                     <input
@@ -639,12 +665,12 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       value={helpSubject}
                       onChange={(e) => setHelpSubject(e.target.value)}
                       placeholder="Ej. Error al subir visor AFORE o discrepancia en semanas..."
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors`}
+                      className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-[13px] font-semibold leading-normal text-slate-800 dark:text-slate-100 placeholder:font-medium transition-colors`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.06em] mb-2 leading-none">
                       Mensaje Detallado
                     </label>
                     <textarea
@@ -652,7 +678,7 @@ export default function UserSettingsModal({ isOpen, onClose }: UserSettingsModal
                       onChange={(e) => setHelpMessage(e.target.value)}
                       rows={3}
                       placeholder="Escribe paso a paso lo que sucede o la duda técnica..."
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors resize-none`}
+                      className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 border border-slate-200 dark:border-slate-800 ${focusBorder} outline-none rounded-xl text-[13px] font-medium leading-relaxed text-slate-800 dark:text-slate-100 placeholder:font-medium transition-colors resize-none`}
                     />
                   </div>
 

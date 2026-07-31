@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useApp, STAGES_LIST, SUB_STAGES_BY_STAGE, getProfileCompletion } from "@/utils/context/AppContext";
+import { useApp, STAGES_LIST, SUB_STAGES_BY_STAGE, getProfileCompletion, getBankingCompletion } from "@/utils/context/AppContext";
 import {
   LayoutDashboard,
   Folder,
@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  Landmark,
   Users,
   GraduationCap,
 } from "lucide-react";
@@ -281,6 +282,7 @@ export default function DashboardLayout({
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"personal" | "banking">("personal");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
@@ -519,10 +521,34 @@ export default function DashboardLayout({
               )}
             </button>
 
-            {/* Nudge: completar perfil (recordatorio persistente, no bloqueante) */}
-            {user && !getProfileCompletion(user).verified && (
+            {/* Aviso persistente: faltan datos de cobro. Va ANTES del nudge de
+                perfil y lo desplaza, porque sin datos bancarios el usuario
+                simplemente no puede recibir su dinero: es lo más urgente. */}
+            {user && !getBankingCompletion(user).complete && (
               <button
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => {
+                  setSettingsTab("banking");
+                  setSettingsOpen(true);
+                }}
+                className="hidden md:flex items-center gap-2 pl-2.5 pr-3.5 py-1.5 rounded-full border border-rose-300/60 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors active:scale-95"
+                title="Registra tus datos de cobro para poder recibir tus pagos"
+              >
+                <Landmark className="h-4 w-4 shrink-0 text-rose-500 dark:text-rose-400" />
+                <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                  {getBankingCompletion(user).mode === "binance"
+                    ? "Registra tu ID de Binance"
+                    : "Registra tus datos bancarios"}
+                </span>
+              </button>
+            )}
+
+            {/* Nudge: completar perfil (recordatorio persistente, no bloqueante) */}
+            {user && getBankingCompletion(user).complete && !getProfileCompletion(user).verified && (
+              <button
+                onClick={() => {
+                  setSettingsTab("personal");
+                  setSettingsOpen(true);
+                }}
                 className="hidden md:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-amber-300/50 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors active:scale-95"
                 title="Completa tu perfil para verificarlo"
               >
@@ -549,7 +575,10 @@ export default function DashboardLayout({
             {/* User Profile Widget */}
             {user && (
               <div
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => {
+                  setSettingsTab("personal");
+                  setSettingsOpen(true);
+                }}
                 className="flex items-center gap-3.5 pl-4 border-l border-slate-200 dark:border-slate-800 select-none cursor-pointer hover:opacity-85 transition-opacity"
               >
                 <div className="text-right hidden sm:block">
@@ -607,7 +636,7 @@ export default function DashboardLayout({
       </div>
 
       {/* User Settings Modal */}
-      <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <UserSettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} initialTab={settingsTab} />
 
       {/* Notifications Right Drawer */}
       {notifDrawerOpen && (

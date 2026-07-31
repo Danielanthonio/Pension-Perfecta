@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppContextProvider } from "@/utils/context/AppContext";
 import ToastSimulator from "@/components/ToastSimulator";
 import GlobalChat from "@/components/GlobalChat";
+import BankingReminder from "@/components/BankingReminder";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,6 +25,9 @@ export default function RootLayout({
           {children}
           <ToastSimulator />
           <GlobalChat />
+          {/* Recordatorio de datos de cobro: una vez por inicio de sesión,
+              mientras el usuario no tenga registrado cómo se le paga. */}
+          <BankingReminder />
         </AppContextProvider>
       </body>
     </html>

@@ -29,6 +29,17 @@ export interface UserProfile {
   ciudad?: string | null;
   pais?: string | null;
   avatar_url?: string | null;
+  // Datos de cobro. La forma de pago depende del rol: los aliados cobran por
+  // transferencia (banco/cuenta/CLABE) y la Dirección y los Account Managers
+  // cobran por Binance. Ver migración 20260731000000_datos_bancarios.sql.
+  banco?: string | null;
+  cuenta_bancaria?: string | null;
+  clabe?: string | null;
+  numero_tarjeta?: string | null;
+  titular_cuenta?: string | null;
+  email_pagos?: string | null;
+  binance_id?: string | null;
+  datos_bancarios_updated_at?: string | null;
   // Solo para Account Managers: si está en `true`, el AM participa en la "ruleta"
   // de asignación automática (recibe PROYECTOS nuevos al azar cuando un aliado
   // captura lo suyo). Lo enciende/apaga el director en el módulo de Account Managers.
@@ -64,6 +75,15 @@ export interface ProfileEditableFields {
   ciudad?: string | null;
   pais?: string | null;
   avatar_url?: string | null;
+  // Datos de cobro (ver getBankingCompletion más abajo).
+  banco?: string | null;
+  cuenta_bancaria?: string | null;
+  clabe?: string | null;
+  numero_tarjeta?: string | null;
+  titular_cuenta?: string | null;
+  email_pagos?: string | null;
+  binance_id?: string | null;
+  datos_bancarios_updated_at?: string | null;
 }
 
 // Estado de completado del perfil. NO limita la operación; solo motiva a completar
@@ -97,6 +117,51 @@ export function getProfileCompletion(profile: UserProfile | null): ProfileComple
   const done = total - missing.length;
   const percent = Math.round((done / total) * 100);
   return { percent, done, total, items, missing, verified: missing.length === 0 };
+}
+
+// ---------------------------------------------------------------------------
+// Datos de cobro (datos bancarios)
+// ---------------------------------------------------------------------------
+// Cada rol cobra distinto, así que "tener los datos completos" significa cosas
+// diferentes según quién pregunte:
+//   * aliado (y líder)            → transferencia: banco + cuenta + CLABE + titular
+//   * director / account_manager  → Binance: su ID de Binance
+// Los campos opcionales (tarjeta, correo de avisos) NO cuentan para el completado:
+// no queremos molestar con el recordatorio a quien ya dio lo indispensable.
+export type BankingMode = "transferencia" | "binance";
+
+export interface BankingCompletion {
+  mode: BankingMode;
+  items: { key: string; label: string; done: boolean }[];
+  missing: { key: string; label: string }[];
+  complete: boolean;
+}
+
+const BANKING_REQUIRED_TRANSFERENCIA: { key: keyof UserProfile; label: string }[] = [
+  { key: "banco", label: "Banco" },
+  { key: "cuenta_bancaria", label: "Número de cuenta" },
+  { key: "clabe", label: "CLABE interbancaria" },
+  { key: "titular_cuenta", label: "Nombre del titular" },
+];
+
+const BANKING_REQUIRED_BINANCE: { key: keyof UserProfile; label: string }[] = [
+  { key: "binance_id", label: "ID de Binance" },
+];
+
+export function getBankingMode(profile: UserProfile | null): BankingMode {
+  // Solo los aliados cobran por transferencia; Dirección y AM cobran por Binance.
+  return profile && profile.role === "aliado" ? "transferencia" : "binance";
+}
+
+export function getBankingCompletion(profile: UserProfile | null): BankingCompletion {
+  const mode = getBankingMode(profile);
+  const required = mode === "transferencia" ? BANKING_REQUIRED_TRANSFERENCIA : BANKING_REQUIRED_BINANCE;
+  const items = required.map(({ key, label }) => {
+    const value = profile ? profile[key] : undefined;
+    return { key: String(key), label, done: typeof value === "string" && value.trim() !== "" };
+  });
+  const missing = items.filter((i) => !i.done).map(({ key, label }) => ({ key, label }));
+  return { mode, items, missing, complete: missing.length === 0 };
 }
 
 export interface EmpresaMultialiado {
@@ -653,6 +718,17 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       ciudad: dbProfile.ciudad || null,
       pais: dbProfile.pais || null,
       avatar_url: dbProfile.avatar_url || null,
+      // Datos de cobro. Si la migración 20260731000000 aún no está aplicada,
+      // las columnas llegan como undefined y quedan en null: el perfil solo se
+      // muestra "sin datos bancarios", nada se rompe.
+      banco: dbProfile.banco || null,
+      cuenta_bancaria: dbProfile.cuenta_bancaria || null,
+      clabe: dbProfile.clabe || null,
+      numero_tarjeta: dbProfile.numero_tarjeta || null,
+      titular_cuenta: dbProfile.titular_cuenta || null,
+      email_pagos: dbProfile.email_pagos || null,
+      binance_id: dbProfile.binance_id || null,
+      datos_bancarios_updated_at: dbProfile.datos_bancarios_updated_at || null,
       auto_assign_enabled: dbProfile.auto_assign_enabled === true,
     };
   };
@@ -2005,6 +2081,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("pensionflow_user");
+    // El recordatorio de datos de cobro se muestra una vez por inicio de sesión:
+    // al cerrar sesión se borra la marca para que vuelva a aparecer al entrar.
+    try {
+      sessionStorage.removeItem("pensionflow_banking_reminder_shown");
+    } catch {}
     if (supabase) {
       supabase.auth.signOut();
     }
