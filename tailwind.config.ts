@@ -9,6 +9,28 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Medios pasos de espaciado (4.5, 9.5, ...) que Tailwind NO trae de fábrica
+      // pero que la UI usa por todos lados. Igual que con los tonos intermedios
+      // de color de más abajo, sin esto las clases NO generan CSS y el estilo se
+      // pierde en silencio. El caso más visible era `pl-9.5` en los inputs con
+      // icono: al no existir, el padding quedaba en 0 y el icono se montaba
+      // encima del texto (se veía "todo enredado"). 1 paso = 0.25rem, así que
+      // el medio paso son 0.125rem.
+      spacing: {
+        "4.5": "1.125rem",
+        "5.5": "1.375rem",
+        "6.5": "1.625rem",
+        "7.5": "1.875rem",
+        "8.5": "2.125rem",
+        "9.5": "2.375rem",
+        "10.5": "2.625rem",
+        "11.5": "2.875rem",
+        "12.5": "3.125rem",
+        "13": "3.25rem",
+        "15": "3.75rem",
+        "17": "4.25rem",
+        "18": "4.5rem",
+      },
       colors: {
         primary: {
           DEFAULT: "#0f172a", // slate-900
