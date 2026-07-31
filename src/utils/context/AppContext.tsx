@@ -2081,10 +2081,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("pensionflow_user");
-    // El recordatorio de datos de cobro se muestra una vez por inicio de sesión:
-    // al cerrar sesión se borra la marca para que vuelva a aparecer al entrar.
+    // El recordatorio de datos de cobro insiste durante toda la sesión con una
+    // pausa de por medio. Al cerrar sesión se borra la pausa para que el aviso
+    // salga de inmediato al volver a entrar.
     try {
-      sessionStorage.removeItem("pensionflow_banking_reminder_shown");
+      sessionStorage.removeItem("pensionflow_banking_reminder_snooze");
     } catch {}
     if (supabase) {
       supabase.auth.signOut();

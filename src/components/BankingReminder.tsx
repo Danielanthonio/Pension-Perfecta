@@ -7,15 +7,27 @@ import BankingDataForm from "@/components/BankingDataForm";
 import { Landmark, Coins, X } from "lucide-react";
 
 // Recordatorio de datos de cobro. Se monta una sola vez en el layout raíz (junto
-// a GlobalChat) y aparece UNA vez por inicio de sesión mientras el usuario no
+// a GlobalChat) y sigue apareciendo DURANTE toda la sesión a quien todavía no
 // tenga registrado cómo se le paga.
 //
-// Trae el formulario dentro a propósito: el recordatorio que solo dice "ve a
-// Configuración" se ignora. Aquí se resuelve en el momento y se cierra solo al
-// guardar. Nunca bloquea: siempre se puede posponer con "Más tarde" y no vuelve
-// a molestar hasta el siguiente inicio de sesión.
+// "Más tarde" NO es un descarte definitivo: solo pausa el aviso SNOOZE_MINUTES
+// y vuelve a salir mientras los datos sigan faltando. La única forma de que deje
+// de aparecer es completarlos (o que Dirección los cargue). Es a propósito: sin
+// datos de cobro el usuario no puede recibir su dinero, así que el recordatorio
+// tiene que ser insistente, no un aviso de una sola vez que se ignora y se olvida.
+//
+// Trae el formulario dentro también a propósito: un recordatorio que solo dice
+// "ve a Configuración" se ignora. Aquí se resuelve en el momento y se cierra solo
+// al guardar. Nunca bloquea la operación: siempre se puede posponer.
 
-export const BANKING_REMINDER_KEY = "pensionflow_banking_reminder_shown";
+export const BANKING_REMINDER_KEY = "pensionflow_banking_reminder_snooze";
+
+// Cuánto se calla el aviso al darle "Más tarde".
+const SNOOZE_MINUTES = 10;
+const SNOOZE_MS = SNOOZE_MINUTES * 60 * 1000;
+
+// Cada cuánto se revisa si ya venció la pausa.
+const CHECK_MS = 30 * 1000;
 
 export default function BankingReminder() {
   const { user, isProvisionalSession, isLoading } = useApp();
@@ -31,24 +43,49 @@ export default function BankingReminder() {
       setOpen(false);
       return;
     }
-    let alreadyShown = false;
-    try {
-      alreadyShown = sessionStorage.getItem(BANKING_REMINDER_KEY) === user.id;
-    } catch {
-      // Sin sessionStorage (modo privado estricto) preferimos no insistir.
-      alreadyShown = true;
-    }
-    if (alreadyShown) return;
 
-    // Pequeño retraso: deja que termine la hidratación y cualquier redirección
-    // de rol, para que el aviso no parpadee sobre la pantalla de carga.
-    const t = window.setTimeout(() => setOpen(true), 1200);
-    return () => window.clearTimeout(t);
+    // La pausa se guarda como "<id de usuario>:<timestamp de vencimiento>". Se
+    // ata al id para que, si entra otra persona en la misma pestaña, no herede
+    // la pausa de la anterior.
+    const snoozedUntil = (): number => {
+      try {
+        const raw = sessionStorage.getItem(BANKING_REMINDER_KEY);
+        if (!raw) return 0;
+        const [id, ts] = raw.split(":");
+        return id === user.id ? Number(ts) || 0 : 0;
+      } catch {
+        // Sin sessionStorage (modo privado estricto) no podríamos recordar la
+        // pausa y el aviso saldría en bucle: mejor mostrarlo una sola vez.
+        return open ? 0 : Number.MAX_SAFE_INTEGER;
+      }
+    };
+
+    const check = () => setOpen(Date.now() >= snoozedUntil());
+
+    // El primer aviso lleva un pequeño retraso: deja que termine la hidratación
+    // y cualquier redirección de rol, para que no parpadee sobre la pantalla de
+    // carga. Después basta con vigilar el vencimiento de la pausa.
+    const first = window.setTimeout(check, 1200);
+    const interval = window.setInterval(check, CHECK_MS);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldRemind, user]);
 
-  const dismiss = () => {
+  // "Más tarde" / cerrar: pausa el aviso, no lo elimina.
+  const snooze = () => {
     try {
-      if (user) sessionStorage.setItem(BANKING_REMINDER_KEY, user.id);
+      if (user) sessionStorage.setItem(BANKING_REMINDER_KEY, `${user.id}:${Date.now() + SNOOZE_MS}`);
+    } catch {}
+    setOpen(false);
+  };
+
+  // Al guardar ya no hace falta ninguna pausa: el aviso deja de aplicar solo.
+  const resolved = () => {
+    try {
+      sessionStorage.removeItem(BANKING_REMINDER_KEY);
     } catch {}
     setOpen(false);
   };
@@ -89,7 +126,7 @@ export default function BankingReminder() {
             </p>
           </div>
           <button
-            onClick={dismiss}
+            onClick={snooze}
             className="shrink-0 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
             aria-label="Cerrar recordatorio"
           >
@@ -100,16 +137,21 @@ export default function BankingReminder() {
         {/* Formulario (se cierra solo al guardar) */}
         <div className="p-6">
           <BankingDataForm
-            onSaved={dismiss}
+            onSaved={resolved}
             submitLabel="Guardar y continuar"
             footerNote={
-              <button
-                type="button"
-                onClick={dismiss}
-                className="text-[12px] font-bold text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
-              >
-                Más tarde
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={snooze}
+                  className="self-start text-[12px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
+                >
+                  Más tarde
+                </button>
+                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-snug">
+                  Te lo recordaremos de nuevo en unos minutos.
+                </span>
+              </div>
             }
           />
         </div>
