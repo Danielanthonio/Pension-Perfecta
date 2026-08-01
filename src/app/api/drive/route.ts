@@ -67,6 +67,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    // El rol CLOSER no toca expedientes. Este endpoint vive fuera de los layouts
+    // y del RLS (opera con una cuenta de servicio de Google Drive), así que sería
+    // el único camino por el que un closer alcanzaría documentos de clientes:
+    // basta una sesión válida y un id de archivo para `downloadFile`/`deleteFile`.
+    // Se le niega explícitamente.
+    //
+    // ⚠️ PENDIENTE APARTE (preexistente, no introducido aquí): este endpoint
+    // sigue sin comprobar la PROPIEDAD del documento — cualquier otro rol
+    // autenticado puede descargar o borrar un archivo si conoce su id de Drive.
+    // Cerrarlo bien exige validar el prospecto contra quien llama.
+    const { data: callerProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (callerProfile?.role === "closer") {
+      return NextResponse.json(
+        { error: "Tu rol no tiene acceso a los expedientes de clientes." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { action } = body;
 

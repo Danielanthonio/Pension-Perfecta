@@ -31,6 +31,15 @@ const COUNTRIES = [
 
 type ViewState = "ROLE_SELECTION" | "LOGIN" | "REGISTER" | "CONFIRMATION_PENDING" | "FORGOT_PASSWORD";
 
+// Etiqueta visible de cada rol. En un solo sitio para que añadir un rol no
+// obligue a cazar ternarios por toda la pantalla.
+const ROLE_LABEL: Record<UserRole, string> = {
+  aliado: "Aliado Comercial",
+  account_manager: "Account Manager",
+  director: "Director",
+  closer: "Closer",
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, registerAliado, isDemoMode, initializeDirector, profiles, isLoading, sendPasswordReset } = useApp();
@@ -136,10 +145,12 @@ export default function LoginPage() {
       const realRole = await login(emailInput, selectedRole, passwordInput);
       setSuccessMsg("¡Acceso concedido! Redirigiendo a tu panel...");
       setTimeout(() => {
-        if (realRole === "director" || realRole === "account_manager") {
-          router.push("/admin");
-        } else {
+        // El portal de /dashboard es solo del aliado; todo lo demás (dirección,
+        // account manager y closer) vive bajo /admin, cada uno con su menú.
+        if (realRole === "aliado") {
           router.push("/dashboard");
+        } else {
+          router.push("/admin");
         }
       }, 1000);
     } catch (err: any) {
@@ -148,7 +159,7 @@ export default function LoginPage() {
       if (errMsg.includes("PENDING_CONFIRMATION")) {
         setViewState("CONFIRMATION_PENDING");
       } else if (errMsg.includes("Acceso Inválido")) {
-        setErrorMsg("Acceso Inválido: Tu cuenta no tiene permisos para ingresar como " + (selectedRole === "aliado" ? "Aliado" : selectedRole === "account_manager" ? "Account Manager" : "Director") + ".");
+        setErrorMsg("Acceso Inválido: Tu cuenta no tiene permisos para ingresar como " + ROLE_LABEL[selectedRole] + ".");
       } else {
         setErrorMsg("Credenciales incorrectas o correo no confirmado. Verifica tus datos.");
       }
@@ -337,6 +348,21 @@ export default function LoginPage() {
                       <ArrowRight className="h-4 w-4 text-teal-400 group-hover/btn:translate-x-0.5 transition-transform" />
                     </div>
                   </motion.button>
+
+                  <motion.button
+                    onClick={() => handleRoleSelect("closer")}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-between px-6 py-4.5 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-indigo-500/[0.06] hover:to-indigo-500/[0.02] border border-white/5 hover:border-indigo-500/20 text-white rounded-2xl transition-all duration-300 group/btn shadow-lg"
+                  >
+                    <div className="text-left">
+                      <span className="block font-bold text-base text-slate-100 group-hover/btn:text-indigo-400 transition-colors">Entrar como Closer</span>
+                      <span className="block text-[11px] text-slate-400 mt-1">Captación de aliados y métricas de tu cartera</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white/5 group-hover/btn:bg-indigo-500/10 flex items-center justify-center transition-colors">
+                      <ArrowRight className="h-4 w-4 text-indigo-400 group-hover/btn:translate-x-0.5 transition-transform" />
+                    </div>
+                  </motion.button>
                 </div>
 
                 {isDemoMode && (
@@ -369,7 +395,7 @@ export default function LoginPage() {
                   </button>
                   <div>
                     <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-                      Acceso: {selectedRole === "aliado" ? "Aliado Comercial" : selectedRole === "account_manager" ? "Account Manager" : "Director"}
+                      Acceso: {ROLE_LABEL[selectedRole]}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
                       Por favor, ingresa tus credenciales

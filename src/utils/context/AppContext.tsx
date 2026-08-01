@@ -6,7 +6,10 @@ import { getExpedienteDocSlots, getTipoFinanciamientoLabel } from "@/components/
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-export type UserRole = "aliado" | "director" | "account_manager";
+// `closer` es la capa que va ANTES del aliado: prospecta y cierra aliados nuevos.
+// En la BD se guarda literal ('closer'), sin el mapeo director↔admin que sí tienen
+// los otros roles. Ver 20260801000000_closers.sql.
+export type UserRole = "aliado" | "director" | "account_manager" | "closer";
 
 export interface UserProfile {
   id: string;
@@ -44,6 +47,36 @@ export interface UserProfile {
   // de asignación automática (recibe PROYECTOS nuevos al azar cuando un aliado
   // captura lo suyo). Lo enciende/apaga el director en el módulo de Account Managers.
   auto_assign_enabled?: boolean;
+  // Atribución al CLOSER (solo tiene sentido en perfiles con rol 'aliado').
+  // `closer_origen_id` es el mérito histórico —quién cerró a este aliado— y NO
+  // cambia al reasignar: es la base de todas las métricas del módulo Closers.
+  // `closer_actual_id` es quién lo acompaña hoy, solo gestión operativa.
+  // Ver migración 20260801000000_closers.sql.
+  closer_origen_id?: string | null;
+  closer_actual_id?: string | null;
+  // Fecha de cierre del aliado. Deliberadamente distinta de `created_at`: un
+  // usuario pudo importarse mucho antes de que se le atribuyera un closer.
+  fecha_incorporacion_closer?: string | null;
+  closer_asignado_por?: string | null;
+  // Enlace al contrato firmado con el aliado. Obligatorio al darlo de alta: al
+  // pagar comisiones se revisa que la documentación esté completa, y un aliado
+  // sin contrato traba su pago y el del closer que lo trajo.
+  // Ver migración 20260801000002_contrato_aliado.sql.
+  contrato_url?: string | null;
+  contrato_url_at?: string | null;
+}
+
+// Movimiento del historial append-only closer↔aliado (tabla
+// `closer_aliado_asignaciones`). El pasado no se reescribe: solo se agregan filas.
+export interface CloserAsignacionInput {
+  aliadoId: string;
+  closerNuevoId: string | null;
+  closerAnteriorId?: string | null;
+  closerOrigenId?: string | null;
+  tipo: "asignacion_inicial" | "reasignacion" | "backfill" | "desasignacion";
+  motivo?: string | null;
+  /** Fecha de incorporación a atribuir. Por defecto, ahora. */
+  fechaIncorporacion?: string | null;
 }
 
 // Convierte la fecha y hora tecleadas al agendar ("2026-08-15" + "15:30") en un
@@ -84,6 +117,8 @@ export interface ProfileEditableFields {
   email_pagos?: string | null;
   binance_id?: string | null;
   datos_bancarios_updated_at?: string | null;
+  contrato_url?: string | null;
+  contrato_url_at?: string | null;
 }
 
 // Estado de completado del perfil. NO limita la operación; solo motiva a completar
@@ -389,6 +424,18 @@ interface AppContextType {
   scheduleAssessment: (id: string, date: string, time: string) => Promise<void>;
   generateInvitationCode: () => Promise<InvitationCode>;
   createProfile: (profileData: Omit<UserProfile, "id" | "created_at">) => Promise<UserProfile>;
+  // Atribuye uno o varios aliados a un closer. `reasignacion` mueve solo el
+  // closer ACTUAL y conserva el de ORIGEN, para no reescribir el mérito
+  // histórico (§23). Ver 20260801000000_closers.sql.
+  assignCloser: (
+    aliadoIds: string[],
+    closerId: string | null,
+    options?: {
+      tipo?: CloserAsignacionInput["tipo"];
+      motivo?: string | null;
+      fechaIncorporacion?: string | null;
+    }
+  ) => Promise<void>;
   deleteProfile: (
     id: string,
     options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null }
@@ -414,6 +461,11 @@ interface AppContextType {
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos hasta cerrar sesión
 const IDLE_WARNING_MS = 30 * 1000; // muestra el aviso 30s antes de cerrar
 const IDLE_ACTIVITY_KEY = "pensionflow_last_activity"; // timestamp compartido entre pestañas
+
+// Historial closer↔aliado en modo demo. En producción vive en la tabla
+// `closer_aliado_asignaciones`; aquí se replica en localStorage para que la
+// previsualización local muestre el mismo comportamiento.
+const CLOSER_ASIGNACIONES_KEY = "pensionflow_closer_asignaciones";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -730,6 +782,15 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       binance_id: dbProfile.binance_id || null,
       datos_bancarios_updated_at: dbProfile.datos_bancarios_updated_at || null,
       auto_assign_enabled: dbProfile.auto_assign_enabled === true,
+      // Atribución al closer. Si la migración 20260801000000 aún no está
+      // aplicada, estas columnas llegan como undefined y quedan en null: el
+      // aliado simplemente sale como "Sin atribución". Nada se rompe.
+      closer_origen_id: dbProfile.closer_origen_id || null,
+      closer_actual_id: dbProfile.closer_actual_id || null,
+      fecha_incorporacion_closer: dbProfile.fecha_incorporacion_closer || null,
+      closer_asignado_por: dbProfile.closer_asignado_por || null,
+      contrato_url: dbProfile.contrato_url || null,
+      contrato_url_at: dbProfile.contrato_url_at || null,
     };
   };
 
@@ -785,18 +846,43 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const dbRole = meta.role || (isDirectorEmail ? "director" : "aliado");
       const invitationCode = meta.invitation_code_used || null;
       
-      const { data: newProfile, error: createError } = await client
+      // Rescate de la atribución al closer: createProfile la deja en la metadata
+      // de auth justo para este camino, en el que el INSERT original fue
+      // bloqueado por RLS y el perfil nace aquí, en el primer login.
+      const closerOrigen = meta.closer_origen_id || null;
+      const incorporado = meta.fecha_incorporacion_closer || null;
+
+      const healBase: any = {
+        id: authUser.id,
+        full_name: fullName,
+        email: email.toLowerCase(),
+        phone: phone,
+        role: dbRole === "director" ? "admin" : dbRole,
+        invitation_code_used: invitationCode,
+      };
+      const healCloser = closerOrigen
+        ? {
+            closer_origen_id: closerOrigen,
+            closer_actual_id: closerOrigen,
+            fecha_incorporacion_closer: incorporado,
+          }
+        : {};
+
+      let { data: newProfile, error: createError } = await client
         .from("profiles")
-        .insert({
-          id: authUser.id,
-          full_name: fullName,
-          email: email.toLowerCase(),
-          phone: phone,
-          role: dbRole === "director" ? "admin" : dbRole,
-          invitation_code_used: invitationCode
-        })
+        .insert({ ...healBase, ...healCloser })
         .select()
         .single();
+
+      // Rescatar la atribución NUNCA puede costar el inicio de sesión: si esas
+      // columnas todavía no existen, se reintenta sin ellas. Perder el dato del
+      // closer es recuperable a mano; dejar al usuario sin poder entrar, no.
+      if (createError && closerOrigen) {
+        console.warn("Self-healing con atribución de closer falló; reintentando sin ella:", createError);
+        const retry = await client.from("profiles").insert(healBase).select().single();
+        newProfile = retry.data;
+        createError = retry.error;
+      }
         
       if (createError) {
         console.error("Error creating profile in self-healing:", createError);
@@ -1375,6 +1461,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                // El AM trabaja POR PROYECTO: ve los prospects que tienen su id
                // como account_manager_id (ya no la cartera de aliados).
                prospectsQuery = prospectsQuery.eq("account_manager_id", activeUser.id);
+             } else if (activeUser && activeUser.role === "closer") {
+               // Un closer no lee expedientes: sus métricas llegan agregadas por
+               // RPC. Se acota a nada para no gastar un viaje de red que el RLS
+               // devolvería vacío igualmente.
+               prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
              }
             const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
             if (prospectsError) {
@@ -1838,7 +1929,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       
       const profile = parsedProfiles.find((p) => p.email === email && p.role === role) || {
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
-        full_name: role === "aliado" ? "Aliado Comercial" : "Director Operaciones",
+        full_name:
+          role === "aliado"
+            ? "Aliado Comercial"
+            : role === "account_manager"
+              ? "Account Manager"
+              : role === "closer"
+                ? "Closer Comercial"
+                : "Director Operaciones",
         email,
         phone: "5500000000",
         role,
@@ -2018,6 +2116,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
                 // El AM trabaja POR PROYECTO: ve los prospects que tienen su id
                 // como account_manager_id (ya no la cartera de aliados).
                 prospectsQuery = prospectsQuery.eq("account_manager_id", activeProfile.id);
+              } else if (activeProfile.role === "closer") {
+                // Un closer no lee expedientes. Se acota a nada para no gastar un
+                // viaje de red que el RLS devolvería vacío de todas formas.
+                prospectsQuery = prospectsQuery.eq("aliado_id", "00000000-0000-0000-0000-000000000000");
               }
               const { data: dbProspects, error: prospectsError } = await prospectsQuery.order("created_at", { ascending: false });
               if (prospectsError) {
@@ -3716,9 +3818,176 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Atribución closer → aliado
+  // ---------------------------------------------------------------------------
+  // El historial es append-only por diseño (§22): reasignar NO borra la
+  // asignación anterior, agrega un movimiento. Y `closer_origen_id` —el mérito
+  // por haber cerrado al aliado— solo se toca en la asignación inicial o en un
+  // backfill explícito; una reasignación operativa jamás lo reescribe.
+
+  const appendCloserAsignacionLocal = (input: CloserAsignacionInput) => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(CLOSER_ASIGNACIONES_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push({
+        id: `caa-${Math.random().toString(36).substr(2, 9)}`,
+        aliado_id: input.aliadoId,
+        closer_anterior_id: input.closerAnteriorId ?? null,
+        closer_nuevo_id: input.closerNuevoId,
+        closer_origen_id: input.closerOrigenId ?? null,
+        tipo_movimiento: input.tipo,
+        motivo: input.motivo ?? null,
+        asignado_por: user?.id || null,
+        fecha_asignacion: input.fechaIncorporacion || new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      });
+      localStorage.setItem(CLOSER_ASIGNACIONES_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.warn("No se pudo guardar el historial local de asignaciones de closer:", e);
+    }
+  };
+
+  /**
+   * Asigna o reasigna uno o varios aliados a un closer.
+   *
+   * · `asignacion_inicial` / `backfill` → fija ORIGEN + ACTUAL (el backfill es para
+   *   los aliados que ya existían antes del módulo).
+   * · `reasignacion` → mueve SOLO el closer actual. El origen se conserva, que es
+   *   justo lo que hace que las métricas históricas no se muevan (§23).
+   * · `desasignacion` → deja al aliado sin closer actual.
+   */
+  const assignCloser = async (
+    aliadoIds: string[],
+    closerId: string | null,
+    options?: {
+      tipo?: CloserAsignacionInput["tipo"];
+      motivo?: string | null;
+      fechaIncorporacion?: string | null;
+    }
+  ): Promise<void> => {
+    const ids = aliadoIds.filter(Boolean);
+    if (ids.length === 0) return;
+
+    const tipo = options?.tipo || (closerId ? "asignacion_inicial" : "desasignacion");
+    const tocaOrigen = tipo === "asignacion_inicial" || tipo === "backfill";
+    const ahora = new Date().toISOString();
+
+    // Se resuelve por aliado porque cada uno arrastra su propio "closer anterior".
+    const movimientos = ids
+      .map((aliadoId) => {
+        const actual = profiles.find((p) => p.id === aliadoId);
+        if (!actual) return null;
+        const fecha = tocaOrigen ? options?.fechaIncorporacion || actual.fecha_incorporacion_closer || ahora : actual.fecha_incorporacion_closer || null;
+        const updates: Partial<UserProfile> = {
+          closer_actual_id: closerId,
+          closer_asignado_por: user?.id || null,
+        };
+        if (tocaOrigen) {
+          updates.closer_origen_id = closerId;
+          updates.fecha_incorporacion_closer = fecha;
+        }
+        return {
+          aliadoId,
+          anterior: actual.closer_actual_id || null,
+          origen: tocaOrigen ? closerId : actual.closer_origen_id || null,
+          fecha,
+          updates,
+        };
+      })
+      .filter(Boolean) as {
+      aliadoId: string;
+      anterior: string | null;
+      origen: string | null;
+      fecha: string | null;
+      updates: Partial<UserProfile>;
+    }[];
+
+    if (movimientos.length === 0) return;
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const byId = new Map(movimientos.map((m) => [m.aliadoId, m]));
+      const updated = profiles.map((p) => {
+        const m = byId.get(p.id);
+        return m ? { ...p, ...m.updates } : p;
+      });
+      setProfiles(updated);
+      saveToStorage("pensionflow_profiles", updated);
+      movimientos.forEach((m) =>
+        appendCloserAsignacionLocal({
+          aliadoId: m.aliadoId,
+          closerNuevoId: closerId,
+          closerAnteriorId: m.anterior,
+          closerOrigenId: m.origen,
+          tipo,
+          motivo: options?.motivo ?? null,
+          fechaIncorporacion: m.fecha,
+        })
+      );
+      return;
+    }
+
+    // Producción. Se actualiza perfil por perfil (son pocos y cada uno lleva su
+    // propia fecha) y después se registra el historial de un solo golpe.
+    for (const m of movimientos) {
+      const dbUpdates: any = {
+        closer_actual_id: closerId,
+        closer_asignado_por: user?.id || null,
+      };
+      if (tocaOrigen) {
+        dbUpdates.closer_origen_id = closerId;
+        dbUpdates.fecha_incorporacion_closer = m.fecha;
+      }
+      const { error } = await supabase.from("profiles").update(dbUpdates).eq("id", m.aliadoId);
+      if (error) throw new Error(`No se pudo actualizar la atribución del aliado: ${error.message}`);
+    }
+
+    const { error: histError } = await supabase.from("closer_aliado_asignaciones").insert(
+      movimientos.map((m) => ({
+        aliado_id: m.aliadoId,
+        closer_anterior_id: m.anterior,
+        closer_nuevo_id: closerId,
+        closer_origen_id: m.origen,
+        tipo_movimiento: tipo,
+        motivo: options?.motivo ?? null,
+        asignado_por: user?.id || null,
+        fecha_asignacion: m.fecha || ahora,
+      }))
+    );
+    if (histError) {
+      // El perfil ya quedó bien; el historial es auditoría. Se avisa pero no se
+      // tira la operación completa encima del usuario.
+      console.warn("No se pudo registrar el historial de asignación de closer:", histError);
+    }
+
+    const byId = new Map(movimientos.map((m) => [m.aliadoId, m]));
+    setProfiles((prev) => prev.map((p) => (byId.has(p.id) ? { ...p, ...byId.get(p.id)!.updates } : p)));
+  };
+
   const createProfile = async (
     profileData: Omit<UserProfile, "id" | "created_at">
   ): Promise<UserProfile> => {
+    // Atribución al closer: solo aplica a los ALIADOS. Si el alta la hace un AM
+    // (que no elige closer) o el rol es otro, queda sin atribuir.
+    //
+    // Cuando quien da el alta ES un closer, la atribución no se negocia: es él.
+    // Su producción se mide justamente por los aliados que incorpora, así que ni
+    // se la puede colgar a un compañero ni puede crear otra cosa que un aliado.
+    // La base impone lo mismo en el WITH CHECK de "Closers dan de alta a sus
+    // aliados" (20260801000001); esto es la primera de las dos barreras.
+    const soyCloser = user?.role === "closer";
+    if (soyCloser && profileData.role !== "aliado") {
+      throw new Error("Un closer solo puede dar de alta aliados.");
+    }
+    const closerOrigenId =
+      profileData.role === "aliado"
+        ? soyCloser
+          ? user?.id || null
+          : profileData.closer_origen_id || null
+        : null;
+    const incorporadoAt = closerOrigenId ? new Date().toISOString() : null;
+
     if (isDemoMode || isProvisionalSession || !supabase) {
       // El aliado nuevo ya NO lleva Account Manager: la ruleta reparte PROYECTOS
       // (ver addProspect / trigger assign_am_to_prospect), no aliados.
@@ -3726,7 +3995,24 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         ...profileData,
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
         created_at: new Date().toISOString(),
+        closer_origen_id: closerOrigenId,
+        closer_actual_id: closerOrigenId,
+        fecha_incorporacion_closer: incorporadoAt,
+        closer_asignado_por: closerOrigenId ? user?.id || null : null,
+        contrato_url: (profileData.contrato_url || "").trim() || null,
+        contrato_url_at: (profileData.contrato_url || "").trim() ? new Date().toISOString() : null,
       };
+
+      if (closerOrigenId) {
+        appendCloserAsignacionLocal({
+          aliadoId: newProfile.id,
+          closerNuevoId: closerOrigenId,
+          closerAnteriorId: null,
+          closerOrigenId,
+          tipo: "asignacion_inicial",
+          fechaIncorporacion: incorporadoAt,
+        });
+      }
 
       const updated = [...profiles, newProfile];
       setProfiles(updated);
@@ -3774,6 +4060,12 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               full_name: profileData.full_name,
               phone: profileData.phone,
               role: profileData.role,
+              // El closer viaja también en la metadata de auth a propósito: si el
+              // INSERT en `profiles` lo bloquea el RLS, el perfil se materializa
+              // en el primer login (ensureProfileExists) y sin esto la atribución
+              // se perdería para siempre.
+              closer_origen_id: closerOrigenId,
+              fecha_incorporacion_closer: incorporadoAt,
             }
           }
         });
@@ -3797,19 +4089,73 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         const dbRole = profileData.role === "director" ? "admin" : profileData.role;
 
         // Insert profile into the profiles table
-        const { data: dbProfile, error: insertError } = await supabase
+        const basePayload: any = {
+          id: authUserId,
+          full_name: profileData.full_name,
+          email: profileData.email.toLowerCase(),
+          phone: profileData.phone,
+          role: dbRole,
+          invitation_code_used: profileData.invitation_code_used || null,
+          password_provisional: profileData.password_provisional || null,
+        };
+        // Contrato firmado. Va en el payload BASE (no en el del closer) para que
+        // también quede registrado cuando el alta la hace Dirección o un AM.
+        // Ojo: para un closer la base lo EXIGE, así que si esto llegara vacío el
+        // insert sería rechazado por la política, no por un descuido silencioso.
+        const contratoUrl = (profileData.contrato_url || "").trim();
+        if (contratoUrl) {
+          basePayload.contrato_url = contratoUrl;
+          basePayload.contrato_url_at = new Date().toISOString();
+        }
+        // Al crear un aliado queda atribuido: el closer de ORIGEN (mérito
+        // histórico) y el ACTUAL arrancan siendo el mismo.
+        const closerPayload = closerOrigenId
+          ? {
+              closer_origen_id: closerOrigenId,
+              closer_actual_id: closerOrigenId,
+              fecha_incorporacion_closer: incorporadoAt,
+              closer_asignado_por: user?.id || null,
+            }
+          : {};
+
+        let { data: dbProfile, error: insertError } = await supabase
           .from("profiles")
-          .insert({
-            id: authUserId,
-            full_name: profileData.full_name,
-            email: profileData.email.toLowerCase(),
-            phone: profileData.phone,
-            role: dbRole,
-            invitation_code_used: profileData.invitation_code_used || null,
-            password_provisional: profileData.password_provisional || null,
-          })
+          .insert({ ...basePayload, ...closerPayload })
           .select()
           .single();
+
+        // Reintento sin los campos del closer. Cubre el hueco de despliegue: si
+        // el código llegara a producción ANTES que la migración 20260801000000,
+        // esas columnas no existirían y el alta de CUALQUIER usuario reventaría.
+        // Mismo patrón que el "retry without is_active" de updateProfileAdmin.
+        // Para un closer el reintento sería contraproducente: su política EXIGE
+        // la atribución, así que un insert sin ella lo rechazaría igual y encima
+        // dejaría el aliado huérfano si algún día se aflojara el RLS.
+        if (insertError && closerOrigenId && !soyCloser) {
+          console.warn("Insert con atribución de closer falló; reintentando sin ella:", insertError);
+          const retry = await supabase.from("profiles").insert(basePayload).select().single();
+          dbProfile = retry.data;
+          insertError = retry.error;
+        }
+
+        // El historial se escribe SIEMPRE que haya atribución, incluso si el
+        // INSERT anterior falló: la tabla no tiene FK sobre `aliado_id`
+        // justamente para que este registro sobreviva a la auto-recuperación.
+        if (closerOrigenId) {
+          const { error: histError } = await supabase.from("closer_aliado_asignaciones").insert({
+            aliado_id: authUserId,
+            closer_anterior_id: null,
+            closer_nuevo_id: closerOrigenId,
+            closer_origen_id: closerOrigenId,
+            tipo_movimiento: "asignacion_inicial",
+            motivo: null,
+            asignado_por: user?.id || null,
+            fecha_asignacion: incorporadoAt,
+          });
+          if (histError) {
+            console.warn("No se pudo registrar la asignación inicial de closer:", histError);
+          }
+        }
 
         let newProfile: UserProfile;
 
@@ -3825,6 +4171,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             invitation_code_used: profileData.invitation_code_used || undefined,
             password_provisional: profileData.password_provisional || undefined,
             created_at: new Date().toISOString(),
+            closer_origen_id: closerOrigenId,
+            closer_actual_id: closerOrigenId,
+            fecha_incorporacion_closer: incorporadoAt,
           };
 
           setProfiles((prev) => [...prev, newProfile]);
@@ -3845,6 +4194,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             invitation_code_used: dbProfile.invitation_code_used,
             password_provisional: dbProfile.password_provisional,
             created_at: dbProfile.created_at,
+            closer_origen_id: dbProfile.closer_origen_id || null,
+            closer_actual_id: dbProfile.closer_actual_id || null,
+            fecha_incorporacion_closer: dbProfile.fecha_incorporacion_closer || null,
           };
 
           setProfiles((prev) => [...prev, newProfile]);
@@ -4054,10 +4406,29 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       };
       setNotifications([newNotif, ...notifications]);
       saveToStorage("pensionflow_notifications", [newNotif, ...notifications]);
+    } else if (user?.role === "closer") {
+      // El closer no tiene política de UPDATE sobre `profiles` —sería ciega a
+      // columnas— así que pasa por una función acotada que solo escribe nombre,
+      // teléfono y contrato. Ver 20260801000004.
+      //
+      // Y aquí SÍ se relanza el error, a diferencia de la rama de abajo: el
+      // closer está editando desde un formulario que debe poder decirle que no
+      // se guardó, en vez de cerrarse como si todo hubiera ido bien.
+      const { error } = await supabase.rpc("closer_actualiza_aliado", {
+        p_aliado_id: id,
+        p_full_name: updates.full_name ?? profile.full_name,
+        p_phone: updates.phone ?? profile.phone ?? null,
+        p_contrato_url: updates.contrato_url ?? profile.contrato_url ?? null,
+      });
+      if (error) {
+        console.error("Error actualizando al aliado desde el closer:", error);
+        throw new Error(error.message || "No se pudo guardar el cambio.");
+      }
+      setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     } else {
       try {
         const dbRole = updates.role === "director" ? "admin" : updates.role;
-        
+
         const dbUpdates: any = {};
         if (updates.full_name !== undefined) dbUpdates.full_name = updates.full_name;
         if (updates.email !== undefined) dbUpdates.email = updates.email.toLowerCase();
@@ -4066,6 +4437,19 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
         if (updates.auto_assign_enabled !== undefined) dbUpdates.auto_assign_enabled = updates.auto_assign_enabled;
         if (updates.password_provisional !== undefined) dbUpdates.password_provisional = updates.password_provisional;
+        // Atribución al closer (ver assignCloser, que es la vía normal; esto
+        // cubre la edición directa del perfil desde Gestión de Usuarios).
+        if (updates.closer_origen_id !== undefined) dbUpdates.closer_origen_id = updates.closer_origen_id;
+        if (updates.closer_actual_id !== undefined) dbUpdates.closer_actual_id = updates.closer_actual_id;
+        if (updates.fecha_incorporacion_closer !== undefined) dbUpdates.fecha_incorporacion_closer = updates.fecha_incorporacion_closer;
+        if (updates.closer_asignado_por !== undefined) dbUpdates.closer_asignado_por = updates.closer_asignado_por;
+        // Contrato firmado del aliado. Se permite editarlo después del alta
+        // porque los 227 aliados anteriores a la regla llegaron sin él y hay que
+        // poder completarlos antes de la siguiente quincena de comisiones.
+        if (updates.contrato_url !== undefined) {
+          dbUpdates.contrato_url = updates.contrato_url;
+          dbUpdates.contrato_url_at = new Date().toISOString();
+        }
 
         const { error } = await supabase
           .from("profiles")
@@ -4616,6 +5000,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       );
       return profiles.filter(p => p.id === user.id || myAmIds.has(p.id));
     }
+    if (user.role === "closer") {
+      // El closer ve su propio perfil y el de los aliados que incorporó o que
+      // acompaña hoy. Nada más: ni otros closers, ni la cartera de nadie más.
+      // Coincide exactamente con la política RLS "Closers ven sus aliados
+      // atribuidos" de 20260801000000, así que el filtro cliente y la base dicen
+      // lo mismo.
+      return profiles.filter(
+        p =>
+          p.id === user.id ||
+          (p.role === "aliado" && (p.closer_origen_id === user.id || p.closer_actual_id === user.id))
+      );
+    }
     return [];
   }, [user, profiles, prospects]);
 
@@ -4656,6 +5052,16 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         (p.role === "aliado" && (p.lider_ids?.includes(user.id) ?? false))
       );
     }
+    if (user.role === "closer") {
+      // Habla con dirección y con los aliados que él mismo incorporó o acompaña.
+      // El RLS de `direct_messages` no discrimina por rol (solo exige que el
+      // emisor sea uno mismo), así que no hace falta migración para esto.
+      return others.filter(
+        p =>
+          p.role === "director" ||
+          (p.role === "aliado" && (p.closer_origen_id === user.id || p.closer_actual_id === user.id))
+      );
+    }
     return [] as UserProfile[];
   }, [user, profiles, prospects]);
 
@@ -4680,6 +5086,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       }
       return prospects.filter(p => p.aliado_id === user.id);
     }
+    // El rol `closer` NO recibe expedientes: cero proyectos, a propósito. Sus
+    // números llegan por las RPC agregadas (closers_overview / closer_aliados),
+    // que devuelven conteos y nunca CURP, NSS ni teléfono de un cliente. La base
+    // impone lo mismo: no existe ninguna política que le dé lectura a
+    // `prospects`. Ver la nota de RLS en 20260801000000_closers.sql.
     return [];
   }, [user, prospects, profiles]);
 
@@ -4734,6 +5145,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         registerAliado,
         initializeDirector,
         createProfile,
+        assignCloser,
         deleteProfile,
         updateProfileAdmin,
         changeAllyType,

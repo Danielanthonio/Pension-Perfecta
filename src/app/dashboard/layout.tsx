@@ -317,24 +317,30 @@ export default function DashboardLayout({
     }
   };
 
-  // Protect client side routes
+  // Protect client side routes.
+  //
+  // Escrito en POSITIVO: este portal es EXCLUSIVO del aliado. Antes se listaban
+  // los roles a expulsar, así que cualquier rol nuevo (p. ej. `closer`) entraba
+  // por omisión al portal de aliados. Ahora solo pasa quien está admitido.
+  const esAliado = user?.role === "aliado";
+
   useEffect(() => {
     if (mounted && !isLoading) {
       if (!user) {
         router.push("/login");
-      } else if (user.role === "director" || user.role === "account_manager") {
+      } else if (!esAliado) {
         router.push("/admin");
       }
     }
-  }, [user, mounted, isLoading, router]);
+  }, [user, mounted, isLoading, router, esAliado]);
 
-  if (!mounted || isLoading || !user || user.role === "director" || user.role === "account_manager") {
+  if (!mounted || isLoading || !user || !esAliado) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
-            {isLoading ? "Cargando Plataforma..." : (user?.role === "director" || user?.role === "account_manager") ? "Redireccionando..." : "Cargando Portal..."}
+            {isLoading ? "Cargando Plataforma..." : user && !esAliado ? "Redireccionando..." : "Cargando Portal..."}
           </span>
         </div>
       </div>

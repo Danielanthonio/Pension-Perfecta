@@ -20,6 +20,7 @@ import {
   User,
   Activity,
   AlertCircle,
+  FileText,
   Trash2,
   Edit3,
   Key,
@@ -29,6 +30,7 @@ import {
   Link2,
   Loader2,
   Save,
+  Target,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -63,7 +65,7 @@ export default function GestionUsuarios() {
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "aliado" | "director" | "account_manager">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "aliado" | "director" | "account_manager" | "closer">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   // Modal / Drawer States
@@ -76,9 +78,14 @@ export default function GestionUsuarios() {
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+52");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"aliado" | "director" | "account_manager">("aliado");
+  const [role, setRole] = useState<"aliado" | "director" | "account_manager" | "closer">("aliado");
   const [isActive, setIsActive] = useState(true);
   const [passwordProvisional, setPasswordProvisional] = useState("");
+  // Closer que incorpora al aliado. Obligatorio al dar de alta un ALIADO (§5):
+  // sin él, el aliado nace "sin atribución" y sus clientes no cuentan para nadie.
+  const [closerResponsableId, setCloserResponsableId] = useState("");
+  // Enlace al contrato firmado con el aliado. Se revisa al pagar comisiones.
+  const [contratoUrl, setContratoUrl] = useState("");
 
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,11 +174,31 @@ export default function GestionUsuarios() {
     }
   };
 
+  // Closers disponibles para atribuir un aliado nuevo.
+  const closersActivos = React.useMemo(
+    () => profiles.filter((p) => p.role === "closer" && p.is_active !== false).sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    [profiles]
+  );
+  // El rol que se va a guardar de verdad: si quien crea es un AM, siempre 'aliado'.
+  const rolEfectivo = isCurrentUserAM ? "aliado" : role;
+  // Regla de negocio: TODO aliado nace con un closer responsable. Sin excepción.
+  const pideCloser = modalMode === "create" && rolEfectivo === "aliado";
+  // Y si todavía no existe ningún closer, el alta se BLOQUEA: no se crea un
+  // aliado huérfano "para arreglarlo luego". Hay que crear antes el closer.
+  const faltanClosers = pideCloser && closersActivos.length === 0;
+
   // Form Validations
   const isNameValid = fullName.trim().length >= 3;
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPhoneValid = /^\d{10}$/.test(phone.replace(/\D/g, ""));
-  const isFormValid = isNameValid && isEmailValid && isPhoneValid;
+  const isCloserValid = !pideCloser || !!closerResponsableId;
+  // El contrato firmado se pide al dar de alta un aliado y se puede completar
+  // después, pero NO bloquea: es una advertencia (decisión del 2026-08-01, con
+  // 228 aliados vivos sin contrato). Ver 20260801000003.
+  const pideContrato = rolEfectivo === "aliado";
+  const contratoLimpio = contratoUrl.trim();
+  const avisoContrato = !contratoLimpio ? "falta" : !/^https?:\/\/\S+\.\S+/i.test(contratoLimpio) ? "no-es-enlace" : null;
+  const isFormValid = isNameValid && isEmailValid && isPhoneValid && isCloserValid && !faltanClosers;
 
   // Open modal for User Creation
   const handleOpenCreateModal = () => {
@@ -183,6 +210,8 @@ export default function GestionUsuarios() {
     setRole("aliado");
     setIsActive(true);
     setPasswordProvisional("");
+    setCloserResponsableId("");
+    setContratoUrl("");
     setFormSubmitted(false);
     setErrorMsg("");
     setCreatedUser(null);
@@ -198,6 +227,8 @@ export default function GestionUsuarios() {
     setIsActive(u.is_active !== false);
     setRole(u.role);
     setPasswordProvisional(u.password_provisional || "");
+    setContratoUrl(u.contrato_url || "");
+    setCloserResponsableId(u.closer_origen_id || "");
     setFormSubmitted(false);
     setErrorMsg("");
     setCreatedUser(null);
@@ -236,16 +267,21 @@ export default function GestionUsuarios() {
           full_name: fullName,
           email: email.toLowerCase(),
           phone: fullPhoneNumber,
-          role: isCurrentUserAM ? "aliado" : role,
+          role: rolEfectivo,
           is_active: isActive,
           password_provisional: passwordProvisional || undefined,
           // El Account Manager NO se fija aquí: se sortea automáticamente entre los
           // AM que están en la ruleta de asignación (aun cuando lo crea un AM). Ya
           // no hay reasignación manual de AM por parte del director.
+          //
+          // El CLOSER sí: queda grabado en el alta, junto con la fecha de
+          // incorporación, y es el que da el mérito de la captación (§4).
+          closer_origen_id: rolEfectivo === "aliado" && closerResponsableId ? closerResponsableId : null,
+          contrato_url: contratoUrl.trim() || null,
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: true });
-        
+
         // Reset form
         setFullName("");
         setEmail("");
@@ -253,6 +289,8 @@ export default function GestionUsuarios() {
         setRole("aliado");
         setIsActive(true);
         setPasswordProvisional("");
+        setCloserResponsableId("");
+        setContratoUrl("");
         setFormSubmitted(false);
         setIsModalOpen(false);
       } else if (modalMode === "edit" && editingUserId) {
@@ -263,6 +301,9 @@ export default function GestionUsuarios() {
           role,
           is_active: isActive,
           password_provisional: passwordProvisional || null,
+          // Vía para completar el contrato de los aliados que se dieron de alta
+          // antes de que la regla existiera.
+          contrato_url: contratoUrl.trim() || null,
         });
 
         setCreatedUser({ name: fullName, email: email.toLowerCase(), isNew: false });
@@ -365,7 +406,7 @@ export default function GestionUsuarios() {
     {
       nombre: (p) => p.full_name,
       correo: (p) => p.email,
-      rol: (p) => (p.role === "director" ? 0 : p.role === "account_manager" ? 1 : 2),
+      rol: (p) => (p.role === "director" ? 0 : p.role === "account_manager" ? 1 : p.role === "closer" ? 2 : 3),
       estado: (p) => (p.is_active === false ? 0 : 1),
     },
     "nombre",
@@ -391,6 +432,7 @@ export default function GestionUsuarios() {
   const totalDirectors = profiles.filter((p) => p.role === "director").length;
   const totalAllies = profiles.filter((p) => p.role === "aliado").length;
   const totalAMs = profiles.filter((p) => p.role === "account_manager").length;
+  const totalClosers = profiles.filter((p) => p.role === "closer").length;
 
   // Invitation codes details
   const unusedCodesCount = myInvitationCodes.filter((c) => !c.is_used).length;
@@ -421,6 +463,16 @@ export default function GestionUsuarios() {
         accent: "border-l-blue-500",
         avatar: "bg-blue-500/10 text-blue-600 border-blue-200 dark:text-blue-400 dark:border-blue-800/40",
         badge: "bg-blue-50 text-blue-700 border-blue-150 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-850",
+      };
+    }
+    if (r === "closer") {
+      return {
+        label: "Closer",
+        short: "Closer",
+        Icon: Target,
+        accent: "border-l-indigo-500",
+        avatar: "bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:text-indigo-400 dark:border-indigo-800/40",
+        badge: "bg-indigo-50 text-indigo-700 border-indigo-150 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-850",
       };
     }
     return {
@@ -658,6 +710,14 @@ export default function GestionUsuarios() {
                       AM ({totalAMs})
                     </button>
                     <button
+                      onClick={() => setRoleFilter("closer")}
+                      className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        roleFilter === "closer" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Closers ({totalClosers})
+                    </button>
+                    <button
                       onClick={() => setRoleFilter("director")}
                       className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
                         roleFilter === "director" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -830,14 +890,16 @@ export default function GestionUsuarios() {
                         ? "bg-emerald-50 text-emerald-600 border-emerald-150 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/40" 
                         : u.role === "account_manager"
                           ? "bg-blue-50 text-blue-600 border-blue-150 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-800/40"
-                          : "bg-teal-50 text-teal-650 border-teal-150 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-800/40"
+                          : u.role === "closer"
+                            ? "bg-indigo-50 text-indigo-600 border-indigo-150 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-800/40"
+                            : "bg-teal-50 text-teal-650 border-teal-150 dark:bg-teal-500/10 dark:text-teal-400 dark:border-teal-800/40"
                     }`}>
                       {u.full_name.charAt(0)}
                     </div>
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">{u.full_name}</span>
                       <span className="text-[9px] text-slate-450 dark:text-slate-500 font-semibold block uppercase">
-                        {u.role === "director" ? "Director" : u.role === "account_manager" ? "Account Manager" : "Aliado Comercial"}
+                        {getRoleMeta(u.role).label}
                       </span>
                     </div>
                   </div>
@@ -1086,7 +1148,7 @@ export default function GestionUsuarios() {
                   <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                     Rol Asignado
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <button
                       type="button"
                       onClick={() => setRole("aliado")}
@@ -1120,7 +1182,115 @@ export default function GestionUsuarios() {
                     >
                       <ShieldCheck className="h-4 w-4" /> Director Operativo
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setRole("closer")}
+                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                        role === "closer"
+                          ? "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                      }`}
+                    >
+                      <Target className="h-4 w-4" /> Closer
+                    </button>
                   </div>
+                </div>
+              )}
+
+              {/* Closer responsable — solo al dar de alta un ALIADO (§5).
+                  Es obligatorio: sin closer, el aliado nace "sin atribución" y ni
+                  él ni sus clientes cuentan para nadie en el módulo Closers. */}
+              {pideCloser && !faltanClosers && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                    Closer Responsable <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                      <Target className="h-4 w-4" />
+                    </span>
+                    <select
+                      value={closerResponsableId}
+                      onChange={(e) => setCloserResponsableId(e.target.value)}
+                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
+                        formSubmitted && !isCloserValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
+                      }`}
+                    >
+                      <option value="">Selecciona quién cerró a este aliado…</option>
+                      {closersActivos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {formSubmitted && !isCloserValid ? (
+                    <span className="text-[9px] text-red-500 dark:text-red-400 font-bold mt-1 block flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> Selecciona el closer que incorporó a este aliado.
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-1.5 block">
+                      Queda registrado junto con la fecha de hoy como fecha de incorporación. Es lo que
+                      atribuye este aliado —y todos sus clientes— al closer.
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Contrato firmado del aliado. Obligatorio en el alta y editable
+                  después, que es como se completan los aliados anteriores a la
+                  regla. El aviso explica el porqué: sin contrato no hay pago. */}
+              {pideContrato && (
+                <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-3.5 py-3">
+                  <label className="block text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1.5">
+                    Contrato firmado
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-500 dark:text-amber-400">
+                      <FileText className="h-4 w-4" />
+                    </span>
+                    <input
+                      value={contratoUrl}
+                      onChange={(e) => setContratoUrl(e.target.value)}
+                      placeholder="https://… enlace al contrato"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-slate-850 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs font-semibold outline-none focus:border-amber-500 transition-colors text-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                  {avisoContrato === "no-es-enlace" ? (
+                    <span className="text-[9px] text-amber-700 dark:text-amber-400 font-bold mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> Eso no parece un enlace: debe empezar por http:// o https://.
+                    </span>
+                  ) : avisoContrato === "falta" ? (
+                    <span className="text-[9px] text-amber-700 dark:text-amber-400 font-bold mt-1.5 block leading-relaxed">
+                      Sin contrato el aliado queda marcado como pendiente. Al pagar comisiones se revisa que la
+                      documentación esté completa.
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-amber-700/90 dark:text-amber-400/80 font-semibold mt-1.5 block leading-relaxed">
+                      Comprueba que el enlace se pueda abrir desde fuera de tu cuenta: un archivo restringido vale
+                      lo mismo que ninguno.
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Sin closers no se puede dar de alta un aliado: la regla es que
+                  ninguno nazca huérfano. Se bloquea y se dice qué hacer. */}
+              {faltanClosers && (
+                <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 px-3.5 py-3 flex items-start gap-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                  <span className="text-[10px] text-red-700 dark:text-red-300 font-semibold leading-relaxed block">
+                    No puedes crear un aliado todavía: <strong>no existe ningún usuario con rol Closer</strong> al
+                    que atribuirlo, y todo aliado debe tener uno. Cambia el rol a{" "}
+                    <button
+                      type="button"
+                      onClick={() => setRole("closer")}
+                      className="underline font-bold hover:text-red-800 dark:hover:text-red-200"
+                    >
+                      Closer
+                    </button>{" "}
+                    y crea primero al responsable de la captación.
+                  </span>
                 </div>
               )}
 

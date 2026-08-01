@@ -34,6 +34,8 @@ import {
   Landmark,
   Building2,
   GraduationCap,
+  Target,
+  Link2,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -41,11 +43,34 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; collapsed?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user } = useApp();
+  const { user, profiles } = useApp();
+  // Aliados sin closer atribuido. Se pinta como contador en el menú porque la
+  // regla es "todo aliado tiene closer": si el hueco no se ve, no se cierra.
+  const sinCloserCount = profiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
   const currentParamsString = searchParams.toString();
   const qs = currentParamsString ? `?${currentParamsString}` : "";
   const cleanPath = pathname.replace(/\/$/, "");
   const isAM = user?.role === "account_manager";
+  const isCloser = user?.role === "closer";
+
+  // Un closer solo mide su captación: no ve el pipeline, ni la gestión de
+  // aliados, ni los usuarios. Su menú tiene una sola entrada, a su propia ficha.
+  if (isCloser) {
+    const href = `/admin/closers/${user?.id ?? ""}${qs}`;
+    return (
+      <Link
+        href={href}
+        onClick={onLinkClick}
+        title="Mis métricas"
+        className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase px-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md`}
+      >
+        <span className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-white/15 ${collapsed ? "md:mr-0 mr-3" : "mr-3"}`}>
+          <Target className="h-4 w-4 stroke-[2.5]" />
+        </span>
+        <span className={collapsed ? "md:hidden" : ""}>Mis métricas</span>
+      </Link>
+    );
+  }
 
   const items = [
     { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
@@ -53,6 +78,21 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/agenda-futura${qs}`, active: cleanPath === "/admin/agenda-futura", Icon: CalendarClock, label: "Agenda Futura" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
+    // Closers: la capa que va ANTES del aliado. Solo Dirección; el módulo mide
+    // captación de aliados, que no forma parte de la operación de un AM (y su
+    // RLS tampoco le daría los datos).
+    ...(!isAM
+      ? [
+          { href: `/admin/closers${qs}`, active: cleanPath.startsWith("/admin/closers"), Icon: Target, label: "Closers" },
+          {
+            href: `/admin/asignacion-closer${qs}`,
+            active: cleanPath === "/admin/asignacion-closer",
+            Icon: Link2,
+            label: "Asignación Closer",
+            badge: sinCloserCount,
+          },
+        ]
+      : []),
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
     ...(!isAM
@@ -64,12 +104,12 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
 
   return (
     <>
-      {items.map(({ href, active, Icon, label }) => (
+      {items.map(({ href, active, Icon, label, badge }: any) => (
         <Link
           key={href}
           href={href}
           onClick={onLinkClick}
-          title={label}
+          title={badge ? `${label} · ${badge} pendiente(s)` : label}
           className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase ${
             collapsed ? "px-2 md:justify-center md:px-2" : "px-2"
           } ${
@@ -78,12 +118,26 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
               : "text-slate-400 hover:text-white hover:bg-slate-800/50"
           }`}
         >
-          <span className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-colors ${collapsed ? "md:mr-0 mr-3" : "mr-3"} ${
+          <span className={`relative flex items-center justify-center h-8 w-8 rounded-lg shrink-0 transition-colors ${collapsed ? "md:mr-0 mr-3" : "mr-3"} ${
             active ? "bg-white/15" : "bg-slate-800/70 group-hover:bg-slate-700/70"
           }`}>
             <Icon className="h-4 w-4 stroke-[2.5]" />
+            {/* Con el menú plegado el número no cabe: queda un punto de aviso. */}
+            {badge > 0 && collapsed && (
+              <span className="hidden md:block absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-[#070b12]" />
+            )}
           </span>
           <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+          {/* Aliados sin closer: el hueco que hay que cerrar, siempre a la vista. */}
+          {badge > 0 && (
+            <span
+              className={`ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-full text-[10px] font-black tabular-nums text-center ${
+                active ? "bg-white/20 text-white" : "bg-amber-500/15 text-amber-400"
+              } ${collapsed ? "md:hidden" : ""}`}
+            >
+              {badge}
+            </span>
+          )}
         </Link>
       ))}
     </>
@@ -348,24 +402,38 @@ export default function AdminLayout({
     }
   };
 
-  // Protect client side routes
+  // Protect client side routes.
+  //
+  // OJO — este guardia se escribe en POSITIVO a propósito. Cuando estaba
+  // redactado como "si es aliado, fuera", cualquier rol NUEVO caía dentro de la
+  // consola completa de Dirección por omisión. Al añadir el rol `closer` eso
+  // habría sido un agujero directo: aquí se listan los roles admitidos y todo lo
+  // demás sale.
+  const puedeVerAdmin = user?.role === "director" || user?.role === "account_manager" || user?.role === "closer";
+  // El closer solo tiene una sección; el resto de /admin no es para él.
+  const closerFueraDeSuZona = user?.role === "closer" && !pathname.replace(/\/$/, "").startsWith("/admin/closers");
+
   useEffect(() => {
     if (mounted && !isLoading) {
       if (!user) {
         router.push("/login");
       } else if (user.role === "aliado") {
         router.push("/dashboard");
+      } else if (!puedeVerAdmin) {
+        router.push("/login");
+      } else if (closerFueraDeSuZona) {
+        router.push(`/admin/closers/${user.id}`);
       }
     }
-  }, [user, mounted, isLoading, router]);
+  }, [user, mounted, isLoading, router, puedeVerAdmin, closerFueraDeSuZona]);
 
-  if (!mounted || isLoading || !user || user.role === "aliado") {
+  if (!mounted || isLoading || !user || !puedeVerAdmin || closerFueraDeSuZona) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
-            {isLoading ? "Cargando Plataforma..." : user?.role === "aliado" ? "Redireccionando..." : "Cargando Consola Director..."}
+            {isLoading ? "Cargando Plataforma..." : !user || !puedeVerAdmin || closerFueraDeSuZona ? "Redireccionando..." : "Cargando Consola Director..."}
           </span>
         </div>
       </div>
@@ -391,6 +459,8 @@ export default function AdminLayout({
   };
 
   const isAM = user.role === "account_manager";
+  const isCloser = user.role === "closer";
+  const rolLabel = isAM ? "Account Manager" : isCloser ? "Closer" : "Director";
   const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
   const selectionColor = "selection:bg-emerald-500";
 
@@ -457,6 +527,20 @@ export default function AdminLayout({
         subtitle: "Inducción, conceptos y material de apoyo para todo el equipo.",
       };
     }
+    if (cleanPath === "/admin/asignacion-closer") {
+      return {
+        title: "Asignación Closer",
+        subtitle: "Atribuye cada aliado al closer que lo incorporó. Ninguno debe quedarse sin uno.",
+      };
+    }
+    if (cleanPath.startsWith("/admin/closers")) {
+      return {
+        title: isCloser ? "Mis métricas" : "Closers",
+        subtitle: isCloser
+          ? "Los aliados que has incorporado y lo que han producido."
+          : "Seguimiento de captación, productividad y resultados comerciales.",
+      };
+    }
     return {
       title: "Consola de Control",
       subtitle: "Portal Operativo de Pensión Perfecta.",
@@ -474,15 +558,18 @@ export default function AdminLayout({
           <div className="flex items-center gap-2">
             <span className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse bg-teal-500" />
             <span>
-              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : "Dirección"}: <span className="text-teal-400">{user.full_name} ({isAM ? "Account Manager" : "Director de Operaciones"})</span>
+              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : isCloser ? "Closer" : "Dirección"}: <span className="text-teal-400">{user.full_name} ({isAM ? "Account Manager" : isCloser ? "Closer" : "Director de Operaciones"})</span>
             </span>
           </div>
-          <button
-            onClick={handleRoleSwitch}
-            className="px-3 py-0.5 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm text-[10px] bg-teal-600 hover:bg-teal-700"
-          >
-            Switch to Ally View 💼
-          </button>
+          {/* El closer no tiene portal de aliado al que saltar. */}
+          {!isCloser && (
+            <button
+              onClick={handleRoleSwitch}
+              className="px-3 py-0.5 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm text-[10px] bg-teal-600 hover:bg-teal-700"
+            >
+              Switch to Ally View 💼
+            </button>
+          )}
         </div>
       )}
 
@@ -651,7 +738,7 @@ export default function AdminLayout({
               >
                 <div className="text-right hidden sm:block">
                   <span className="block text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                    {isAM ? "Account Manager" : "Director"}
+                    {rolLabel}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5 justify-end">
                     <span className="block text-xs font-black text-slate-850 dark:text-white leading-none">

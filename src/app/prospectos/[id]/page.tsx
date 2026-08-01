@@ -443,6 +443,17 @@ export default function ProspectoDetalle() {
     reader.readAsDataURL(file);
   };
 
+  // Un CLOSER no abre expedientes, ni siquiera tecleando la URL. Esta ruta vive
+  // fuera de los layouts de /admin y /dashboard, así que no hereda sus guardias:
+  // sin este bloqueo sería el único hueco por el que un closer llegaría a la PII
+  // de un cliente. (En producción el RLS tampoco le daría la fila, pero la
+  // defensa no puede depender solo de eso.)
+  useEffect(() => {
+    if (user?.role === "closer") {
+      router.push(`/admin/closers/${user.id}`);
+    }
+  }, [user, router]);
+
   useEffect(() => {
     if (prospects.length > 0) {
       const found = prospects.find((p) => p.id === id);
@@ -921,6 +932,16 @@ export default function ProspectoDetalle() {
       </div>
     </div>
   );
+
+  // Cortafuegos síncrono: el redirect de arriba es un efecto y tarda un tick, así
+  // que sin esto el expediente alcanzaría a pintarse un instante para un closer.
+  if (user?.role === "closer") {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
+        <span className="text-sm font-semibold text-slate-400">Redireccionando…</span>
+      </div>
+    );
+  }
 
   if (!prospect) {
     return (

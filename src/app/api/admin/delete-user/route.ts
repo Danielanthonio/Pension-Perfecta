@@ -77,6 +77,9 @@ export async function POST(request: Request) {
   if (callerErr) {
     return NextResponse.json({ error: "No se pudo verificar tus permisos." }, { status: 500 });
   }
+  // El closer administra a sus aliados (nombre, teléfono, contrato) pero NO los
+  // elimina: borrar una cuenta es permanente y arrastra proyectos, expedientes y
+  // comisiones. Decisión de Dirección del 2026-08-01.
   if (!callerProfile || !DIRECTOR_ROLES.includes(callerProfile.role)) {
     return NextResponse.json({ error: "Solo la Dirección puede eliminar usuarios." }, { status: 403 });
   }
@@ -153,6 +156,28 @@ export async function POST(request: Request) {
     }
   }
 
+  // --- 6a-bis. Aliados atribuidos a este usuario como CLOSER ---
+  // `profiles.closer_origen_id` es ON DELETE SET NULL: borrar a un closer con
+  // aliados a su nombre BORRARÍA EN SILENCIO el mérito histórico de todas sus
+  // captaciones, y ese dato no se puede reconstruir. Se bloquea el borrado y se
+  // exige reatribuir antes, igual que con los proyectos de un aliado.
+  const { data: aliadosDelCloser, error: closerErr } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("closer_origen_id", userId);
+  // Si la migración de closers todavía no está aplicada, la columna no existe:
+  // el error se ignora y el borrado sigue como antes.
+  if (!closerErr && (aliadosDelCloser?.length ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error: `Este closer tiene ${aliadosDelCloser!.length} aliado(s) atribuido(s). Reasígnalos a otro closer desde el módulo Closers antes de eliminarlo: al borrarlo se perdería el histórico de su captación.`,
+        needsCloserReassign: true,
+        aliadoCount: aliadosDelCloser!.length,
+      },
+      { status: 409 }
+    );
+  }
+
   // --- 6b. Proyectos donde este usuario es el ACCOUNT MANAGER ---
   // La FK `prospects.account_manager_id` es ON DELETE SET NULL, así que al
   // borrar la cuenta esos proyectos quedarían SIN AM. Si el director indicó un
@@ -196,6 +221,23 @@ export async function POST(request: Request) {
   // Ambas columnas son nullable; sin esto la FK bloquea el borrado del perfil.
   await admin.from("invitation_codes").update({ created_by: null }).eq("created_by", userId);
   await admin.from("invitation_codes").update({ used_by: null }).eq("used_by", userId);
+
+  // --- 7.b Historial de atribución a closers ---
+  // `closer_aliado_asignaciones.aliado_id` NO tiene FK a propósito (ver
+  // 20260801000000_closers.sql): así el registro sobrevive a la ruta de
+  // auto-recuperación de createProfile, en la que el perfil todavía no existe.
+  // El precio de esa decisión se paga aquí: al borrar de verdad a un usuario,
+  // hay que limpiar sus filas a mano o el historial acumula huérfanos.
+  // Las columnas de closer sí son FK con ON DELETE SET NULL, así que borrar a un
+  // CLOSER no destruye la historia de sus aliados: solo deja de nombrarlo.
+  const { error: histDelErr } = await admin
+    .from("closer_aliado_asignaciones")
+    .delete()
+    .eq("aliado_id", userId);
+  if (histDelErr) {
+    // No es motivo para abortar el borrado: es auditoría, no integridad.
+    console.warn("No se pudo limpiar el historial de closers del usuario:", histDelErr.message);
+  }
 
   // --- 8. Eliminar la cuenta de auth (el perfil cae por cascada) ---
   const { error: deleteAuthErr } = await admin.auth.admin.deleteUser(userId);
