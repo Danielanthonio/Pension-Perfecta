@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Target,
   Link2,
+  Wallet,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
 import UserSettingsModal from "@/components/UserSettingsModal";
@@ -75,6 +76,12 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   const items = [
     { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
     { href: `/admin/reportes${qs}`, active: cleanPath === "/admin/reportes", Icon: FileBarChart, label: "Reportes" },
+    // Finanzas y Comisiones: exclusivo de la Dirección (§2 del brief). Un Account
+    // Manager no lo ve —ni aquí ni consultando la base: las tablas de comisiones
+    // solo tienen SELECT para dirección y las RPC lo comprueban por dentro—.
+    ...(!isAM
+      ? [{ href: `/admin/finanzas${qs}`, active: cleanPath === "/admin/finanzas", Icon: Wallet, label: "Finanzas" }]
+      : []),
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/agenda-futura${qs}`, active: cleanPath === "/admin/agenda-futura", Icon: CalendarClock, label: "Agenda Futura" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
@@ -525,6 +532,12 @@ export default function AdminLayout({
       return {
         title: "Classroom",
         subtitle: "Inducción, conceptos y material de apoyo para todo el equipo.",
+      };
+    }
+    if (cleanPath === "/admin/finanzas") {
+      return {
+        title: "Finanzas y Comisiones",
+        subtitle: "Revisa la producción, aprueba las comisiones y controla los pagos del equipo.",
       };
     }
     if (cleanPath === "/admin/asignacion-closer") {
