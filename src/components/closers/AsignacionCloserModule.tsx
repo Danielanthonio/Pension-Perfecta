@@ -56,7 +56,16 @@ const segmented =
   "flex items-center gap-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/70 p-0.5 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/50";
 
 export default function AsignacionCloserModule() {
-  const { profiles, prospects, empresasMultialiado, assignCloser } = useApp();
+  const { user, profiles, prospects, empresasMultialiado, assignCloser } = useApp();
+  // Dirección hace todo. El Account Manager solo cierra huecos: puede atribuir a
+  // un aliado que NO tiene closer, y ahí se acaba su alcance. Reescribir una
+  // atribución existente mueve métricas históricas y comisiones, así que ni
+  // reasigna ni toca a los ya atribuidos. La base impone lo mismo dentro de
+  // `asigna_closer_a_aliado` (20260803000000): esto solo evita el intento.
+  const soloAtribucionInicial = user?.role === "account_manager";
+  // Un aliado ya atribuido no es seleccionable para el AM: marcarlo solo llevaría
+  // a un error de la base al guardar.
+  const seleccionable = (a: UserProfile) => !soloAtribucionInicial || !a.closer_origen_id;
   // Solo se usa el lector de historial; las métricas de esta pantalla salen del
   // contexto, que la Dirección ya tiene en memoria.
   const { fetchHistorial } = useClosers({ desde: "", hasta: "", grano: "mes", tipoAliado: "todos", estadoAliado: "todos" });
@@ -123,21 +132,26 @@ export default function AsignacionCloserModule() {
       });
   }, [aliados, filtro, closerFiltro, busqueda, empresaPorId, nombrePorId]);
 
-  const todosVisiblesMarcados = visibles.length > 0 && visibles.every((a) => seleccion.has(a.id));
+  // "Todos" significa "todos los que este usuario puede tocar".
+  const marcables = useMemo(() => visibles.filter(seleccionable), [visibles, soloAtribucionInicial]);
+  const todosVisiblesMarcados = marcables.length > 0 && marcables.every((a) => seleccion.has(a.id));
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    const a = profiles.find((p) => p.id === id);
+    if (a && !seleccionable(a)) return;
     setSeleccion((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
 
   const toggleTodos = () =>
     setSeleccion((prev) => {
       const next = new Set(prev);
-      if (todosVisiblesMarcados) visibles.forEach((a) => next.delete(a.id));
-      else visibles.forEach((a) => next.add(a.id));
+      if (todosVisiblesMarcados) marcables.forEach((a) => next.delete(a.id));
+      else marcables.forEach((a) => next.add(a.id));
       return next;
     });
 
@@ -227,6 +241,18 @@ export default function AsignacionCloserModule() {
           <History className="h-4 w-4" strokeWidth={2.4} /> Historial
         </button>
       </div>
+
+      {/* El AM tiene que saber dónde termina su alcance ANTES de intentar algo. */}
+      {soloAtribucionInicial && (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-5 py-3.5 flex items-start gap-3">
+          <UserCheck className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5" />
+          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+            Puedes atribuir los aliados que <strong>todavía no tienen closer</strong>. Los que ya lo tienen
+            aparecen en gris: cambiar una atribución existente mueve métricas históricas y comisiones, así que
+            eso lo hace Dirección.
+          </p>
+        </div>
+      )}
 
       {/* Estado de cobertura */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -346,6 +372,7 @@ export default function AsignacionCloserModule() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                 {visibles.map((a) => {
                   const marcado = seleccion.has(a.id);
+                  const puedeMarcarse = seleccionable(a);
                   const origen = a.closer_origen_id ? nombrePorId.get(a.closer_origen_id) : null;
                   const actual = a.closer_actual_id ? nombrePorId.get(a.closer_actual_id) : null;
                   const tipo = tipoDeAliado(a);
@@ -353,14 +380,23 @@ export default function AsignacionCloserModule() {
                     <tr
                       key={a.id}
                       onClick={() => toggle(a.id)}
-                      className={`cursor-pointer transition-colors ${
-                        marcado ? "bg-emerald-50/70 dark:bg-emerald-950/20" : "hover:bg-slate-50/60 dark:hover:bg-slate-800/20"
+                      title={puedeMarcarse ? undefined : "Ya tiene closer de origen: cambiarlo es cosa de Dirección."}
+                      className={`transition-colors ${
+                        !puedeMarcarse
+                          ? "cursor-not-allowed opacity-60"
+                          : marcado
+                            ? "cursor-pointer bg-emerald-50/70 dark:bg-emerald-950/20"
+                            : "cursor-pointer hover:bg-slate-50/60 dark:hover:bg-slate-800/20"
                       }`}
                     >
                       <td className="pl-5 pr-2 py-2.5">
                         <span
                           className={`h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-                            marcado ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 dark:border-slate-600"
+                            marcado
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : puedeMarcarse
+                                ? "border-slate-300 dark:border-slate-600"
+                                : "border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                           }`}
                         >
                           {marcado && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -409,7 +445,7 @@ export default function AsignacionCloserModule() {
                         {clientesPorAliado.get(a.id) || 0}
                       </td>
                       <td className="pl-3 pr-5 py-2.5 text-right">
-                        {a.closer_origen_id && (
+                        {a.closer_origen_id && !soloAtribucionInicial && (
                           <button
                             onClick={(ev) => {
                               ev.stopPropagation();

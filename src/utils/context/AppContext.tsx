@@ -3928,6 +3928,36 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return;
     }
 
+    // ── Account Manager ──────────────────────────────────────────────────────
+    // El AM no tiene UPDATE sobre los perfiles de aliado (desde que el AM es por
+    // PROYECTO, la condición `account_manager_id = auth.uid()` ya casi nunca se
+    // cumple) ni INSERT en el historial, que solo acepta a Dirección. Su
+    // asignación pasa entera por `asigna_closer_a_aliado` (20260803000000): una
+    // función con lista blanca de columnas que además le impide reescribir una
+    // atribución que ya existía. Dirección sigue por el camino directo de abajo.
+    if (user?.role === "account_manager") {
+      if (!closerId) {
+        throw new Error("Quitarle el closer a un aliado es cosa de Dirección.");
+      }
+      if (tipo !== "asignacion_inicial" && tipo !== "backfill") {
+        throw new Error("Reasignar a otro closer es cosa de Dirección.");
+      }
+      const { error: rpcError } = await supabase.rpc("asigna_closer_a_aliado", {
+        p_aliado_ids: movimientos.map((m) => m.aliadoId),
+        p_closer_id: closerId,
+        p_tipo: tipo,
+        p_motivo: options?.motivo ?? null,
+        p_fecha: options?.fechaIncorporacion ?? null,
+      });
+      if (rpcError) {
+        console.error("Error asignando closer (Account Manager):", rpcError);
+        throw new Error(rpcError.message || "No se pudo atribuir el aliado al closer.");
+      }
+      const byIdAm = new Map(movimientos.map((m) => [m.aliadoId, m]));
+      setProfiles((prev) => prev.map((p) => (byIdAm.has(p.id) ? { ...p, ...byIdAm.get(p.id)!.updates } : p)));
+      return;
+    }
+
     // Producción. Se actualiza perfil por perfil (son pocos y cada uno lleva su
     // propia fecha) y después se registra el historial de un solo golpe.
     for (const m of movimientos) {
@@ -3979,6 +4009,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const soyCloser = user?.role === "closer";
     if (soyCloser && profileData.role !== "aliado") {
       throw new Error("Un closer solo puede dar de alta aliados.");
+    }
+    // El Account Manager incorpora la capa comercial —aliados y closers— pero no
+    // reparte poder: ni directores ni otros AM. La base impone lo mismo en el
+    // WITH CHECK de "Admins y Account Managers pueden crear perfiles"
+    // (20260803000000); esto es la primera de las dos barreras.
+    if (user?.role === "account_manager" && profileData.role !== "aliado" && profileData.role !== "closer") {
+      throw new Error("Un Account Manager solo puede dar de alta aliados y closers.");
     }
     const closerOrigenId =
       profileData.role === "aliado"
@@ -4100,8 +4137,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         };
         // Contrato firmado. Va en el payload BASE (no en el del closer) para que
         // también quede registrado cuando el alta la hace Dirección o un AM.
-        // Ojo: para un closer la base lo EXIGE, así que si esto llegara vacío el
-        // insert sería rechazado por la política, no por un descuido silencioso.
+        // NO es obligatorio: la base lo dejó en advertencia el 2026-08-01 (ver
+        // 20260801000003), porque había 228 aliados vivos sin contrato y
+        // exigirlo habría bloqueado su mantenimiento. Si viene vacío, el aliado
+        // nace marcado como pendiente y se completa después.
         const contratoUrl = (profileData.contrato_url || "").trim();
         if (contratoUrl) {
           basePayload.contrato_url = contratoUrl;

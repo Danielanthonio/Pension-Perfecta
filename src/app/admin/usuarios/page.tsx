@@ -179,8 +179,11 @@ export default function GestionUsuarios() {
     () => profiles.filter((p) => p.role === "closer" && p.is_active !== false).sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [profiles]
   );
-  // El rol que se va a guardar de verdad: si quien crea es un AM, siempre 'aliado'.
-  const rolEfectivo = isCurrentUserAM ? "aliado" : role;
+  // El rol que se va a guardar de verdad. Un Account Manager incorpora la capa
+  // comercial —aliados y closers— y nada más: si intentara cualquier otro rol,
+  // se guarda como aliado. La base impone el mismo límite (20260803000000), así
+  // que esto es comodidad de pantalla, no la seguridad.
+  const rolEfectivo = isCurrentUserAM ? (role === "closer" ? "closer" : "aliado") : role;
   // Regla de negocio: TODO aliado nace con un closer responsable. Sin excepción.
   const pideCloser = modalMode === "create" && rolEfectivo === "aliado";
   // Y si todavía no existe ningún closer, el alta se BLOQUEA: no se crea un
@@ -1142,13 +1145,16 @@ export default function GestionUsuarios() {
                 )}
               </div>
 
-              {/* Role Selection */}
-              {!isCurrentUserAM && (
+              {/* Role Selection.
+                  El Account Manager elige, pero solo entre los dos roles que
+                  puede crear: aliado y closer. Al EDITAR no ve el selector, para
+                  que no pueda degradar sin querer el rol de nadie. */}
+              {(!isCurrentUserAM || modalMode === "create") && (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                     Rol Asignado
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className={`grid grid-cols-1 gap-3 ${isCurrentUserAM ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
                     <button
                       type="button"
                       onClick={() => setRole("aliado")}
@@ -1160,28 +1166,32 @@ export default function GestionUsuarios() {
                     >
                       <UserCheck className="h-4 w-4" /> Aliado Comercial
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole("account_manager")}
-                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                        role === "account_manager"
-                          ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500 text-blue-600 dark:text-blue-400"
-                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
-                      }`}
-                    >
-                      <ShieldCheck className="h-4 w-4" /> Account Manager
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole("director")}
-                      className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
-                        role === "director"
-                          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
-                      }`}
-                    >
-                      <ShieldCheck className="h-4 w-4" /> Director Operativo
-                    </button>
+                    {!isCurrentUserAM && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setRole("account_manager")}
+                          className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                            role === "account_manager"
+                              ? "bg-blue-50 dark:bg-blue-950/30 border-blue-500 text-blue-600 dark:text-blue-400"
+                              : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <ShieldCheck className="h-4 w-4" /> Account Manager
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRole("director")}
+                          className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                            role === "director"
+                              ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                              : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <ShieldCheck className="h-4 w-4" /> Director Operativo
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => setRole("closer")}
@@ -1237,9 +1247,10 @@ export default function GestionUsuarios() {
                 </div>
               )}
 
-              {/* Contrato firmado del aliado. Obligatorio en el alta y editable
-                  después, que es como se completan los aliados anteriores a la
-                  regla. El aviso explica el porqué: sin contrato no hay pago. */}
+              {/* Contrato firmado del aliado. Se pide en el alta y se puede
+                  completar después —así se ponen al día los aliados anteriores a
+                  la regla—, pero NO bloquea: es una advertencia. El aviso explica
+                  el porqué de insistir: sin contrato no hay pago de comisión. */}
               {pideContrato && (
                 <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 px-3.5 py-3">
                   <label className="block text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1.5">

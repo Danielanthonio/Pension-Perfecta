@@ -85,21 +85,20 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/agenda-futura${qs}`, active: cleanPath === "/admin/agenda-futura", Icon: CalendarClock, label: "Agenda Futura" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
-    // Closers: la capa que va ANTES del aliado. Solo Dirección; el módulo mide
-    // captación de aliados, que no forma parte de la operación de un AM (y su
-    // RLS tampoco le daría los datos).
+    // Closers: la capa que va ANTES del aliado. El tablero de MÉTRICAS es solo de
+    // Dirección —mide captación, que no es operación de un AM, y su RLS tampoco
+    // le daría los datos—. La ASIGNACIÓN sí la ve el AM: desde el 2026-08-03
+    // también él cierra el hueco de los aliados sin closer.
     ...(!isAM
-      ? [
-          { href: `/admin/closers${qs}`, active: cleanPath.startsWith("/admin/closers"), Icon: Target, label: "Closers" },
-          {
-            href: `/admin/asignacion-closer${qs}`,
-            active: cleanPath === "/admin/asignacion-closer",
-            Icon: Link2,
-            label: "Asignación Closer",
-            badge: sinCloserCount,
-          },
-        ]
+      ? [{ href: `/admin/closers${qs}`, active: cleanPath.startsWith("/admin/closers"), Icon: Target, label: "Closers" }]
       : []),
+    {
+      href: `/admin/asignacion-closer${qs}`,
+      active: cleanPath === "/admin/asignacion-closer",
+      Icon: Link2,
+      label: "Asignación Closer",
+      badge: sinCloserCount,
+    },
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
     ...(!isAM
