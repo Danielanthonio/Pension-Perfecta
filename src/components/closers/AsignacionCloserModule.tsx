@@ -56,7 +56,15 @@ const segmented =
   "flex items-center gap-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/70 p-0.5 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/50";
 
 export default function AsignacionCloserModule() {
-  const { user, profiles, prospects, empresasMultialiado, assignCloser } = useApp();
+  // `assignmentProfiles` es el `profiles` CRUDO, sin el recorte por rol que hace
+  // el contexto. Aquí es imprescindible: a un Account Manager el recorte le deja
+  // solo los aliados de sus proyectos, y esta pantalla existe justamente para
+  // atribuir los que NO tienen closer —que casi nunca son suyos—. Con el
+  // filtrado, el módulo le salía prácticamente vacío. El alcance real lo pone el
+  // RLS, que ya le deja leer los aliados y los closers; ver
+  // [[project-am-asigna-cualquier-aliado]], que resolvió lo mismo para el
+  // asignador de AMs.
+  const { user, assignmentProfiles: profiles, prospects, empresasMultialiado, assignCloser } = useApp();
   // Dirección hace todo. El Account Manager solo cierra huecos: puede atribuir a
   // un aliado que NO tiene closer, y ahí se acaba su alcance. Reescribir una
   // atribución existente mueve métricas históricas y comisiones, así que ni

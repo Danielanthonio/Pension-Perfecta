@@ -5203,7 +5203,22 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const myAllyIds = new Set(
         prospects.filter(p => p.account_manager_id === user.id).map(p => p.aliado_id)
       );
-      return profiles.filter(p => p.id === user.id || (p.role === "aliado" && myAllyIds.has(p.id)));
+      return profiles.filter(p =>
+        p.id === user.id ||
+        // Los CLOSERS. El AM los da de alta y les atribuye aliados desde
+        // 20260803000000, y el RLS ya se lo permite; este filtro de cliente se
+        // quedó atrás y los borraba después de traerlos, así que el selector
+        // "Closer responsable" salía vacío y el alta se bloqueaba con un
+        // "no existe ningún closer" que era mentira.
+        p.role === "closer" ||
+        (p.role === "aliado" && (
+          myAllyIds.has(p.id) ||
+          // Los aliados que él mismo dio de alta. Sin esto, un aliado recién
+          // creado por el AM desaparecía de su lista en cuanto se guardaba:
+          // todavía no tiene ningún proyecto que los relacione.
+          (!!p.created_by && p.created_by === user.id)
+        ))
+      );
     }
     if (user.role === "aliado") {
       const myAmIds = new Set(

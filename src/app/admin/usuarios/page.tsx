@@ -426,8 +426,11 @@ export default function GestionUsuarios() {
     })
     .filter((p) => {
       if (isCurrentUserAM) {
-        // AM only manages and lists allies
-        return p.role === "aliado";
+        // El AM administra la capa comercial: aliados y closers. Los closers
+        // entran en la lista porque desde 20260803000000 él los da de alta, y
+        // dejarlos fuera hacía que un closer recién creado desapareciera de la
+        // pantalla justo después de crearlo, sin forma de darle sus accesos.
+        return p.role === "aliado" || p.role === "closer";
       }
       if (roleFilter === "all") return true;
       return p.role === roleFilter;
@@ -472,14 +475,15 @@ export default function GestionUsuarios() {
   ];
 
   // User Counts Statistics
+  const gestionadosPorAM = (p: UserProfile) => p.role === "aliado" || p.role === "closer";
   const totalUsers = isCurrentUserAM
-    ? profiles.filter((p) => p.role === "aliado").length
+    ? profiles.filter(gestionadosPorAM).length
     : profiles.length;
   const totalActive = isCurrentUserAM
-    ? profiles.filter((p) => p.role === "aliado" && p.is_active !== false).length
+    ? profiles.filter((p) => gestionadosPorAM(p) && p.is_active !== false).length
     : profiles.filter((p) => p.is_active !== false).length;
   const totalInactive = isCurrentUserAM
-    ? profiles.filter((p) => p.role === "aliado" && p.is_active === false).length
+    ? profiles.filter((p) => gestionadosPorAM(p) && p.is_active === false).length
     : profiles.filter((p) => p.is_active === false).length;
   const totalDirectors = profiles.filter((p) => p.role === "director").length;
   const totalAllies = profiles.filter((p) => p.role === "aliado").length;
@@ -1134,9 +1138,16 @@ export default function GestionUsuarios() {
       </div>
 
       {/* Creation & Editing Modal */}
+      {/* El formulario de alta creció (rol, asignación de closer, contrato,
+          contraseña, estado) y en una pantalla de portátil ya no cabe. Con
+          `items-center` el sobrante se recorta ARRIBA y no hay forma de llegar a
+          él: el navegador no deja desplazarse por encima del inicio del flex.
+          La combinación que sí funciona es desplazamiento en el contenedor +
+          `items-start` + `my-auto` en el panel: centrado cuando sobra alto, y
+          desplazable —sin recortar la cabecera— cuando falta. */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 mx-4 relative">
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-6 z-50 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 mx-4 my-auto relative">
             
             {/* Modal Header */}
             <button

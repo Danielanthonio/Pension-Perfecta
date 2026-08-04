@@ -44,10 +44,13 @@ import UserSettingsModal from "@/components/UserSettingsModal";
 function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; collapsed?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user, profiles } = useApp();
+  // Sobre el `profiles` CRUDO, igual que el módulo de asignación al que enlaza:
+  // con el recortado por rol, a un Account Manager le saldría un contador mucho
+  // menor que la lista que va a encontrar al entrar.
+  const { user, assignmentProfiles } = useApp();
   // Aliados sin closer atribuido. Se pinta como contador en el menú porque la
   // regla es "todo aliado tiene closer": si el hueco no se ve, no se cierra.
-  const sinCloserCount = profiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
+  const sinCloserCount = assignmentProfiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
   const currentParamsString = searchParams.toString();
   const qs = currentParamsString ? `?${currentParamsString}` : "";
   const cleanPath = pathname.replace(/\/$/, "");
