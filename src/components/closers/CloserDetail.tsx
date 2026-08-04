@@ -16,7 +16,9 @@ import {
   ArrowRight,
   ArrowRightLeft,
   BarChart3,
+  FileCheck,
   FileText,
+  FileWarning,
   ChevronRight,
   Clock,
   History,
@@ -25,7 +27,6 @@ import {
   Loader2,
   Lock,
   Pencil,
-  Percent,
   Route,
   Target,
   Trash2,
@@ -50,17 +51,14 @@ import {
   type CloserAsignacion,
   type Grano,
   GRANO_LABEL,
-  RANGO_LABEL,
   bucketFullLabel,
   bucketLabel,
   bucketStart,
   conversion,
   fmtFecha,
-  fmtNum,
   fmtPct,
   nextBucket,
   periodoAnterior,
-  promedio,
   variacion,
 } from "./closerTypes";
 
@@ -237,10 +235,34 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
     return m;
   }, [profiles]);
 
-  const sinContrato = useMemo(
-    () => aliados.filter((a) => !contratoPorAliado.get(a.aliado_id)).length,
-    [aliados, contratoPorAliado]
-  );
+  // ── Las cuatro métricas de la ficha (§12) ─────────────────────────────────
+  // Salen de la LISTA de aliados, no del agregado de `closers_overview`, por dos
+  // motivos: el contrato vive en el perfil del aliado (no en las métricas), y así
+  // las tarjetas nunca contradicen a la tabla de abajo cuando hay filtros activos.
+  //
+  //   · Aliados      → los que el closer creó MÁS los que le atribuyeron la
+  //                    Dirección o un AM; ambos casos fijan `closer_origen_id`,
+  //                    que es lo que ancla esta lista.
+  //   · CF / CNF     → contrato firmado / sin firmar. Se reparten el total: un
+  //                    aliado está en una tarjeta o en la otra, nunca en las dos.
+  //   · PPE          → primer proyecto ejecutado. Se cuentan ALIADOS, no
+  //                    proyectos: si un aliado ejecuta cuatro financiamientos, al
+  //                    closer se le paga UNO. Por eso basta con "¿este aliado ya
+  //                    ejecutó alguno?" en vez de sumar ventas. Es la misma regla
+  //                    que aplica Finanzas, que devenga una sola comisión por
+  //                    aliado con la clave `1fin:<aliado_id>` (§18 del ledger).
+  const resumen = useMemo(() => {
+    const total = aliadosVisibles.length;
+    const cf = aliadosVisibles.filter((a) => !!contratoPorAliado.get(a.aliado_id)).length;
+    return {
+      total,
+      cf,
+      cnf: total - cf,
+      ppe: aliadosVisibles.filter((a) => a.ventas > 0).length,
+    };
+  }, [aliadosVisibles, contratoPorAliado]);
+
+  const sinContrato = resumen.cnf;
 
   // ── Embudo (§16) ──────────────────────────────────────────────────────────
   const embudo = useMemo(() => {
@@ -279,7 +301,9 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
   }
 
   const varPct = aliadosPrevios !== null && fila ? variacion(fila.aliados_periodo, aliadosPrevios) : null;
-  const convTotal = fila ? conversion(fila.ventas_total, fila.clientes_total) : null;
+  // Las tarjetas dependen de la lista de aliados, así que se atenúan también
+  // mientras esa lista viaja: si no, se ven cuatro ceros y luego el salto.
+  const atenuado = loading || cargandoAliados;
 
   return (
     <div className="closers-viz space-y-5 animate-fade-in text-slate-800 dark:text-slate-100">
@@ -354,58 +378,18 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
         </div>
       )}
 
-      <div className={loading ? "opacity-50 transition-opacity duration-200 space-y-5" : "transition-opacity duration-200 space-y-5"}>
+      <div className={atenuado ? "opacity-50 transition-opacity duration-200 space-y-5" : "transition-opacity duration-200 space-y-5"}>
         {/* ── Tarjetas de métricas (§12) ────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <StatCard label="Aliados incorporados" value={fila?.aliados_total ?? 0} icon={UserPlus} tone="teal" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Aliados" value={resumen.total} sub="creados y asignados" icon={Users} tone="teal" />
+          <StatCard label="Aliados CF" value={resumen.cf} sub="contrato firmado" icon={FileCheck} tone="emerald" />
+          <StatCard label="Aliados CNF" value={resumen.cnf} sub="contrato no firmado" icon={FileWarning} tone="amber" />
           <StatCard
-            label="Con clientes (90 d)"
-            value={fila?.aliados_activos_90d ?? 0}
-            sub={`${fila?.aliados_sin_actividad ?? 0} sin actividad`}
-            icon={Users}
-            tone="emerald"
-          />
-          <StatCard
-            label="Aliados del período"
-            value={fila?.aliados_periodo ?? 0}
-            sub={RANGO_LABEL[filters.preset]}
-            icon={TrendingUp}
+            label="PPE — primer proyecto ejecutado"
+            value={resumen.ppe}
+            sub={resumen.total > 0 ? `de ${resumen.total} aliados` : "uno por aliado"}
+            icon={Target}
             tone="blue"
-          />
-          <StatCard label="Clientes generados" value={fila?.clientes_total ?? 0} icon={Users} tone="indigo" />
-          <StatCard label="Ventas" value={fila?.ventas_total ?? 0} icon={Target} tone="cyan" />
-          <StatCard
-            label="Aliados productivos"
-            value={fila?.aliados_productivos ?? 0}
-            sub={fmtPct(
-              fila && fila.aliados_total > 0 ? (fila.aliados_productivos / fila.aliados_total) * 100 : null,
-              0
-            )}
-            icon={Target}
-            tone="teal"
-            size="sm"
-          />
-          <StatCard
-            label="Clientes en proceso"
-            value={aliadosVisibles.reduce((s, a) => s + a.clientes_en_proceso, 0)}
-            icon={Route}
-            tone="amber"
-            size="sm"
-          />
-          <StatCard label="Conversión" value={fmtPct(convTotal)} sub="ventas / clientes" icon={Percent} tone="amber" size="sm" />
-          <StatCard
-            label="Clientes por aliado"
-            value={fmtNum(promedio(fila?.clientes_total ?? 0, fila?.aliados_total ?? 0), 2)}
-            icon={Users}
-            tone="slate"
-            size="sm"
-          />
-          <StatCard
-            label="Ventas por aliado"
-            value={fmtNum(promedio(fila?.ventas_total ?? 0, fila?.aliados_total ?? 0), 2)}
-            icon={Target}
-            tone="slate"
-            size="sm"
           />
         </div>
 
