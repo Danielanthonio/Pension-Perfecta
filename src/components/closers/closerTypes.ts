@@ -56,6 +56,16 @@ export interface CloserAliadoRow {
   empresa_nombre: string | null;
   fecha_incorporacion: string | null;
   es_closer_actual: boolean;
+  /**
+   * Quién ABRIÓ la cuenta, que no es lo mismo que quién la cerró comercialmente.
+   * De esto —y no de la atribución— dependen los permisos de administración:
+   * el closer edita, ve credenciales y elimina SOLO lo que él dio de alta (§8);
+   * de un aliado que le abrió el AM y le atribuyeron después, únicamente ve la
+   * ficha y le trabaja el proceso comercial (§9). `null` = alta anterior a que
+   * se registrara la autoría, y no concede permisos a nadie.
+   */
+  creado_por: string | null;
+  creado_por_mi: boolean;
   clientes_total: number;
   clientes_periodo: number;
   clientes_en_proceso: number;

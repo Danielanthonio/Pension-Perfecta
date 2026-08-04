@@ -3,12 +3,12 @@
 // Administración de un aliado por parte de su closer: corregir el nombre,
 // actualizar el teléfono y cargar el enlace del contrato.
 //
-// Tres cosas quedan deliberadamente FUERA y conviene saber por qué:
+// Solo se abre para los aliados que ESE closer dio de alta: desde el 2026-08-04
+// la atribución no basta para administrar (§8/§9), y quien lo decide es
+// `closer_actualiza_aliado` en la base, no esta pantalla.
 //
-//  * ELIMINAR. Decisión de Dirección (2026-08-01): el closer administra, no
-//    borra. Un borrado es permanente y arrastra proyectos, expedientes y
-//    comisiones. El endpoint /api/admin/delete-user lo rechaza igual, así que
-//    esto no es solo una pantalla sin botón.
+// Dos cosas quedan deliberadamente FUERA y conviene saber por qué:
+//
 //  * El CORREO. Es la credencial con la que el aliado entra, y vive en
 //    `auth.users`, no en `profiles`. Cambiarlo solo aquí dejaría el perfil
 //    diciendo una cosa y el acceso otra: el aliado seguiría entrando con el
@@ -188,8 +188,8 @@ export function EditarAliadoCloser({
           </div>
 
           <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
-            El correo no se edita aquí —es la credencial con la que entra el aliado— y eliminar cuentas es cosa
-            de Dirección.
+            El correo no se edita aquí: es la credencial con la que entra el aliado y cambiarlo solo en la
+            ficha lo dejaría fuera. Eso lo hace Dirección.
           </p>
 
           {errorMsg && (

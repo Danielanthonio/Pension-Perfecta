@@ -64,6 +64,41 @@ export interface UserProfile {
   // Ver migración 20260801000002_contrato_aliado.sql.
   contrato_url?: string | null;
   contrato_url_at?: string | null;
+  // Autoría del alta. NO es lo mismo que `closer_origen_id`: uno dice quién
+  // ABRIÓ la cuenta y el otro quién la CERRÓ comercialmente. Un aliado que dio
+  // de alta el AM y atribuyó a un closer tiene `created_by` = AM y
+  // `closer_origen_id` = closer, y de esa diferencia dependen los permisos de
+  // administración del closer (§8/§9 de la especificación del 2026-08-04).
+  // La estampa la base en un trigger: no se manda desde el navegador.
+  // Ver migración 20260804000000_creador_de_aliado.sql.
+  created_by?: string | null;
+  created_by_role?: string | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
+}
+
+// Acciones administrativas que se auditan sobre un aliado (§14 de la
+// especificación del 2026-08-04). Espejo del CHECK de `aliado_auditoria.accion`
+// en 20260804000000_creador_de_aliado.sql: si cambia una lista, cambia la otra.
+export type AliadoAuditoriaAccion =
+  | "alta"
+  | "edicion"
+  | "credenciales_vistas"
+  | "credenciales_cambiadas"
+  | "estado"
+  | "eliminacion"
+  | "atribucion_closer";
+
+export interface AliadoAuditoriaRow {
+  id: string;
+  aliado_id: string;
+  actor_id: string | null;
+  actor_rol: string | null;
+  accion: AliadoAuditoriaAccion;
+  datos_antes: Record<string, unknown> | null;
+  datos_despues: Record<string, unknown> | null;
+  motivo: string | null;
+  created_at: string;
 }
 
 // Movimiento del historial append-only closer↔aliado (tabla
@@ -438,8 +473,24 @@ interface AppContextType {
   ) => Promise<void>;
   deleteProfile: (
     id: string,
-    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null }
+    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null; motivo?: string | null }
   ) => Promise<void>;
+  // Credenciales de acceso de un aliado. Va por RPC y no leyendo la fila porque
+  // el RLS es ciego a COLUMNAS: la política que le deja a un closer ver a sus
+  // aliados atribuidos le entrega la fila entera. La función comprueba que quien
+  // pregunta sea Dirección, el AM o el closer que ABRIÓ esa cuenta (§8/§9), y
+  // deja constancia en la auditoría de que se consultaron.
+  credencialesAliado: (aliadoId: string) => Promise<{ email: string; password: string | null }>;
+  // Registra una acción administrativa sobre un aliado (§14). El actor lo firma
+  // la base con `auth.uid()`: no se puede registrar a nombre de otro.
+  registrarAuditoriaAliado: (input: {
+    aliadoId: string;
+    accion: AliadoAuditoriaAccion;
+    antes?: Record<string, unknown> | null;
+    despues?: Record<string, unknown> | null;
+    motivo?: string | null;
+  }) => Promise<void>;
+  auditoriaDeAliado: (aliadoId: string) => Promise<AliadoAuditoriaRow[]>;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
   changeAllyType: (allyId: string, tipo: "aliado" | "lider", empresaMultialiadoId?: string | null) => Promise<void>;
   assignAllyToLider: (allyId: string, liderIds: string[]) => Promise<void>;
@@ -791,6 +842,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       closer_asignado_por: dbProfile.closer_asignado_por || null,
       contrato_url: dbProfile.contrato_url || null,
       contrato_url_at: dbProfile.contrato_url_at || null,
+      created_by: dbProfile.created_by || null,
+      created_by_role: dbProfile.created_by_role || null,
+      updated_at: dbProfile.updated_at || null,
+      updated_by: dbProfile.updated_by || null,
     };
   };
 
@@ -851,6 +906,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       // bloqueado por RLS y el perfil nace aquí, en el primer login.
       const closerOrigen = meta.closer_origen_id || null;
       const incorporado = meta.fecha_incorporacion_closer || null;
+      // La AUTORÍA viaja por el mismo camino y por el mismo motivo. Aquí el
+      // trigger de la base no puede deducirla: quien inserta es el propio
+      // usuario recién llegado (`auth.uid() = id`), así que sin este rescate el
+      // aliado nacería sin creador y su closer no podría administrarlo (§8).
+      const creador = meta.created_by || null;
 
       const healBase: any = {
         id: authUser.id,
@@ -867,17 +927,18 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             fecha_incorporacion_closer: incorporado,
           }
         : {};
+      const healAutoria = creador ? { created_by: creador } : {};
 
       let { data: newProfile, error: createError } = await client
         .from("profiles")
-        .insert({ ...healBase, ...healCloser })
+        .insert({ ...healBase, ...healCloser, ...healAutoria })
         .select()
         .single();
 
       // Rescatar la atribución NUNCA puede costar el inicio de sesión: si esas
       // columnas todavía no existen, se reintenta sin ellas. Perder el dato del
       // closer es recuperable a mano; dejar al usuario sin poder entrar, no.
-      if (createError && closerOrigen) {
+      if (createError && (closerOrigen || creador)) {
         console.warn("Self-healing con atribución de closer falló; reintentando sin ella:", createError);
         const retry = await client.from("profiles").insert(healBase).select().single();
         newProfile = retry.data;
@@ -4038,6 +4099,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         closer_asignado_por: closerOrigenId ? user?.id || null : null,
         contrato_url: (profileData.contrato_url || "").trim() || null,
         contrato_url_at: (profileData.contrato_url || "").trim() ? new Date().toISOString() : null,
+        // En producción esto lo estampa el trigger de la base; aquí, que no hay
+        // base, se pone a mano para que el modo demo se comporte igual.
+        created_by: user?.id || null,
+        created_by_role: user?.role || null,
       };
 
       if (closerOrigenId) {
@@ -4103,6 +4168,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               // se perdería para siempre.
               closer_origen_id: closerOrigenId,
               fecha_incorporacion_closer: incorporadoAt,
+              // La autoría viaja igual que la atribución: si el INSERT lo frena
+              // el RLS, el perfil nace en el primer login y ahí el trigger no
+              // puede deducirla (quien inserta es el propio usuario nuevo).
+              created_by: user?.id || null,
             }
           }
         });
@@ -4196,6 +4265,26 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           }
         }
 
+        // Auditoría del alta (§14). Solo de los ALIADOS: es la entidad de la que
+        // habla la especificación. Nunca puede tumbar un alta que ya ocurrió, así
+        // que el error solo se avisa por consola.
+        if (profileData.role === "aliado") {
+          const { error: audError } = await supabase.rpc("registrar_auditoria_aliado", {
+            p_aliado_id: authUserId,
+            p_accion: "alta",
+            p_antes: null,
+            p_despues: {
+              full_name: profileData.full_name,
+              email: profileData.email.toLowerCase(),
+              closer_origen_id: closerOrigenId,
+              con_closer: !!closerOrigenId,
+              contrato_url: (profileData.contrato_url || "").trim() || null,
+            },
+            p_motivo: null,
+          });
+          if (audError) console.warn("No se pudo registrar el alta en la auditoría:", audError);
+        }
+
         let newProfile: UserProfile;
 
         if (insertError) {
@@ -4213,6 +4302,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             closer_origen_id: closerOrigenId,
             closer_actual_id: closerOrigenId,
             fecha_incorporacion_closer: incorporadoAt,
+            created_by: user?.id || null,
+            created_by_role: user?.role || null,
           };
 
           setProfiles((prev) => [...prev, newProfile]);
@@ -4236,6 +4327,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             closer_origen_id: dbProfile.closer_origen_id || null,
             closer_actual_id: dbProfile.closer_actual_id || null,
             fecha_incorporacion_closer: dbProfile.fecha_incorporacion_closer || null,
+            created_by: dbProfile.created_by || null,
+            created_by_role: dbProfile.created_by_role || null,
           };
 
           setProfiles((prev) => [...prev, newProfile]);
@@ -4271,9 +4364,64 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  // ── Auditoría y credenciales de un aliado (§8, §9 y §14) ──────────────────
+  const registrarAuditoriaAliado = async (input: {
+    aliadoId: string;
+    accion: AliadoAuditoriaAccion;
+    antes?: Record<string, unknown> | null;
+    despues?: Record<string, unknown> | null;
+    motivo?: string | null;
+  }): Promise<void> => {
+    if (isDemoMode || isProvisionalSession || !supabase) return;
+    // Registrar nunca puede tumbar la acción que se acaba de hacer: si esto
+    // falla, la operación ya ocurrió y lo único que se pierde es el renglón del
+    // historial. Se avisa por consola y se sigue.
+    const { error } = await supabase.rpc("registrar_auditoria_aliado", {
+      p_aliado_id: input.aliadoId,
+      p_accion: input.accion,
+      p_antes: input.antes ?? null,
+      p_despues: input.despues ?? null,
+      p_motivo: input.motivo ?? null,
+    });
+    if (error) console.warn("No se pudo registrar en la auditoría del aliado:", error);
+  };
+
+  const credencialesAliado = async (
+    aliadoId: string
+  ): Promise<{ email: string; password: string | null }> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const local = profiles.find((p) => p.id === aliadoId);
+      if (!local) throw new Error("Ese aliado ya no existe.");
+      return { email: local.email, password: local.password_provisional || null };
+    }
+    const { data, error } = await supabase.rpc("credenciales_aliado", { p_aliado_id: aliadoId });
+    if (error) {
+      console.error("Error consultando las credenciales del aliado:", error);
+      throw new Error(error.message || "No se pudieron consultar las credenciales.");
+    }
+    const fila = Array.isArray(data) ? data[0] : data;
+    if (!fila) throw new Error("No se pudieron consultar las credenciales.");
+    return { email: fila.email, password: fila.password_provisional || null };
+  };
+
+  const auditoriaDeAliado = async (aliadoId: string): Promise<AliadoAuditoriaRow[]> => {
+    if (isDemoMode || isProvisionalSession || !supabase) return [];
+    const { data, error } = await supabase
+      .from("aliado_auditoria")
+      .select("*")
+      .eq("aliado_id", aliadoId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      console.warn("No se pudo leer la auditoría del aliado:", error);
+      return [];
+    }
+    return (data || []) as AliadoAuditoriaRow[];
+  };
+
   const deleteProfile = async (
     id: string,
-    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null }
+    options?: { reassignToAliadoId?: string | null; reassignToAmId?: string | null; motivo?: string | null }
   ): Promise<void> => {
     const reassignToAliadoId = options?.reassignToAliadoId || null;
     const reassignToAmId = options?.reassignToAmId || null;
@@ -4342,6 +4490,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           userId: id,
           reassignToAliadoId: reassignToAliadoId || null,
           reassignToAmId: reassignToAmId || null,
+          motivo: options?.motivo || null,
         }),
       });
       const data = await res.json().catch(() => ({} as any));
@@ -4515,6 +4664,31 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
         if (user?.id === id) {
           setUser((prev) => (prev ? { ...prev, ...updates } : null));
+        }
+
+        // Auditoría (§14). Solo de los aliados y solo de lo que de verdad
+        // cambió: un renglón por cada campo tocado, con su antes y su después.
+        // Cambiar la contraseña provisional se registra aparte, pero NUNCA con
+        // el valor: en el historial queda el hecho, no la credencial.
+        if (profile.role === "aliado") {
+          const campos = ["full_name", "email", "phone", "contrato_url", "is_active"] as const;
+          const antes: Record<string, unknown> = {};
+          const despues: Record<string, unknown> = {};
+          for (const c of campos) {
+            if (updates[c] !== undefined && updates[c] !== (profile as any)[c]) {
+              antes[c] = (profile as any)[c] ?? null;
+              despues[c] = updates[c] ?? null;
+            }
+          }
+          if (Object.keys(despues).length > 0) {
+            await registrarAuditoriaAliado({ aliadoId: id, accion: "edicion", antes, despues });
+          }
+          if (
+            updates.password_provisional !== undefined &&
+            updates.password_provisional !== profile.password_provisional
+          ) {
+            await registrarAuditoriaAliado({ aliadoId: id, accion: "credenciales_cambiadas" });
+          }
         }
 
         await supabase.from("notifications").insert({
@@ -5186,6 +5360,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         createProfile,
         assignCloser,
         deleteProfile,
+        credencialesAliado,
+        registrarAuditoriaAliado,
+        auditoriaDeAliado,
         updateProfileAdmin,
         changeAllyType,
         assignAllyToLider,

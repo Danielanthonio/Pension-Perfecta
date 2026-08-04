@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/utils/supabase/server";
 
-// Borrado PERMANENTE de un usuario (director → aliado / account_manager / otro).
+// Borrado PERMANENTE de un usuario.
+//
+// Quién puede llamar:
+//   · Dirección (admin/director) → cualquier usuario, reasignando antes lo que
+//     quede colgando (proyectos del aliado, cartera del AM).
+//   · Closer → SOLO las cuentas de aliado que él mismo abrió (`created_by`) y
+//     solo mientras no tengan clientes registrados. Es el §8 de la
+//     especificación del 2026-08-04; hasta entonces el borrado era exclusivo de
+//     Dirección. Repartir una cartera de clientes sigue siéndolo.
 //
 // El frontend NO puede borrar de verdad: la tabla `profiles` no tiene política
 // RLS de DELETE, la FK `prospects.aliado_id` bloquea el borrado, y aunque se
@@ -18,7 +26,12 @@ import { createClient as createUserClient } from "@/utils/supabase/server";
 //     elimina la cuenta de auth.users, lo que borra el perfil por cascada.
 export async function POST(request: Request) {
   // --- 1. Body ---
-  let body: { userId?: string; reassignToAliadoId?: string | null; reassignToAmId?: string | null };
+  let body: {
+    userId?: string;
+    reassignToAliadoId?: string | null;
+    reassignToAmId?: string | null;
+    motivo?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -28,6 +41,9 @@ export async function POST(request: Request) {
   const userId = body?.userId;
   const reassignToAliadoId = body?.reassignToAliadoId || null;
   const reassignToAmId = body?.reassignToAmId || null;
+  // Motivo de la baja (§14). Opcional para Dirección; la pantalla del closer sí
+  // lo pide, porque una eliminación suya no la revisa nadie más.
+  const motivo = (body?.motivo || "").trim() || null;
   if (!userId) {
     return NextResponse.json({ error: "Falta el usuario a eliminar." }, { status: 400 });
   }
@@ -77,11 +93,13 @@ export async function POST(request: Request) {
   if (callerErr) {
     return NextResponse.json({ error: "No se pudo verificar tus permisos." }, { status: 500 });
   }
-  // El closer administra a sus aliados (nombre, teléfono, contrato) pero NO los
-  // elimina: borrar una cuenta es permanente y arrastra proyectos, expedientes y
-  // comisiones. Decisión de Dirección del 2026-08-01.
-  if (!callerProfile || !DIRECTOR_ROLES.includes(callerProfile.role)) {
-    return NextResponse.json({ error: "Solo la Dirección puede eliminar usuarios." }, { status: 403 });
+  if (!callerProfile) {
+    return NextResponse.json({ error: "No se pudo verificar tus permisos." }, { status: 500 });
+  }
+  const esDireccion = DIRECTOR_ROLES.includes(callerProfile.role);
+  const esCloser = callerProfile.role === "closer";
+  if (!esDireccion && !esCloser) {
+    return NextResponse.json({ error: "No tienes permiso para eliminar usuarios." }, { status: 403 });
   }
 
   // --- 5. Salvaguardas básicas ---
@@ -91,7 +109,7 @@ export async function POST(request: Request) {
 
   const { data: target, error: targetErr } = await admin
     .from("profiles")
-    .select("id, role, full_name, email")
+    .select("id, role, full_name, email, created_by, closer_origen_id")
     .eq("id", userId)
     .maybeSingle();
   if (targetErr) {
@@ -99,6 +117,30 @@ export async function POST(request: Request) {
   }
   if (!target) {
     return NextResponse.json({ error: "El usuario ya no existe." }, { status: 404 });
+  }
+
+  // --- 5.b Alcance del closer (§8 de la especificación del 2026-08-04) ---
+  // El closer elimina ÚNICAMENTE las cuentas de aliado que él mismo abrió. Un
+  // aliado que le atribuyeron pero que dio de alta otra persona lo ve y le
+  // trabaja el proceso comercial, y ahí se acaba (§9). `created_by` en NULL —los
+  // aliados anteriores al registro de autoría— no concede nada: se comprueba
+  // contra un valor presente, nunca contra la ausencia de dato.
+  if (esCloser) {
+    if (target.role !== "aliado") {
+      return NextResponse.json(
+        { error: "Un closer solo puede eliminar cuentas de aliado." },
+        { status: 403 }
+      );
+    }
+    if (!target.created_by || target.created_by !== caller.id) {
+      return NextResponse.json(
+        {
+          error:
+            "Solo puedes eliminar los aliados que tú diste de alta. Este lo abrió otra persona: pídeselo a Dirección.",
+        },
+        { status: 403 }
+      );
+    }
   }
 
   // --- 6. Proyectos del aliado (FK bloqueante) ---
@@ -110,6 +152,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Error consultando sus proyectos." }, { status: 500 });
   }
   const ownedCount = ownedProspects?.length ?? 0;
+
+  // Un closer no reparte carteras de clientes. Si el aliado ya tiene proyectos,
+  // moverlos a otro aliado es una decisión comercial que no le corresponde (y su
+  // RLS ni siquiera le deja ver los aliados destino), así que aquí se para.
+  if (esCloser && ownedCount > 0) {
+    return NextResponse.json(
+      {
+        error: `Este aliado ya tiene ${ownedCount} cliente(s) registrado(s). Reasignarlos es cosa de Dirección: pídele a ella la baja.`,
+        projectCount: ownedCount,
+      },
+      { status: 409 }
+    );
+  }
 
   if (ownedCount > 0) {
     if (!reassignToAliadoId) {
@@ -237,6 +292,32 @@ export async function POST(request: Request) {
   if (histDelErr) {
     // No es motivo para abortar el borrado: es auditoría, no integridad.
     console.warn("No se pudo limpiar el historial de closers del usuario:", histDelErr.message);
+  }
+
+  // --- 7.c Auditoría de la baja (§14) ---
+  // Se escribe ANTES de borrar, que es cuando todavía se puede leer lo que se va
+  // a perder. `aliado_auditoria.aliado_id` tampoco tiene FK, así que el renglón
+  // sobrevive a la desaparición del perfil — que es justo lo que se quiere de un
+  // historial de eliminaciones. Va con la service_role, de modo que el actor se
+  // escribe explícitamente: aquí no hay `auth.uid()` que valga.
+  if (target.role === "aliado") {
+    const { error: audErr } = await admin.from("aliado_auditoria").insert({
+      aliado_id: userId,
+      actor_id: caller.id,
+      actor_rol: callerProfile.role,
+      accion: "eliminacion",
+      datos_antes: {
+        full_name: target.full_name,
+        email: target.email,
+        created_by: target.created_by,
+        closer_origen_id: target.closer_origen_id,
+        proyectos: ownedCount,
+        reasignados_a: reassignToAliadoId,
+      },
+      datos_despues: null,
+      motivo: motivo,
+    });
+    if (audErr) console.warn("No se pudo auditar la eliminación:", audErr.message);
   }
 
   // --- 8. Eliminar la cuenta de auth (el perfil cae por cascada) ---

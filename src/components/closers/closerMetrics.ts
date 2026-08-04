@@ -267,6 +267,8 @@ export function buildAliadoRows(
         empresa_nombre: a.empresa_multialiado_id ? empresaNombre.get(a.empresa_multialiado_id) || null : null,
         fecha_incorporacion: a.fecha_incorporacion_closer || null,
         es_closer_actual: (a.closer_actual_id || null) === closerId,
+        creado_por: a.created_by || null,
+        creado_por_mi: !!a.created_by && a.created_by === closerId,
         clientes_total: agg.clientesTotal,
         clientes_periodo: agg.clientesPeriodo,
         clientes_en_proceso: agg.enProceso,

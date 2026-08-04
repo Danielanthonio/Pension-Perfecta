@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useApp, UserProfile } from "@/utils/context/AppContext";
+import { useApp, UserProfile, AliadoAuditoriaAccion, AliadoAuditoriaRow } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
@@ -43,6 +43,18 @@ const COUNTRIES = [
   { code: "+51", flag: "🇵🇪", label: "Perú (+51)" },
 ];
 
+// Etiquetas del historial administrativo. Espejo del CHECK de
+// `aliado_auditoria.accion` en 20260804000000_creador_de_aliado.sql.
+const ACCION_LABEL: Record<AliadoAuditoriaAccion, string> = {
+  alta: "Alta de la cuenta",
+  edicion: "Edición de datos",
+  credenciales_vistas: "Consulta de credenciales",
+  credenciales_cambiadas: "Cambio de credenciales",
+  estado: "Cambio de estado",
+  eliminacion: "Eliminación",
+  atribucion_closer: "Cambio de closer",
+};
+
 export default function GestionUsuarios() {
   const {
     user,
@@ -51,6 +63,7 @@ export default function GestionUsuarios() {
     createProfile,
     deleteProfile,
     updateProfileAdmin,
+    auditoriaDeAliado,
     invitationCodes,
     generateInvitationCode,
     triggerPushNotification,
@@ -67,6 +80,15 @@ export default function GestionUsuarios() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "aliado" | "director" | "account_manager" | "closer">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  // Filtro de atribución (§13): "all" | "con" | "sin" | el id de un closer.
+  const [closerFilter, setCloserFilter] = useState<string>("all");
+  // Filtro por quién abrió la cuenta (§13): "all" | "sin" | el id del creador.
+  const [creadorFilter, setCreadorFilter] = useState<string>("all");
+
+  // Historial administrativo del aliado que se está editando (§14).
+  const [verAuditoria, setVerAuditoria] = useState(false);
+  const [auditoria, setAuditoria] = useState<AliadoAuditoriaRow[] | null>(null);
+  const [cargandoAuditoria, setCargandoAuditoria] = useState(false);
 
   // Modal / Drawer States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,6 +106,9 @@ export default function GestionUsuarios() {
   // Closer que incorpora al aliado. Obligatorio al dar de alta un ALIADO (§5):
   // sin él, el aliado nace "sin atribución" y sus clientes no cuentan para nadie.
   const [closerResponsableId, setCloserResponsableId] = useState("");
+  // Estado de asignación del §3: "Con Closer" (hay que elegir uno) o "Sin
+  // Closer" (queda bajo el Account Manager y se le atribuye después).
+  const [conCloser, setConCloser] = useState(true);
   // Enlace al contrato firmado con el aliado. Se revisa al pagar comisiones.
   const [contratoUrl, setContratoUrl] = useState("");
 
@@ -184,17 +209,19 @@ export default function GestionUsuarios() {
   // se guarda como aliado. La base impone el mismo límite (20260803000000), así
   // que esto es comodidad de pantalla, no la seguridad.
   const rolEfectivo = isCurrentUserAM ? (role === "closer" ? "closer" : "aliado") : role;
-  // Regla de negocio: TODO aliado nace con un closer responsable. Sin excepción.
+  // Al dar de alta un ALIADO hay que decir si nace con closer o sin él (§3).
   const pideCloser = modalMode === "create" && rolEfectivo === "aliado";
-  // Y si todavía no existe ningún closer, el alta se BLOQUEA: no se crea un
-  // aliado huérfano "para arreglarlo luego". Hay que crear antes el closer.
-  const faltanClosers = pideCloser && closersActivos.length === 0;
+  // Solo bloquea cuando se pidió "Con Closer" y no hay ninguno a quien atribuir:
+  // ahí el alta no se puede completar como se pidió. Con "Sin Closer" el alta
+  // sigue adelante, que es justo lo que la especificación vino a permitir.
+  const faltanClosers = pideCloser && conCloser && closersActivos.length === 0;
 
   // Form Validations
   const isNameValid = fullName.trim().length >= 3;
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isPhoneValid = /^\d{10}$/.test(phone.replace(/\D/g, ""));
-  const isCloserValid = !pideCloser || !!closerResponsableId;
+  // "Con Closer" sin closer elegido no se guarda (§12); "Sin Closer" siempre vale.
+  const isCloserValid = !pideCloser || !conCloser || !!closerResponsableId;
   // El contrato firmado se pide al dar de alta un aliado y se puede completar
   // después, pero NO bloquea: es una advertencia (decisión del 2026-08-01, con
   // 228 aliados vivos sin contrato). Ver 20260801000003.
@@ -214,6 +241,7 @@ export default function GestionUsuarios() {
     setIsActive(true);
     setPasswordProvisional("");
     setCloserResponsableId("");
+    setConCloser(true);
     setContratoUrl("");
     setFormSubmitted(false);
     setErrorMsg("");
@@ -232,6 +260,10 @@ export default function GestionUsuarios() {
     setPasswordProvisional(u.password_provisional || "");
     setContratoUrl(u.contrato_url || "");
     setCloserResponsableId(u.closer_origen_id || "");
+    setConCloser(!!u.closer_origen_id);
+    // El historial es de OTRO aliado: hay que descartar el que quedó cargado.
+    setVerAuditoria(false);
+    setAuditoria(null);
     setFormSubmitted(false);
     setErrorMsg("");
     setCreatedUser(null);
@@ -279,7 +311,8 @@ export default function GestionUsuarios() {
           //
           // El CLOSER sí: queda grabado en el alta, junto con la fecha de
           // incorporación, y es el que da el mérito de la captación (§4).
-          closer_origen_id: rolEfectivo === "aliado" && closerResponsableId ? closerResponsableId : null,
+          closer_origen_id:
+            rolEfectivo === "aliado" && conCloser && closerResponsableId ? closerResponsableId : null,
           contrato_url: contratoUrl.trim() || null,
         });
 
@@ -293,6 +326,7 @@ export default function GestionUsuarios() {
         setIsActive(true);
         setPasswordProvisional("");
         setCloserResponsableId("");
+        setConCloser(true);
         setContratoUrl("");
         setFormSubmitted(false);
         setIsModalOpen(false);
@@ -402,6 +436,21 @@ export default function GestionUsuarios() {
       if (statusFilter === "all") return true;
       if (statusFilter === "active") return p.is_active !== false;
       return p.is_active === false;
+    })
+    .filter((p) => {
+      if (closerFilter === "all") return true;
+      // El filtro habla de aliados; a los demás roles no les aplica y saldrían
+      // siempre "sin closer", que sería una respuesta engañosa.
+      if (p.role !== "aliado") return false;
+      if (closerFilter === "con") return !!p.closer_origen_id;
+      if (closerFilter === "sin") return !p.closer_origen_id;
+      return p.closer_origen_id === closerFilter;
+    })
+    .filter((p) => {
+      if (creadorFilter === "all") return true;
+      if (p.role !== "aliado") return false;
+      if (creadorFilter === "sin") return !p.created_by;
+      return p.created_by === creadorFilter;
     });
 
   const sortU = useSortable<UserProfile>(
@@ -436,6 +485,25 @@ export default function GestionUsuarios() {
   const totalAllies = profiles.filter((p) => p.role === "aliado").length;
   const totalAMs = profiles.filter((p) => p.role === "account_manager").length;
   const totalClosers = profiles.filter((p) => p.role === "closer").length;
+  const aliadosConCloser = profiles.filter((p) => p.role === "aliado" && !!p.closer_origen_id).length;
+  const aliadosSinCloser = profiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
+
+  // Para poner nombre a los ids de creador y de última modificación (§11).
+  const nombrePorId = React.useMemo(
+    () => new Map(profiles.map((p) => [p.id, p.full_name])),
+    [profiles]
+  );
+  const editingUser = editingUserId ? profiles.find((p) => p.id === editingUserId) || null : null;
+
+  const creadoresConAltas = React.useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const p of profiles) {
+      if (p.role === "aliado" && p.created_by) cuenta.set(p.created_by, (cuenta.get(p.created_by) || 0) + 1);
+    }
+    return [...cuenta.entries()]
+      .map(([id, n]) => ({ id, n, nombre: nombrePorId.get(id) || "Usuario eliminado" }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [profiles, nombrePorId]);
 
   // Invitation codes details
   const unusedCodesCount = myInvitationCodes.filter((c) => !c.is_used).length;
@@ -733,6 +801,54 @@ export default function GestionUsuarios() {
 
                 {/* Filter by Activation Status + Sort */}
                 <div className="flex flex-wrap items-center gap-3">
+                  {/* Con closer / sin closer (§13). Solo tiene sentido mirando
+                      aliados: para un AM la lista ya son aliados y solo, y para
+                      Dirección se ofrece cuando ha filtrado por ese rol. */}
+                  {(isCurrentUserAM || roleFilter === "aliado" || roleFilter === "all") && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">
+                        Closer
+                      </span>
+                      <select
+                        value={closerFilter}
+                        onChange={(e: any) => setCloserFilter(e.target.value)}
+                        className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
+                      >
+                        <option value="all">Con y sin closer</option>
+                        <option value="con">Con closer ({aliadosConCloser})</option>
+                        <option value="sin">Sin closer ({aliadosSinCloser})</option>
+                        {closersActivos.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {/* Quién abrió la cuenta (§13). La lista son los usuarios que
+                      de verdad han dado de alta a alguien: un desplegable con
+                      todo el directorio sería inservible. */}
+                  {creadoresConAltas.length > 0 &&
+                    (isCurrentUserAM || roleFilter === "aliado" || roleFilter === "all") && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">
+                          Alta por
+                        </span>
+                        <select
+                          value={creadorFilter}
+                          onChange={(e: any) => setCreadorFilter(e.target.value)}
+                          className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors cursor-pointer"
+                        >
+                          <option value="all">Cualquiera</option>
+                          {creadoresConAltas.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nombre} ({c.n})
+                            </option>
+                          ))}
+                          <option value="sin">Sin registro de alta</option>
+                        </select>
+                      </div>
+                    )}
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-slate-400 dark:text-slate-500 font-semibold text-[10px] uppercase tracking-[0.08em]">Estado</span>
                     <select
@@ -1048,6 +1164,44 @@ export default function GestionUsuarios() {
               </div>
             </div>
 
+            {/* Trazabilidad de la cuenta (§11). Solo al editar, y solo si consta:
+                los aliados anteriores al registro de autoría no tienen creador y
+                decir "Sistema" sería inventarlo. */}
+            {modalMode === "edit" && editingUser && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850/60 px-3.5 py-2.5 mb-4 flex flex-wrap gap-x-5 gap-y-1">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                  Alta:{" "}
+                  <span className="text-slate-700 dark:text-slate-200">
+                    {new Date(editingUser.created_at).toLocaleDateString("es-MX")}
+                  </span>
+                  {editingUser.created_by && (
+                    <>
+                      {" · por "}
+                      <span className="text-slate-700 dark:text-slate-200">
+                        {nombrePorId.get(editingUser.created_by) || "Usuario eliminado"}
+                      </span>
+                    </>
+                  )}
+                </span>
+                {editingUser.updated_at && (
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                    Última modificación:{" "}
+                    <span className="text-slate-700 dark:text-slate-200">
+                      {new Date(editingUser.updated_at).toLocaleDateString("es-MX")}
+                    </span>
+                    {editingUser.updated_by && (
+                      <>
+                        {" · por "}
+                        <span className="text-slate-700 dark:text-slate-200">
+                          {nombrePorId.get(editingUser.updated_by) || "Usuario eliminado"}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Modal Form */}
             <form onSubmit={handleSubmitUser} className="space-y-4">
               {/* Full Name */}
@@ -1207,41 +1361,87 @@ export default function GestionUsuarios() {
                 </div>
               )}
 
-              {/* Closer responsable — solo al dar de alta un ALIADO (§5).
-                  Es obligatorio: sin closer, el aliado nace "sin atribución" y ni
-                  él ni sus clientes cuentan para nadie en el módulo Closers. */}
-              {pideCloser && !faltanClosers && (
+              {/* Estado de asignación — obligatorio al dar de alta un ALIADO
+                  (§3). Hasta el 2026-08-04 todo aliado nacía con closer a la
+                  fuerza; ahora la elección es explícita, porque hay altas
+                  legítimas que todavía no tienen quién las acredite y forzar un
+                  closer cualquiera ensucia la producción de alguien.
+                  "Con Closer" sigue siendo lo predeterminado: es el caso normal
+                  y así el flujo de siempre no cambia de comportamiento. */}
+              {pideCloser && (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                    Closer Responsable <span className="text-red-500">*</span>
+                    Asignación de closer <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
-                      <Target className="h-4 w-4" />
-                    </span>
-                    <select
-                      value={closerResponsableId}
-                      onChange={(e) => setCloserResponsableId(e.target.value)}
-                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
-                        formSubmitted && !isCloserValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConCloser(true)}
+                      className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                        conCloser
+                          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-400 hover:bg-slate-100/60 dark:hover:bg-slate-800/50"
                       }`}
                     >
-                      <option value="">Selecciona quién cerró a este aliado…</option>
-                      {closersActivos.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.full_name}
-                        </option>
-                      ))}
-                    </select>
+                      <Target className="h-3.5 w-3.5" /> Con Closer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConCloser(false);
+                        setCloserResponsableId("");
+                      }}
+                      className={`px-3 py-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                        !conCloser
+                          ? "bg-slate-100 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-200"
+                          : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-400 hover:bg-slate-100/60 dark:hover:bg-slate-800/50"
+                      }`}
+                    >
+                      <UserX className="h-3.5 w-3.5" /> Sin Closer
+                    </button>
                   </div>
-                  {formSubmitted && !isCloserValid ? (
-                    <span className="text-[9px] text-red-500 dark:text-red-400 font-bold mt-1 block flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> Selecciona el closer que incorporó a este aliado.
-                    </span>
+
+                  {conCloser ? (
+                    faltanClosers ? null : (
+                      <div className="mt-3">
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                            <Target className="h-4 w-4" />
+                          </span>
+                          <select
+                            value={closerResponsableId}
+                            onChange={(e) => setCloserResponsableId(e.target.value)}
+                            className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 focus:bg-white dark:focus:bg-slate-850 border rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-colors text-slate-800 dark:text-slate-200 ${
+                              formSubmitted && !isCloserValid ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-750"
+                            }`}
+                          >
+                            <option value="">Selecciona quién cerró a este aliado…</option>
+                            {/* Nombre y correo: en una lista de homónimos el
+                                correo es lo único que distingue de verdad (§6). */}
+                            {closersActivos.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.full_name}{c.email ? ` — ${c.email}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {formSubmitted && !isCloserValid ? (
+                          <span className="text-[9px] text-red-500 dark:text-red-400 font-bold mt-1 block flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> Elige el closer o marca "Sin Closer".
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-1.5 block">
+                            Queda registrado junto con la fecha de hoy como fecha de incorporación. Es lo que
+                            atribuye este aliado —y todos sus clientes— al closer.
+                          </span>
+                        )}
+                      </div>
+                    )
                   ) : (
-                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-1.5 block">
-                      Queda registrado junto con la fecha de hoy como fecha de incorporación. Es lo que
-                      atribuye este aliado —y todos sus clientes— al closer.
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-2 block leading-relaxed">
+                      El aliado queda bajo la gestión del Account Manager, sin closer atribuido. Aparecerá en
+                      "Asignación Closer" para que se le asigne uno cuando corresponda, y hasta entonces su
+                      producción no cuenta para ningún closer.
                     </span>
                   )}
                 </div>
@@ -1285,14 +1485,25 @@ export default function GestionUsuarios() {
                 </div>
               )}
 
-              {/* Sin closers no se puede dar de alta un aliado: la regla es que
-                  ninguno nazca huérfano. Se bloquea y se dice qué hacer. */}
+              {/* Pediste "Con Closer" y no hay ninguno. Ya no es un callejón sin
+                  salida: se ofrecen las dos salidas reales. */}
               {faltanClosers && (
                 <div className="rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 px-3.5 py-3 flex items-start gap-2.5">
                   <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
                   <span className="text-[10px] text-red-700 dark:text-red-300 font-semibold leading-relaxed block">
-                    No puedes crear un aliado todavía: <strong>no existe ningún usuario con rol Closer</strong> al
-                    que atribuirlo, y todo aliado debe tener uno. Cambia el rol a{" "}
+                    <strong>No existe ningún usuario con rol Closer</strong> al que atribuir este aliado.
+                    Puedes darlo de alta{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConCloser(false);
+                        setCloserResponsableId("");
+                      }}
+                      className="underline font-bold hover:text-red-800 dark:hover:text-red-200"
+                    >
+                      sin closer
+                    </button>{" "}
+                    y atribuirlo después, o cambiar el rol a{" "}
                     <button
                       type="button"
                       onClick={() => setRole("closer")}
@@ -1300,7 +1511,7 @@ export default function GestionUsuarios() {
                     >
                       Closer
                     </button>{" "}
-                    y crea primero al responsable de la captación.
+                    y crear primero al responsable de la captación.
                   </span>
                 </div>
               )}
@@ -1367,6 +1578,68 @@ export default function GestionUsuarios() {
                 </button>
               </div>
             </form>
+
+            {/* Historial administrativo (§14). Se carga bajo demanda: la mayoría
+                de las veces se abre este modal para corregir un teléfono, no para
+                auditar. Es de solo lectura por construcción — la tabla no tiene
+                políticas de UPDATE ni de DELETE para nadie. */}
+            {modalMode === "edit" && editingUser?.role === "aliado" && (
+              <div className="mt-5 pt-4 border-t border-slate-150 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const abrir = !verAuditoria;
+                    setVerAuditoria(abrir);
+                    if (abrir && auditoria === null && editingUserId) {
+                      setCargandoAuditoria(true);
+                      setAuditoria(await auditoriaDeAliado(editingUserId));
+                      setCargandoAuditoria(false);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5" /> Historial administrativo
+                  </span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${verAuditoria ? "rotate-180" : ""}`} />
+                </button>
+
+                {verAuditoria && (
+                  <div className="mt-3">
+                    {cargandoAuditoria ? (
+                      <div className="py-3 flex items-center gap-2 text-slate-400 dark:text-slate-500">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span className="text-[10px] font-semibold">Cargando…</span>
+                      </div>
+                    ) : !auditoria || auditoria.length === 0 ? (
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold py-2 leading-relaxed">
+                        Sin movimientos registrados. El historial arranca el 4 de agosto de 2026: lo anterior
+                        a esa fecha no quedó grabado.
+                      </p>
+                    ) : (
+                      <ul className="divide-y divide-slate-100 dark:divide-slate-800/70 max-h-52 overflow-y-auto">
+                        {auditoria.map((h) => (
+                          <li key={h.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
+                            <span className="tabular-nums text-slate-400 dark:text-slate-500 shrink-0">
+                              {new Date(h.created_at).toLocaleDateString("es-MX")}
+                            </span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">
+                              {ACCION_LABEL[h.accion] || h.accion}
+                            </span>
+                            {h.motivo && (
+                              <span className="text-slate-400 dark:text-slate-500 italic truncate">{h.motivo}</span>
+                            )}
+                            <span className="ml-auto text-slate-400 dark:text-slate-500 shrink-0">
+                              {nombrePorId.get(h.actor_id || "") || "Usuario eliminado"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

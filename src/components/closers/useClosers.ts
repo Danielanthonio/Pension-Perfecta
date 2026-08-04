@@ -72,6 +72,8 @@ function normalizeAliado(row: any): CloserAliadoRow {
     empresa_nombre: row.empresa_nombre ?? null,
     fecha_incorporacion: row.fecha_incorporacion ?? null,
     es_closer_actual: row.es_closer_actual === true,
+    creado_por: row.creado_por ?? null,
+    creado_por_mi: row.creado_por_mi === true,
     clientes_total: n(row.clientes_total),
     clientes_periodo: n(row.clientes_periodo),
     clientes_en_proceso: n(row.clientes_en_proceso),

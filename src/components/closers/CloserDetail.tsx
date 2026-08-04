@@ -20,12 +20,15 @@ import {
   ChevronRight,
   Clock,
   History,
+  Key,
   LineChart as LineChartIcon,
   Loader2,
+  Lock,
   Pencil,
   Percent,
   Route,
   Target,
+  Trash2,
   TrendingDown,
   TrendingUp,
   UserPlus,
@@ -40,6 +43,8 @@ import { CloserChart, CLOSER_VIZ_STYLE, type ChartBucket, type ChartSeries } fro
 import { ReasignarCloser } from "./ReasignarCloser";
 import { AltaAliadoCloser } from "./AltaAliadoCloser";
 import { EditarAliadoCloser } from "./EditarAliadoCloser";
+import { CredencialesAliado } from "./CredencialesAliado";
+import { EliminarAliadoCloser } from "./EliminarAliadoCloser";
 import {
   type CloserAliadoRow,
   type CloserAsignacion,
@@ -109,9 +114,14 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
   // acreditado a ese closer (no a ella).
   const esMiFicha = user?.role === "closer" && user?.id === closerId;
   const puedeDarDeAlta = esMiFicha || esDireccion;
-  // Administrar = corregir el nombre, el teléfono, cargar el contrato y eliminar
-  // a quien nunca arrancó. Mismo alcance que dar de alta: sus propios aliados.
-  const puedeAdministrar = esMiFicha || esDireccion;
+  // Administrar = corregir el nombre y el teléfono, cargar el contrato, ver las
+  // credenciales y dar de baja. Desde el 2026-08-04 el alcance del closer NO es
+  // "los aliados que tengo atribuidos" sino "los que YO di de alta" (§8/§9):
+  // un aliado que abrió el AM y le atribuyeron después lo ve y le trabaja el
+  // proceso comercial, pero no lo administra. La base impone lo mismo en
+  // `closer_actualiza_aliado`, `credenciales_aliado` y /api/admin/delete-user;
+  // esto es solo la pantalla.
+  const puedeAdministrar = (a: CloserAliadoRow) => esDireccion || (esMiFicha && a.creado_por_mi);
 
   const closer = useMemo(() => profiles.find((p) => p.id === closerId) || null, [profiles, closerId]);
   const fila = useMemo(() => overview.find((r) => r.closer_id === closerId) || null, [overview, closerId]);
@@ -122,6 +132,8 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
   const [historial, setHistorial] = useState<CloserAsignacion[]>([]);
   const [reasignando, setReasignando] = useState<CloserAliadoRow | null>(null);
   const [altaAbierta, setAltaAbierta] = useState(false);
+  const [viendoCredenciales, setViendoCredenciales] = useState<CloserAliadoRow | null>(null);
+  const [eliminando, setEliminando] = useState<CloserAliadoRow | null>(null);
   const [editando, setEditando] = useState<CloserAliadoRow | null>(null);
   const [aliadosPrevios, setAliadosPrevios] = useState<number | null>(null);
 
@@ -594,8 +606,21 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
                                 />
                               )}
                               <div className="min-w-0">
-                                <span className="block font-bold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
-                                  {a.aliado_nombre}
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
+                                    {a.aliado_nombre}
+                                  </span>
+                                  {/* Quién abrió la cuenta cambia lo que se puede
+                                      hacer con ella, así que se dice en la fila y
+                                      no solo en el hueco donde faltan botones. */}
+                                  {!a.creado_por_mi && (
+                                    <span
+                                      className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                      title="Esta cuenta la abrió otra persona y después se te atribuyó."
+                                    >
+                                      Atribuido
+                                    </span>
+                                  )}
                                 </span>
                                 <span className="block text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]">
                                   {a.aliado_email || "—"}
@@ -661,17 +686,57 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
                           </td>
                           <td className="pl-3 pr-5 py-2.5 text-right">
                             <div className="inline-flex items-center gap-1.5">
-                              {puedeAdministrar && (
-                                <button
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setEditando(a);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
-                                  title="Editar nombre, teléfono o contrato · eliminar"
-                                >
-                                  <Pencil className="h-3 w-3" /> Editar
-                                </button>
+                              {puedeAdministrar(a) ? (
+                                <>
+                                  <button
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      setViendoCredenciales(a);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
+                                    title="Ver el correo y la contraseña provisional"
+                                  >
+                                    <Key className="h-3 w-3" /> Acceso
+                                  </button>
+                                  <button
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      setEditando(a);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
+                                    title="Editar nombre, teléfono o contrato"
+                                  >
+                                    <Pencil className="h-3 w-3" /> Editar
+                                  </button>
+                                  {esMiFicha && (
+                                    // Dirección borra desde Gestión de Usuarios,
+                                    // que además sabe reasignar la cartera; aquí
+                                    // el botón es para el closer que abrió la
+                                    // cuenta y se equivocó.
+                                    <button
+                                      onClick={(ev) => {
+                                        ev.stopPropagation();
+                                        setEliminando(a);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors active:scale-95"
+                                      title="Dar de baja esta cuenta"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                esMiFicha && (
+                                  // No es un botón deshabilitado: es la
+                                  // explicación de por qué no hay botones. Sin
+                                  // esto la fila parece rota.
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500"
+                                    title="Esta cuenta la abrió otra persona. La ves y le trabajas el proceso comercial, pero administrarla es de quien la creó o de Dirección."
+                                  >
+                                    <Lock className="h-3 w-3" /> Solo lectura
+                                  </span>
+                                )
                               )}
                               {esDireccion && (
                                 <button
@@ -801,6 +866,27 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
           onCerrar={() => setEditando(null)}
           onGuardado={async () => {
             // Tanto editar como eliminar cambian la lista y los agregados.
+            await Promise.all([recargarAliados(), reload()]);
+          }}
+        />
+      )}
+
+      {viendoCredenciales && (
+        <CredencialesAliado
+          aliadoId={viendoCredenciales.aliado_id}
+          aliadoNombre={viendoCredenciales.aliado_nombre}
+          onCerrar={() => setViendoCredenciales(null)}
+        />
+      )}
+
+      {eliminando && (
+        <EliminarAliadoCloser
+          aliadoId={eliminando.aliado_id}
+          aliadoNombre={eliminando.aliado_nombre}
+          clientesTotal={eliminando.clientes_total}
+          onCerrar={() => setEliminando(null)}
+          onEliminado={async () => {
+            // Una baja mueve la lista y los agregados: el aliado deja de contar.
             await Promise.all([recargarAliados(), reload()]);
           }}
         />

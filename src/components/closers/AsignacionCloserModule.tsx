@@ -212,6 +212,10 @@ export default function AsignacionCloserModule() {
     empresa_nombre: a.empresa_multialiado_id ? empresaPorId.get(a.empresa_multialiado_id) || null : null,
     fecha_incorporacion: a.fecha_incorporacion_closer || null,
     es_closer_actual: true,
+    creado_por: a.created_by || null,
+    // Este modal solo reasigna; nadie administra al aliado desde aquí, así que
+    // la autoría se pasa tal cual y "lo creé yo" no aplica.
+    creado_por_mi: false,
     clientes_total: clientesPorAliado.get(a.id) || 0,
     clientes_periodo: 0,
     clientes_en_proceso: 0,
