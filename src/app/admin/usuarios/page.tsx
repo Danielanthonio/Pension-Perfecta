@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp, UserProfile, AliadoAuditoriaAccion, AliadoAuditoriaRow } from "@/utils/context/AppContext";
+import { puedeCerrarAliados, etiquetaCerrador } from "@/components/closers/closerMetrics";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import {
@@ -199,9 +200,18 @@ export default function GestionUsuarios() {
     }
   };
 
-  // Closers disponibles para atribuir un aliado nuevo.
+  // Responsables de cierre a los que se puede atribuir un aliado nuevo: los
+  // closers y también la Dirección, que cierra aliados y cobra por ello con su
+  // propia tarifa (ver 20260804000001). Los closers primero, porque son el caso
+  // habitual; la Dirección al final y etiquetada.
   const closersActivos = React.useMemo(
-    () => profiles.filter((p) => p.role === "closer" && p.is_active !== false).sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () =>
+      profiles
+        .filter((p) => puedeCerrarAliados(p) && p.is_active !== false)
+        .sort((a, b) => {
+          if (a.role !== b.role) return a.role === "closer" ? -1 : 1;
+          return a.full_name.localeCompare(b.full_name);
+        }),
     [profiles]
   );
   // El rol que se va a guardar de verdad. Un Account Manager incorpora la capa
@@ -1431,7 +1441,7 @@ export default function GestionUsuarios() {
                                 correo es lo único que distingue de verdad (§6). */}
                             {closersActivos.map((c) => (
                               <option key={c.id} value={c.id}>
-                                {c.full_name}{c.email ? ` — ${c.email}` : ""}
+                                {etiquetaCerrador(c)}
                               </option>
                             ))}
                           </select>

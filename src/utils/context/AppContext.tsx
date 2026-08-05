@@ -5211,6 +5211,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         // "Closer responsable" salía vacío y el alta se bloqueaba con un
         // "no existe ningún closer" que era mentira.
         p.role === "closer" ||
+        // La DIRECCIÓN, por dos motivos: es un destino válido de la atribución
+        // —también cierra aliados y cobra por ello, 20260804000001— y es con
+        // quien el AM habla en el chat.
+        p.role === "director" ||
         (p.role === "aliado" && (
           myAllyIds.has(p.id) ||
           // Los aliados que él mismo dio de alta. Sin esto, un aliado recién

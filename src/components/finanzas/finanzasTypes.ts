@@ -128,6 +128,19 @@ export const METODO_PAGO_LABEL: Record<MetodoPago, string> = {
   otro: "Otro",
 };
 
+// Familias de concepto: en qué casilla del recibo cae cada movimiento. Las usan
+// tanto el cálculo de la liquidación como el cuadre del detalle por persona, y
+// por eso viven aquí y no en cada consumidor.
+export const TIPOS_COMISION: TipoEvento[] = [
+  "comision_financiamiento",
+  "comision_cierre_aliado",
+  "comision_primer_financiamiento",
+  "comision_aliado",
+];
+export const TIPOS_BONO: TipoEvento[] = ["bono_mensual", "bono_trimestral"];
+export const TIPOS_SALARIO: TipoEvento[] = ["salario_fijo"];
+export const TIPOS_AJUSTE: TipoEvento[] = ["ajuste_positivo", "ajuste_negativo", "reversion"];
+
 /** Conceptos cuyo importe NO depende del producto. */
 export const CONCEPTOS_SIN_PRODUCTO: ConceptoTarifa[] = [
   "comision_cierre_aliado",

@@ -39,7 +39,7 @@ import { useApp } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { useClosers } from "./useClosers";
 import { useCloserFilters } from "./closerFilters";
-import { clientesDeAliado, tipoAliadoLabel } from "./closerMetrics";
+import { clientesDeAliado, puedeCerrarAliados, tipoAliadoLabel } from "./closerMetrics";
 import { CloserChart, CLOSER_VIZ_STYLE, type ChartBucket, type ChartSeries } from "./CloserChart";
 import { ReasignarCloser } from "./ReasignarCloser";
 import { AltaAliadoCloser } from "./AltaAliadoCloser";
@@ -282,8 +282,14 @@ export default function CloserDetail({ closerId }: { closerId: string }) {
     }));
   }, [fila]);
 
+  // Destinos posibles de una reasignación: los closers y la Dirección, que
+  // también cierra aliados y cobra por ello (20260804000001).
   const closersDisponibles = useMemo(
-    () => profiles.filter((p) => p.role === "closer").sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () =>
+      profiles.filter(puedeCerrarAliados).sort((a, b) => {
+        if (a.role !== b.role) return a.role === "closer" ? -1 : 1;
+        return a.full_name.localeCompare(b.full_name);
+      }),
     [profiles]
   );
 

@@ -37,6 +37,9 @@ import {
   type TarifaRow,
   type TipoEvento,
   RESUMEN_VACIO,
+  TIPOS_AJUSTE,
+  TIPOS_BONO,
+  TIPOS_COMISION,
   bucketStart,
   inRange,
   isoDay,
@@ -580,14 +583,9 @@ export function filtrarEventos(eventos: EventoRow[], f: FiltroLocal): EventoRow[
   });
 }
 
-const COMISIONES: TipoEvento[] = [
-  "comision_financiamiento",
-  "comision_cierre_aliado",
-  "comision_primer_financiamiento",
-  "comision_aliado",
-];
-const BONOS: TipoEvento[] = ["bono_mensual", "bono_trimestral"];
-const AJUSTES: TipoEvento[] = ["ajuste_positivo", "ajuste_negativo", "reversion"];
+const COMISIONES = TIPOS_COMISION;
+const BONOS = TIPOS_BONO;
+const AJUSTES = TIPOS_AJUSTE;
 
 const suma = (xs: EventoRow[]) => xs.reduce((s, e) => s + (Number(e.monto) || 0), 0);
 

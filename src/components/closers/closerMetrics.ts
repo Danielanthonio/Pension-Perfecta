@@ -50,6 +50,27 @@ export function isCloser(p: UserProfile): boolean {
   return p.role === "closer";
 }
 
+/**
+ * Quién puede figurar como responsable del CIERRE de un aliado.
+ *
+ * No es solo el rol closer: la Dirección también cierra aliados y cobra por
+ * ello, con su propia tarifa de `comision_cierre_aliado` (§4.2 de Finanzas, y
+ * migración 20260804000001). Por eso aparece en los selectores de atribución.
+ *
+ * Ojo con el rol: la base guarda 'admin' para las cuentas de dirección y la app
+ * las normaliza a 'director' al mapear el perfil, así que aquí solo hay que
+ * mirar 'director'.
+ */
+export function puedeCerrarAliados(p: UserProfile): boolean {
+  return p.role === "closer" || p.role === "director";
+}
+
+/** Etiqueta para los selectores: distingue a la Dirección de un closer. */
+export function etiquetaCerrador(p: UserProfile): string {
+  const base = p.role === "director" ? `${p.full_name} (Dirección)` : p.full_name;
+  return p.email ? `${base} — ${p.email}` : base;
+}
+
 export function isAliado(p: UserProfile): boolean {
   return p.role === "aliado";
 }
@@ -176,7 +197,17 @@ export function buildOverview(
   scopeCloserId?: string | null
 ): CloserOverviewRow[] {
   const porAliado = indexByAliado(prospects);
-  const closers = profiles.filter((p) => isCloser(p) && (!scopeCloserId || p.id === scopeCloserId));
+  // Espejo de `closers_cuenta_como_cerrador` en 20260804000001: un closer
+  // siempre; una cuenta de dirección solo si de verdad tiene aliados a su
+  // nombre, para no llenar el tablero de renglones a cero.
+  const conAliados = new Set(
+    profiles.filter(isAliado).map((a) => a.closer_origen_id).filter(Boolean) as string[]
+  );
+  const closers = profiles.filter(
+    (p) =>
+      (isCloser(p) || (p.role === "director" && conAliados.has(p.id))) &&
+      (!scopeCloserId || p.id === scopeCloserId)
+  );
 
   // Un solo pase por los aliados: se agrupan por su closer de ORIGEN (mérito
   // histórico), nunca por el actual. Ver §23 del brief.
@@ -294,8 +325,13 @@ export function buildSerie(
   scopeCloserId?: string | null,
   prospects?: Prospect[]
 ): CloserSeriePoint[] {
+  // Igual que en `buildOverview`: la serie también dibuja los cierres de la
+  // Dirección. Aquí basta con admitir el rol, porque el punto solo existe si hay
+  // un aliado que lo apunte.
   const closerIds = new Set(
-    profiles.filter((p) => isCloser(p) && (!scopeCloserId || p.id === scopeCloserId)).map((p) => p.id)
+    profiles
+      .filter((p) => puedeCerrarAliados(p) && (!scopeCloserId || p.id === scopeCloserId))
+      .map((p) => p.id)
   );
   const counts = new Map<string, number>();
   const porAliado = v.estadoAliado && v.estadoAliado !== "todos" ? indexByAliado(prospects || []) : null;

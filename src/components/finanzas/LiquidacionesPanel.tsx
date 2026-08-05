@@ -48,6 +48,10 @@ import {
   ESTADO_LABEL,
   PRODUCTO_LABEL,
   ROL_LABEL,
+  TIPOS_AJUSTE,
+  TIPOS_BONO,
+  TIPOS_COMISION,
+  TIPOS_SALARIO,
   TIPO_EVENTO_LABEL,
   datosDeCobro,
   fmtFecha,
@@ -397,6 +401,18 @@ export function LiquidacionesPanel({
 // Cada concepto se despliega hasta las operaciones que lo originaron. Es la
 // vista con la que la Dirección valida el origen de una comisión antes de
 // aprobarla: nombre del cliente, producto, fecha de cierre y quién gestionó.
+//
+// Las casillas hacen doble trabajo. Además de elegir sobre qué movimientos cae
+// la acción masiva, son el cuadre: las tarjetas de arriba suman SOLO lo marcado.
+// Todo entra marcado —así el total abre igual que la fila de la tabla— y al
+// desmarcar un movimiento su importe sale del concepto y del total. Es la forma
+// de contestar "¿cuánto le toca a esta persona si esta comisión no cuenta?" sin
+// tener que revertir nada ni sacar la calculadora.
+
+const BONOS_Y_SALARIO: TipoEvento[] = [...TIPOS_BONO, ...TIPOS_SALARIO];
+
+const sumar = (xs: EventoRow[]) => xs.reduce((s, e) => s + (Number(e.monto) || 0), 0);
+const deFamilia = (xs: EventoRow[], tipos: TipoEvento[]) => xs.filter((e) => tipos.includes(e.tipo_evento));
 
 function DetallePersona({
   usuarioId,
@@ -425,10 +441,24 @@ function DetallePersona({
   const [observando, setObservando] = useState(false);
   const [revirtiendo, setRevirtiendo] = useState<EventoRow | null>(null);
 
+  // Qué movimientos ya habíamos visto. Al recargar (tras aprobar, observar o
+  // revertir) se respeta lo que el usuario había desmarcado y solo se marca
+  // solo lo que aparece por primera vez —incluida la contrapartida negativa de
+  // una reversión, que sí debe entrar en el cuadre.
+  const conocidos = React.useRef<Set<string>>(new Set());
+
   const cargar = React.useCallback(async () => {
     setCargando(true);
     try {
-      setEventos(await fetchEventos({ usuarioId, limite: 1000 }));
+      const nuevos = await fetchEventos({ usuarioId, limite: 1000 });
+      const vistos = conocidos.current;
+      conocidos.current = new Set(nuevos.map((e) => e.id));
+      setEventos(nuevos);
+      setSeleccion((prev) => {
+        const s = new Set<string>();
+        for (const e of nuevos) if (!vistos.has(e.id) || prev.has(e.id)) s.add(e.id);
+        return s;
+      });
     } catch (e: any) {
       onAviso(e?.message || "No se pudo cargar el detalle.", "error");
     } finally {
@@ -463,6 +493,17 @@ function DetallePersona({
     setSeleccion(s);
   };
 
+  /** Marca o desmarca un concepto entero: si ya estaba completo, lo vacía. */
+  const toggleGrupoSel = (evs: EventoRow[]) => {
+    const s = new Set(seleccion);
+    const completo = evs.every((e) => s.has(e.id));
+    for (const e of evs) {
+      if (completo) s.delete(e.id);
+      else s.add(e.id);
+    }
+    setSeleccion(s);
+  };
+
   const revisables = eventos.filter((e) => e.estado !== "pagado" && !e.anulado_at);
   const seleccionados = [...seleccion].filter((id) => revisables.some((e) => e.id === id));
 
@@ -471,7 +512,7 @@ function DetallePersona({
     setTrabajando(true);
     try {
       const n = await setEstadoEventos(seleccionados, nuevo, comentario);
-      setSeleccion(new Set());
+      // La selección NO se limpia: es el cuadre del pago, no un paso del flujo.
       await cargar();
       onAviso(`${n} comisión(es) ${nuevo === "aprobado" ? "aprobada(s)" : nuevo === "observado" ? "observada(s)" : "devuelta(s) a revisión"}.`, "ok");
     } catch (e: any) {
@@ -482,8 +523,42 @@ function DetallePersona({
     }
   };
 
-  const total = eventos.reduce((s, e) => s + e.monto, 0);
-  const pagado = eventos.filter((e) => e.estado === "pagado").reduce((s, e) => s + e.monto, 0);
+  // Lo marcado manda: cada tarjeta suma su familia dentro de la selección y
+  // guarda aparte el total del período para poder decir de cuánto se recortó.
+  const marcados = useMemo(() => eventos.filter((e) => seleccion.has(e.id)), [eventos, seleccion]);
+  const totalPeriodo = sumar(eventos);
+  const total = sumar(marcados);
+  const pagado = sumar(eventos.filter((e) => e.estado === "pagado"));
+  const ajustesPeriodo = sumar(deFamilia(eventos, TIPOS_AJUSTE));
+
+  const tarjetas = [
+    { t: "Total seleccionado", sel: total, todo: totalPeriodo, c: "text-slate-900 dark:text-white" },
+    {
+      t: "Comisiones",
+      sel: sumar(deFamilia(marcados, TIPOS_COMISION)),
+      todo: sumar(deFamilia(eventos, TIPOS_COMISION)),
+      c: "text-slate-700 dark:text-slate-200",
+    },
+    {
+      t: "Bonos y salario",
+      sel: sumar(deFamilia(marcados, BONOS_Y_SALARIO)),
+      todo: sumar(deFamilia(eventos, BONOS_Y_SALARIO)),
+      c: "text-slate-700 dark:text-slate-200",
+    },
+    // Los ajustes solo ocupan sitio cuando existen; si no, las tres tarjetas de
+    // arriba ya suman el total y una casilla en cero solo despista.
+    ...(ajustesPeriodo !== 0
+      ? [
+          {
+            t: "Ajustes",
+            sel: sumar(deFamilia(marcados, TIPOS_AJUSTE)),
+            todo: ajustesPeriodo,
+            c: "text-rose-600 dark:text-rose-400",
+          },
+        ]
+      : []),
+    { t: "Pagado", sel: pagado, todo: pagado, c: "text-emerald-600 dark:text-emerald-400" },
+  ];
 
   return (
     <>
@@ -497,12 +572,15 @@ function DetallePersona({
           <>
             <button
               onClick={() => {
-                const datos = filasEventos(eventos);
+                const datos = filasEventos(marcados.length > 0 ? marcados : eventos);
                 exportarCsv(`detalle-${(fila?.usuario_nombre || "persona").toLowerCase().replace(/\s+/g, "-")}`, datos);
               }}
               className={btnSecundario}
             >
-              <Download className="h-3.5 w-3.5" /> Exportar detalle
+              <Download className="h-3.5 w-3.5" />{" "}
+              {marcados.length > 0 && marcados.length < eventos.length
+                ? `Exportar ${marcados.length} ${marcados.length === 1 ? "marcado" : "marcados"}`
+                : "Exportar detalle"}
             </button>
             <button onClick={onCerrar} className={btnSecundario}>
               Cerrar
@@ -510,17 +588,17 @@ function DetallePersona({
           </>
         }
       >
-        {/* Cabecera de totales */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { t: "Total del periodo", v: fmtMoneda(total), c: "text-slate-900 dark:text-white" },
-            { t: "Comisiones", v: fmtMoneda(fila?.comision_base ?? 0), c: "text-slate-700 dark:text-slate-200" },
-            { t: "Bonos y salario", v: fmtMoneda((fila?.bonos ?? 0) + (fila?.salario ?? 0)), c: "text-slate-700 dark:text-slate-200" },
-            { t: "Pagado", v: fmtMoneda(pagado), c: "text-emerald-600 dark:text-emerald-400" },
-          ].map((x) => (
+        {/* Cabecera de totales — refleja lo marcado, no el período entero */}
+        <div className={`grid grid-cols-2 gap-3 ${tarjetas.length === 5 ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+          {tarjetas.map((x) => (
             <div key={x.t} className="rounded-xl border border-slate-200/70 dark:border-slate-800 px-3 py-2.5">
               <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">{x.t}</p>
-              <p className={`mt-0.5 text-[15px] font-bold tabular-nums ${x.c}`}>{x.v}</p>
+              <p className={`mt-0.5 text-[15px] font-bold tabular-nums ${x.c}`}>{fmtMoneda(x.sel)}</p>
+              {x.sel !== x.todo && (
+                <p className="mt-0.5 text-[9px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+                  de {fmtMoneda(x.todo)} del periodo
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -537,21 +615,60 @@ function DetallePersona({
           </div>
         )}
 
-        {/* Barra de revisión */}
-        {seleccionados.length > 0 && (
-          <div className="sticky top-0 z-10 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-200">
-              {seleccionados.length} comisión(es) seleccionada(s)
-            </span>
-            <div className="flex items-center gap-2">
-              <button onClick={() => aplicar("aprobado")} disabled={trabajando} className={btnPrimario}>
+        {/* Barra de cuadre y revisión */}
+        {eventos.length > 0 && (
+          <div
+            className={`sticky top-0 z-10 rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap ${
+              marcados.length === eventos.length
+                ? "border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20"
+                : "border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20"
+            }`}
+          >
+            <div className="min-w-0">
+              <p
+                className={`text-[11px] font-bold ${
+                  marcados.length === eventos.length
+                    ? "text-emerald-800 dark:text-emerald-200"
+                    : "text-amber-800 dark:text-amber-200"
+                }`}
+              >
+                {marcados.length} de {eventos.length} movimiento(s) · {fmtMoneda(total)}
+              </p>
+              {seleccionados.length !== marcados.length && (
+                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  Las acciones solo alcanzan a {seleccionados.length} movimiento(s): el resto ya está pagado o anulado.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className={segmentado}>
+                <button onClick={() => setSeleccion(new Set(eventos.map((e) => e.id)))} className={pastilla(false)}>
+                  Todos
+                </button>
+                <button onClick={() => setSeleccion(new Set())} className={pastilla(false)}>
+                  Ninguno
+                </button>
+              </div>
+              <button
+                onClick={() => aplicar("aprobado")}
+                disabled={trabajando || seleccionados.length === 0}
+                className={btnPrimario}
+              >
                 {trabajando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BadgeCheck className="h-3.5 w-3.5" />}
                 Aprobar
               </button>
-              <button onClick={() => setObservando(true)} disabled={trabajando} className={btnSecundario}>
+              <button
+                onClick={() => setObservando(true)}
+                disabled={trabajando || seleccionados.length === 0}
+                className={btnSecundario}
+              >
                 Observar
               </button>
-              <button onClick={() => aplicar("pendiente_revision")} disabled={trabajando} className={btnSecundario}>
+              <button
+                onClick={() => aplicar("pendiente_revision")}
+                disabled={trabajando || seleccionados.length === 0}
+                className={btnSecundario}
+              >
                 <RotateCcw className="h-3.5 w-3.5" /> Reabrir
               </button>
             </div>
@@ -566,37 +683,60 @@ function DetallePersona({
           <ul className="space-y-2">
             {grupos.map(([tipo, evs]) => {
               const abierto = abiertos.has(tipo);
-              const subtotal = evs.reduce((s, e) => s + e.monto, 0);
+              const subtotal = sumar(evs);
+              const marcadosGrupo = evs.filter((e) => seleccion.has(e.id));
+              const subtotalSel = sumar(marcadosGrupo);
               return (
                 <li
                   key={tipo}
                   className="rounded-xl border border-slate-200/70 dark:border-slate-800 overflow-hidden"
                 >
-                  <button
-                    onClick={() => toggleGrupo(tipo)}
-                    className="w-full px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left"
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      {abierto ? (
-                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      )}
-                      <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate">
-                        {TIPO_EVENTO_LABEL[tipo]}
-                      </span>
-                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 shrink-0">
-                        {evs.length} {evs.length === 1 ? "movimiento" : "movimientos"}
-                      </span>
-                    </span>
-                    <span
-                      className={`text-[13px] font-bold tabular-nums shrink-0 ${
-                        subtotal < 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white"
-                      }`}
+                  <div className="w-full px-4 py-2.5 flex items-center gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={marcadosGrupo.length === evs.length}
+                      ref={(el) => {
+                        if (el) el.indeterminate = marcadosGrupo.length > 0 && marcadosGrupo.length < evs.length;
+                      }}
+                      onChange={() => toggleGrupoSel(evs)}
+                      aria-label={`Marcar todo el concepto ${TIPO_EVENTO_LABEL[tipo]}`}
+                      className="h-3.5 w-3.5 rounded accent-emerald-600 shrink-0"
+                    />
+                    <button
+                      onClick={() => toggleGrupo(tipo)}
+                      className="flex-1 min-w-0 flex items-center justify-between gap-3 text-left"
                     >
-                      {fmtMoneda(subtotal)}
-                    </span>
-                  </button>
+                      <span className="flex items-center gap-2 min-w-0">
+                        {abierto ? (
+                          <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        )}
+                        <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate">
+                          {TIPO_EVENTO_LABEL[tipo]}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 shrink-0">
+                          {marcadosGrupo.length < evs.length
+                            ? `${marcadosGrupo.length} de ${evs.length} movimientos`
+                            : `${evs.length} ${evs.length === 1 ? "movimiento" : "movimientos"}`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span
+                          className={`block text-[13px] font-bold tabular-nums ${
+                            subtotalSel < 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white"
+                          }`}
+                        >
+                          {fmtMoneda(subtotalSel)}
+                        </span>
+                        {subtotalSel !== subtotal && (
+                          <span className="block text-[9px] font-semibold text-slate-400 dark:text-slate-500 tabular-nums">
+                            de {fmtMoneda(subtotal)}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </div>
 
                   {abierto && (
                     <div className="border-t border-slate-100 dark:border-slate-800 overflow-x-auto">
@@ -607,13 +747,15 @@ function DetallePersona({
                             return (
                               <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                                 <td className="pl-4 pr-2 py-2 w-8">
+                                  {/* Se puede desmarcar cualquier movimiento —también uno
+                                      pagado— porque la casilla cuadra el importe; que la
+                                      acción masiva no le llegue lo resuelve `seleccionados`. */}
                                   <input
                                     type="checkbox"
                                     checked={seleccion.has(e.id)}
-                                    disabled={bloqueado}
                                     onChange={() => toggleSel(e.id)}
-                                    aria-label={`Seleccionar comisión de ${fmtMoneda(e.monto)}`}
-                                    className="h-3.5 w-3.5 rounded accent-emerald-600 disabled:opacity-30"
+                                    aria-label={`Contar la comisión de ${fmtMoneda(e.monto)} en el total`}
+                                    className="h-3.5 w-3.5 rounded accent-emerald-600"
                                   />
                                 </td>
                                 <td className="px-2 py-2">

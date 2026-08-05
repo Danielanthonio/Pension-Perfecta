@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { useApp, type UserProfile } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
-import { activeProspects, tipoDeAliado } from "./closerMetrics";
+import { activeProspects, etiquetaCerrador, puedeCerrarAliados, tipoDeAliado } from "./closerMetrics";
 import { ReasignarCloser } from "./ReasignarCloser";
 import { useClosers } from "./useClosers";
 import { type CloserAliadoRow, type CloserAsignacion, fmtFecha, fmtPct } from "./closerTypes";
@@ -95,8 +95,14 @@ export default function AsignacionCloserModule() {
   const [errorMsg, setErrorMsg] = useState("");
   const [okMsg, setOkMsg] = useState("");
 
+  // Los closers y también la Dirección: cierra aliados y cobra por ello con su
+  // propia tarifa (20260804000001). Los closers primero, que son el caso normal.
   const closers = useMemo(
-    () => profiles.filter((p) => p.role === "closer").sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    () =>
+      profiles.filter(puedeCerrarAliados).sort((a, b) => {
+        if (a.role !== b.role) return a.role === "closer" ? -1 : 1;
+        return a.full_name.localeCompare(b.full_name);
+      }),
     [profiles]
   );
   const nombrePorId = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name])), [profiles]);
@@ -322,7 +328,7 @@ export default function AsignacionCloserModule() {
               <option value="">Todos los closers</option>
               {closers.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.full_name}
+                  {c.role === "director" ? `${c.full_name} (Dirección)` : c.full_name}
                 </option>
               ))}
             </select>
@@ -495,7 +501,7 @@ export default function AsignacionCloserModule() {
                 <option value="">Selecciona un closer…</option>
                 {closers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.full_name}
+                    {etiquetaCerrador(c)}
                   </option>
                 ))}
               </select>
