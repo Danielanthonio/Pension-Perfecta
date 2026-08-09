@@ -31,18 +31,20 @@ export const VIZ_SERIES_VARS = [
   "var(--rp-8)",
 ];
 export const VIZ_MUTED_VAR = "var(--rp-muted)";
+/** Fondo del hueco por llenar en las barras de objetivo. */
+export const VIZ_TRACK_VAR = "var(--rp-track)";
 export const MAX_SERIES = VIZ_SERIES_VARS.length;
 
 export const REPORTES_VIZ_STYLE = `
 .reportes-viz{
   --rp-1:#2a78d6; --rp-2:#eb6834; --rp-3:#1baf7a; --rp-4:#eda100;
   --rp-5:#e87ba4; --rp-6:#008300; --rp-7:#4a3aa7; --rp-8:#e34948;
-  --rp-muted:#94a3b8;
+  --rp-muted:#94a3b8; --rp-track:#e2e8f0;
 }
 .dark .reportes-viz{
   --rp-1:#3987e5; --rp-2:#d95926; --rp-3:#199e70; --rp-4:#c98500;
   --rp-5:#d55181; --rp-6:#008300; --rp-7:#9085e9; --rp-8:#e66767;
-  --rp-muted:#64748b;
+  --rp-muted:#64748b; --rp-track:#334155;
 }
 `;
 
@@ -515,15 +517,21 @@ export interface FilaAvance {
   real: number;
 }
 
+/** Pasos de eje que un humano lee sin pensar. Nada de 33 · 65 · 98. */
+const PASOS_EJE = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
+const pasoBonito = (max: number, ticks = 5) => PASOS_EJE.find((p) => p >= max / ticks) ?? PASOS_EJE[PASOS_EJE.length - 1];
+
 /**
- * Una sola barra por entidad: su porcentaje de avance sobre el objetivo a la fecha.
+ * Una barra por entidad que es el OBJETIVO y se va llenando con lo conseguido.
  *
- * Antes iban dos barras enfrentadas —meta y real— y la comparación había que
- * hacerla a ojo, columna contra columna, con el agravante de que un AM con meta
- * 200 parecía peor que uno con meta 20 aunque fuera igual de bien. En porcentaje
- * la referencia es la misma para todos, el 100 % de la rejilla, y quién llega se
- * ve de un golpe. La cantidad no se pierde: va escrita bajo el porcentaje como
- * «conseguidas / objetivo a la fecha».
+ * El hueco gris mide el objetivo a la fecha —su cantidad va rotulada encima—, y
+ * el relleno de color, lo que se lleva; el porcentaje se escribe dentro. Así la
+ * barra responde de un vistazo a las dos preguntas a la vez: cuánto falta (lo
+ * que queda por llenar) y a qué ritmo se va (el color).
+ *
+ * El relleno se TOPA en el hueco: pasarse del objetivo deja la barra llena y el
+ * porcentaje —110 %— lo dice. Dejarlo desbordar rompería la metáfora del vaso
+ * que se llena y obligaría a estirar el eje por un solo caso.
  */
 export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: FilaAvance[]; unidad?: string }) {
   const n = filas.length;
@@ -533,74 +541,93 @@ export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: Fila
   // Sin objetivo a la fecha no hay porcentaje que calcular: dividir por cero
   // daría Infinity y una barra fuera del lienzo.
   const pctDe = (f: FilaAvance) => (f.esperado > 0 ? (f.real / f.esperado) * 100 : null);
-  const maxPct = Math.max(0, ...filas.map((f) => pctDe(f) ?? 0));
-  // Techo con aire: las dos etiquetas van ENCIMA de la barra y necesitan sitio.
-  // Nunca baja de 120 para que la línea del 100 % quede dentro aunque nadie llegue.
-  const bruto = Math.max(120, maxPct * 1.18);
-  // El techo se redondea a un paso redondo y la rejilla se dibuja con ESE paso:
-  // así el eje va de 20 en 20 en vez de soltar 0 · 33 · 65 · 98, y el 100 % —que
-  // es la vara— cae siempre justo encima de una línea.
-  const paso = bruto <= 200 ? 20 : bruto <= 500 ? 50 : 100;
-  const maxV = Math.ceil(bruto / paso) * paso;
+  // El eje va en CANTIDAD y lo manda el objetivo, que es el tope de cada barra.
+  // El 1,14 deja aire para el rótulo del objetivo, que va por encima del hueco.
+  const maxObj = Math.max(1, ...filas.map((f) => f.esperado));
+  const paso = pasoBonito(maxObj * 1.14);
+  const maxV = Math.ceil((maxObj * 1.14) / paso) * paso;
   const bandW = e.plotW / n;
-  const barW = Math.min(52, Math.max(6, bandW * 0.46));
+  const barW = Math.min(58, Math.max(8, bandW * 0.44));
   const xCenter = (i: number) => e.padL + bandW * i + bandW / 2;
-  const yFor = (v: number) => PAD_T + e.plotH - (v / maxV) * e.plotH;
+  const alto = (v: number) => (v / maxV) * e.plotH;
   const rotarNombres = n > 6;
+  // «1 agendas» canta. La unidad llega en plural y se le quita la ese para el uno.
+  const conUnidad = (v: number) => `${v} ${v === 1 ? unidad.replace(/s$/, "") : unidad}`;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet" role="img">
-      <Rejilla e={e} max={maxV} ticks={Math.round(maxV / paso)} sufijo="%" />
+      <Rejilla e={e} max={maxV} ticks={Math.round(maxV / paso)} />
 
       {filas.map((f, i) => {
         const pct = pctDe(f);
-        // Sin meta puesta no hay nada que cumplir ni que incumplir: no se pinta
-        // barra. Dibujarla a cero diría "va fatal" cuando lo único que pasa es
-        // que Dirección todavía no le ha fijado objetivo.
-        const h = pct === null || pct <= 0 ? 0 : Math.max((Math.min(pct, maxV) / maxV) * e.plotH, 2);
-        const fill = pct === null ? VIZ_MUTED_VAR : pct >= 100 ? "var(--rp-6)" : pct >= 70 ? "var(--rp-4)" : "var(--rp-8)";
-        const yTope = e.baseline - h;
+        const hHueco = f.esperado > 0 ? Math.max(alto(f.esperado), 3) : 0;
+        const hLleno = f.esperado > 0 && f.real > 0 ? Math.min(Math.max(alto(f.real), 2), hHueco) : 0;
+        const yHueco = e.baseline - hHueco;
+        const yLleno = e.baseline - hLleno;
+        // Sin objetivo no hay hueco que llenar: solo se dice cuántas lleva. Pintar
+        // una barra vacía diría "va fatal" cuando lo que pasa es que Dirección
+        // todavía no le ha fijado meta.
+        const color = pct === null ? VIZ_MUTED_VAR : pct >= 100 ? "var(--rp-6)" : pct >= 70 ? "var(--rp-4)" : "var(--rp-8)";
+        // Las etiquetas van dentro del relleno si cabe; si el relleno es un dedo,
+        // saltan justo encima. Ahí caen sobre el gris del hueco, no sobre el
+        // fondo del panel, así que el gris claro de siempre no daba contraste.
+        const dentro = hLleno >= 34;
+        const cx = xCenter(i);
         const tip =
           `${f.nombre}\n` +
-          `Llevan: ${f.real} ${unidad}\n` +
+          `Llevan: ${conUnidad(f.real)}\n` +
           `Objetivo a la fecha: ${f.esperado}\n` +
           `Meta del mes: ${f.objetivo}\n` +
           `Avance: ${pct === null ? "sin objetivo" : `${Math.round(pct)} %`}`;
         return (
           <g key={f.id}>
-            {/* Zona de impacto a toda altura: el tooltip funciona igual cuando la
-                barra es un hilo o cuando no hay barra que señalar. */}
+            {/* Zona de impacto a toda altura: el tooltip responde igual sobre el
+                hueco vacío que sobre el relleno. */}
             <rect x={e.padL + bandW * i} y={PAD_T} width={bandW} height={e.plotH} fill="transparent">
               <title>{tip}</title>
             </rect>
-            {h > 0 && (
-              <rect x={xCenter(i) - barW / 2} y={yTope} width={barW} height={h} rx={3} fill={fill}>
+            {hHueco > 0 && (
+              <rect x={cx - barW / 2} y={yHueco} width={barW} height={hHueco} rx={3} fill={VIZ_TRACK_VAR}>
                 <title>{tip}</title>
               </rect>
             )}
+            {hLleno > 0 && (
+              <rect x={cx - barW / 2} y={yLleno} width={barW} height={hLleno} rx={3} fill={color}>
+                <title>{tip}</title>
+              </rect>
+            )}
+
+            {/* El objetivo, en cantidad, coronando la barra. */}
+            {f.esperado > 0 && (
+              <text x={cx} y={yHueco - 6} textAnchor="middle" className="fill-slate-700 dark:fill-slate-200 tabular-nums" style={{ fontSize: 11, fontWeight: 700 }}>
+                {f.esperado}
+              </text>
+            )}
             <text
-              x={xCenter(i)}
-              y={yTope - 16}
+              x={cx}
+              y={dentro ? yLleno + 17 : yLleno - 16}
               textAnchor="middle"
-              className="fill-slate-700 dark:fill-slate-200 tabular-nums"
+              className={`tabular-nums ${dentro ? "fill-white" : "fill-slate-700 dark:fill-slate-200"}`}
               style={{ fontSize: 11, fontWeight: 700 }}
             >
               {pct === null ? "Sin meta" : `${Math.round(pct)} %`}
             </text>
             <text
-              x={xCenter(i)}
-              y={yTope - 5}
+              x={cx}
+              y={dentro ? yLleno + 30 : yLleno - 5}
               textAnchor="middle"
-              className="fill-slate-400 dark:fill-slate-500 tabular-nums"
+              fillOpacity={dentro ? 0.85 : 1}
+              className={`tabular-nums ${dentro ? "fill-white" : "fill-slate-500 dark:fill-slate-300"}`}
               style={{ fontSize: 9, fontWeight: 600 }}
             >
-              {pct === null ? `${f.real} ${unidad}` : `${f.real} / ${f.esperado}`}
+              {conUnidad(f.real)}
             </text>
+
             <text
-              x={xCenter(i)}
+              x={cx}
               y={e.baseline + (rotarNombres ? 12 : 14)}
               textAnchor={rotarNombres ? "end" : "middle"}
-              transform={rotarNombres ? `rotate(-38 ${xCenter(i)} ${e.baseline + 12})` : undefined}
+              transform={rotarNombres ? `rotate(-38 ${cx} ${e.baseline + 12})` : undefined}
               className="fill-slate-500 dark:fill-slate-400"
               style={{ fontSize: 9 }}
             >
@@ -609,13 +636,6 @@ export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: Fila
           </g>
         );
       })}
-
-      {/* La meta a la fecha es el 100 %, la misma vara para todos. Va la última
-          para que ninguna barra la tape. */}
-      <line x1={e.padL} y1={yFor(100)} x2={W - e.padR} y2={yFor(100)} stroke="var(--rp-8)" strokeWidth="1.6" strokeDasharray="5 3" />
-      <text x={W - e.padR} y={yFor(100) - 5} textAnchor="end" fill="var(--rp-8)" style={{ fontSize: 9, fontWeight: 700 }}>
-        objetivo a la fecha · 100 %
-      </text>
     </svg>
   );
 }

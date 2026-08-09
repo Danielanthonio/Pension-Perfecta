@@ -43,6 +43,7 @@ import {
   pill,
   segmented,
   VIZ_MUTED_VAR,
+  VIZ_TRACK_VAR,
 } from "./ReportesCharts";
 import { SubEstadosPanel } from "./SubEstadosPanel";
 import { useObjetivosAM } from "./useObjetivosAM";
@@ -598,6 +599,7 @@ export function AccountManagersReportes({
             <AvanceObjetivoChart filas={filasAgenda} />
             <Leyenda
               series={[
+                { id: "meta", label: "Objetivo a la fecha (la barra entera)", color: VIZ_TRACK_VAR },
                 { id: "ok", label: "Al día (100 % o más)", color: "var(--rp-6)" },
                 { id: "cerca", label: "Por debajo (70–99 %)", color: "var(--rp-4)" },
                 { id: "lejos", label: "Muy por debajo (menos de 70 %)", color: "var(--rp-8)" },
@@ -605,10 +607,10 @@ export function AccountManagersReportes({
               ]}
             />
             <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              La barra es el porcentaje de avance del account manager: agendas conseguidas en el rango contra el
-              objetivo a la fecha, que es la meta del mes repartida entre esos días. Bajo el porcentaje van las
-              cantidades. Una agenda cuenta el día de la reunión y sigue contando aunque el proyecto ya haya avanzado;
-              lo agendado para más adelante no cuenta todavía como conseguido.
+              Cada barra es el objetivo a la fecha —la meta del mes repartida entre los días del rango, con su cantidad
+              rotulada encima— y se va llenando con las agendas conseguidas. El color dice el ritmo y el porcentaje va
+              dentro. Una agenda cuenta el día de la reunión y sigue contando aunque el proyecto ya haya avanzado; lo
+              agendado para más adelante no cuenta todavía como conseguido.
             </p>
 
             {puedeEditar && (
