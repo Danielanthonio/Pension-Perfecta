@@ -450,6 +450,58 @@ export function objetivoEnVentana(objetivo: number, ventana: VentanaMes): number
   return Math.min(objetivo, Math.ceil(objetivo * ventana.fraccion));
 }
 
+// ---------------------------------------------------------------------------
+// Cierre de agendas
+// ---------------------------------------------------------------------------
+
+export interface RangoAgendas {
+  /** Primer día contado. Vacío cuando el informe no pone suelo (preset «Todo»). */
+  desde: string;
+  /** Último día contado. SIEMPRE topado en hoy. */
+  hasta: string;
+  /** El rango pedido empieza después de hoy: no hay agendas que medir. */
+  vacio: boolean;
+}
+
+/**
+ * El rango del informe llevado a la fecha de la REUNIÓN, topado en hoy.
+ *
+ * Hermano de `ventanaDelMes`, pero sin el corsé del mes: el reporte de cierre no
+ * se mide contra una meta mensual que haya que prorratear, así que respeta el
+ * rango entero que pide el informe —«Histórico» incluido—. El tope en hoy es
+ * obligatorio igual: una asesoría agendada para la semana que viene no se puede
+ * haber cerrado todavía, y contarla hundiría la tasa por algo que aún no ocurre.
+ */
+export function rangoDeAgendas(desde: string, hasta: string, hoyIso?: string): RangoAgendas {
+  const hoy = hoyIso || new Date().toISOString().substring(0, 10);
+  const fin = hasta && hasta < hoy ? hasta : hoy;
+  return { desde, hasta: fin, vacio: Boolean(desde) && desde > fin };
+}
+
+/** ¿La asesoría de este proyecto cae dentro del rango? Por el día de la REUNIÓN. */
+export function agendaEnRango(p: Prospect, rango: RangoAgendas): boolean {
+  if (rango.vacio) return false;
+  const d = diaDeCita(p.asesoria_at);
+  if (d === null) return false;
+  if (rango.desde && d < rango.desde) return false;
+  return d <= rango.hasta;
+}
+
+/**
+ * Una agenda está CERRADA cuando su proyecto llegó a «Cerrada Ganada»
+ * (`firma_programada`).
+ *
+ * Cuenta también «Pagada Cerrada» (`pagado_comision`), que es el paso siguiente y
+ * no otra cosa: mirar solo el primero haría desaparecer el cierre del informe el
+ * día que se libera la comisión, y la tasa de un AM bajaría justo por cobrar. Es
+ * el mismo criterio con el que el resto de la app agrupa ambos estados en
+ * «Fin. Otorgado» (`FIN_OTORGADO_STAGE`).
+ */
+export const esAgendaCerrada = (p: Prospect): boolean => METRICAS.otorgados.match(p);
+
+/** Cerrada ganada con la comisión ya liberada: subconjunto de `esAgendaCerrada`. */
+export const esAgendaPagada = (p: Prospect): boolean => p.status === "pagado_comision";
+
 /** Día corto para los rótulos de rango: '2026-08-09' → '9 ago'. */
 export function diaLabel(iso: string): string {
   const CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

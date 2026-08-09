@@ -8,7 +8,8 @@
 //   3. Estados por AM        — línea de tiempo clicable arriba, barras abajo.
 //   4. AM x Estados (grupo)  — barras agrupadas, todas las métricas a la vez.
 //   5. AM «Agendas»          — asesorías del mes contra la meta que fija Dirección.
-//   6. Sub estados           — panel compartido con la pestaña ALIADOS.
+//   6. Cierre de agendas     — de esas asesorías, cuántas acabaron en Cerrada Ganada.
+//   7. Sub estados           — panel compartido con la pestaña ALIADOS.
 //
 // El AM del proyecto vive en `prospects.account_manager_id`, no en el aliado
 // (ver [[project-am-por-proyecto]]): un proyecto sin AM es mesa de dirección y se
@@ -19,6 +20,7 @@ import {
   BarChart3,
   CalendarCheck,
   Download,
+  Handshake,
   LineChart as LineChartIcon,
   Layers3,
   Route,
@@ -32,6 +34,7 @@ import { STEP_DEFS, STEP_STATUSES } from "@/components/ui/projectStepper";
 import {
   AvanceObjetivoChart,
   ChipTasa,
+  ConversionChart,
   GrupoBarrasChart,
   Leyenda,
   PanelHeader,
@@ -54,17 +57,21 @@ import {
   METRICAS,
   METRICAS_RANKING,
   SERIES_AM,
+  agendaEnRango,
   agrupaPor,
   aplicaFiltros,
   calcTasas,
   construyeCubos,
   diaDeCita,
   diaLabel,
+  esAgendaCerrada,
+  esAgendaPagada,
   fmtNum,
   fmtPct,
   mesDe,
   mesLabel,
   objetivoEnVentana,
+  rangoDeAgendas,
   serieDe,
   ventanaDelMes,
 } from "./reportesTypes";
@@ -290,6 +297,61 @@ export function AccountManagersReportes({
   const cumplen = filasAgenda.filter((f) => f.esperado > 0 && f.real >= f.esperado).length;
   const conObjetivo = filasAgenda.filter((f) => f.objetivo > 0).length;
 
+  // ── 6 · Cierre de agendas ──────────────────────────────────────────────────
+  // Mismo universo que el panel de arriba —la cartera entera acotada por la fecha
+  // de la REUNIÓN, no por la de captura—, pero sin el corsé del mes: aquí no hay
+  // meta mensual que prorratear, así que se mide el rango entero que pide el
+  // informe. Con «Histórico» salen todas las asesorías celebradas.
+  //
+  // Ojo a la cifra: este panel cuenta las agendas del rango COMPLETO y el de
+  // arriba solo el trozo que cae en el mes de la meta. Con «Mes a la fecha» dicen
+  // lo mismo; con «Año actual», no, y por eso cada uno rotula su ventana.
+  const rangoCierre = useMemo(() => rangoDeAgendas(filters.desde, filters.hasta), [filters.desde, filters.hasta]);
+
+  // Se incluye la mesa de dirección: sus agendas también se cierran, y esconderlas
+  // haría que la tasa global no cuadrara con la suma de las barras. Solo se cae
+  // del gráfico quien no tenga NINGUNA agenda en el rango — una barra a cero no
+  // dice «cierra mal», dice «no tenía nada que cerrar».
+  const filasCierre = useMemo(
+    () =>
+      gruposAgenda
+        .map((g) => {
+          const agendas = g.items.filter((p) => agendaEnRango(p, rangoCierre));
+          const cerradas = agendas.filter(esAgendaCerrada);
+          // «Rechazado» va aparte de «Cerrado Perdido»: `isLostStatus` NO lo
+          // incluye, así que sumarlo a las perdidas sería mentir y dejarlo fuera
+          // lo metería en «en proceso», que es justo lo que no está.
+          const perdidas = agendas.filter(METRICAS.perdidos.match).length;
+          const rechazadas = agendas.filter(METRICAS.rechazados.match).length;
+          return {
+            id: g.id,
+            nombre: g.nombre,
+            base: agendas.length,
+            logrado: cerradas.length,
+            pagadas: cerradas.filter(esAgendaPagada).length,
+            perdidas,
+            rechazadas,
+            // Lo que ni se ganó ni se cayó: sigue vivo en el pipeline.
+            enProceso: agendas.length - cerradas.length - perdidas - rechazadas,
+          };
+        })
+        .filter((f) => f.base > 0)
+        // Por TASA, que es lo que dibuja el relleno de la barra. El empate lo
+        // rompe el volumen: entre dos al 50 %, delante quien cerró sobre más.
+        .sort((a, b) => b.logrado / b.base - a.logrado / a.base || b.base - a.base),
+    [gruposAgenda, rangoCierre]
+  );
+
+  // El CSV lee de aquí y no recalcula, igual que en el panel de agendas.
+  const cierrePorAM = useMemo(() => new Map(filasCierre.map((f) => [f.id, f])), [filasCierre]);
+
+  const totAgendasCierre = filasCierre.reduce((s, f) => s + f.base, 0);
+  const totCerradas = filasCierre.reduce((s, f) => s + f.logrado, 0);
+  const totEnProceso = filasCierre.reduce((s, f) => s + f.enProceso, 0);
+  const totPerdidasAgenda = filasCierre.reduce((s, f) => s + f.perdidas, 0);
+  const totRechazadasAgenda = filasCierre.reduce((s, f) => s + f.rechazadas, 0);
+  const tasaCierreAgendas = totAgendasCierre > 0 ? (totCerradas / totAgendasCierre) * 100 : null;
+
   // ── Filtro por AM ──────────────────────────────────────────────────────────
   const amDisponibles = useMemo(() => {
     const enDatos = new Set(grupos.map((g) => g.id));
@@ -332,12 +394,19 @@ export function AccountManagersReportes({
         `Meta de agendas ${periodo}`,
         "Objetivo de agendas a la fecha",
         `Agendas del ${ventana.desde} al ${ventana.hasta}`,
+        `Agendas del rango (${rangoCierre.desde || "inicio"} al ${rangoCierre.hasta})`,
+        "Cerradas ganadas",
+        "En proceso",
+        "Perdidas",
+        "Rechazadas",
+        "Tasa de cierre de agendas %",
       ],
     ];
     ranking.forEach((r) => {
       const g = grupos.find((x) => x.id === r.id);
       const list = g?.items || [];
       const t = calcTasas(list);
+      const c = cierrePorAM.get(r.id);
       rows.push([
         r.nombre,
         ...METRICAS_RANKING.map((id) => list.filter(METRICAS[id].match).length),
@@ -349,6 +418,13 @@ export function AccountManagersReportes({
         objetivos.get(r.id) ?? 0,
         esperadoPorAM.get(r.id) ?? 0,
         agendasPorAM.get(r.id) ?? 0,
+        c?.base ?? 0,
+        c?.logrado ?? 0,
+        c?.enProceso ?? 0,
+        c?.perdidas ?? 0,
+        c?.rechazadas ?? 0,
+        // Sin agendas no hay tasa: un 0,0 se leería como "no cerró ninguna".
+        c && c.base > 0 ? ((c.logrado / c.base) * 100).toFixed(1) : "",
       ]);
     });
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
@@ -652,7 +728,155 @@ export function AccountManagersReportes({
         )}
       </div>
 
-      {/* ── 6 · Sub estados ───────────────────────────────────────────────── */}
+      {/* ── 6 · Cierre de agendas ─────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
+        <PanelHeader
+          icon={Handshake}
+          tone="sky"
+          title="Cierre de agendas"
+          subtitle={
+            rangoCierre.vacio ? (
+              <>El rango elegido empieza después de hoy: todavía no hay asesorías celebradas que medir.</>
+            ) : rangoCierre.desde ? (
+              <>
+                Asesorías con reunión del <strong>{diaLabel(rangoCierre.desde)}</strong> al{" "}
+                <strong>{diaLabel(rangoCierre.hasta)}</strong> y cuántas de ellas acabaron en Cerrada Ganada.
+              </>
+            ) : (
+              <>
+                Todas las asesorías celebradas hasta el <strong>{diaLabel(rangoCierre.hasta)}</strong> y cuántas de ellas
+                acabaron en Cerrada Ganada.
+              </>
+            )
+          }
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <ChipTasa label="Agendas" value={fmtNum(totAgendasCierre, 0)} tone="sky" />
+            <ChipTasa label="Cerradas ganadas" value={fmtNum(totCerradas, 0)} tone="teal" />
+            <ChipTasa
+              label="Tasa de cierre"
+              value={tasaCierreAgendas === null ? "—" : `${Math.round(tasaCierreAgendas)} %`}
+              tone="teal"
+            />
+            <ChipTasa label="En proceso" value={fmtNum(totEnProceso, 0)} tone="amber" />
+          </div>
+        </PanelHeader>
+
+        {filasCierre.length === 0 ? (
+          <Vacio>No hay asesorías celebradas en el rango con los filtros activos.</Vacio>
+        ) : (
+          <>
+            <ConversionChart
+              filas={filasCierre}
+              baseLabel="Agendas del rango"
+              logradoLabel="Cerradas ganadas"
+              unidadLograda="cerradas"
+            />
+            <Leyenda
+              series={[
+                { id: "agendas", label: "Agendas del rango (la barra entera)", color: VIZ_TRACK_VAR, total: totAgendasCierre },
+                { id: "cerradas", label: "Cerradas ganadas", color: "var(--rp-6)", total: totCerradas },
+              ]}
+            />
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+              La barra entera son las agendas del rango —su cantidad va rotulada encima— y el relleno, las que llegaron a
+              Cerrada Ganada; dentro va la tasa. Una agenda cuenta el día de la reunión, y «Pagada Cerrada» cuenta como
+              cerrada: es el paso siguiente al cierre, no otra cosa. El orden es por tasa, así que conviene mirar también
+              la altura de la barra: cerrar 1 de 1 es 100 % y no es lo mismo que 20 de 50.
+            </p>
+
+            <div className="rounded-xl border border-slate-200/70 dark:border-slate-800 overflow-hidden">
+              <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                <h4 className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                  Cierre de agendas por Account Manager
+                </h4>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                  Cerradas + En proceso + Perdidas + Rechazadas suman las agendas del rango.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
+                      {[
+                        "Account Manager",
+                        "Agendas",
+                        "Cerradas ganadas",
+                        "En proceso",
+                        "Perdidas",
+                        "Rechazadas",
+                        "Tasa de cierre",
+                      ].map((h, i) => (
+                        <th
+                          key={h}
+                          className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 ${
+                            i > 0 ? "text-right" : ""
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                    {filasCierre.map((f) => {
+                      const tasa = (f.logrado / f.base) * 100;
+                      return (
+                        <tr key={f.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                          <td className="px-4 py-2 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[220px]">
+                            {f.nombre}
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{f.base}</td>
+                          <td
+                            className="px-4 py-2 text-right font-bold tabular-nums text-slate-900 dark:text-white"
+                            title={`${f.pagadas} de ellas con la comisión ya pagada`}
+                          >
+                            {f.logrado}
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
+                            {f.enProceso}
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
+                            {f.perdidas}
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
+                            {f.rechazadas}
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tabular-nums bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400"
+                              title={`${f.logrado} de ${f.base} agendas`}
+                            >
+                              {tasa.toFixed(0)} %
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {/* Los totales van aquí y no en más chips de cabecera: es donde se
+                      comprueba que las cuatro columnas suman las agendas. */}
+                  <tfoot>
+                    <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 font-bold text-slate-700 dark:text-slate-200">
+                      <td className="px-4 py-2">Total</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totAgendasCierre}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totCerradas}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totEnProceso}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totPerdidasAgenda}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totRechazadasAgenda}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {tasaCierreAgendas === null ? "—" : `${tasaCierreAgendas.toFixed(0)} %`}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── 7 · Sub estados ───────────────────────────────────────────────── */}
       <SubEstadosPanel
         items={items}
         profiles={profiles}

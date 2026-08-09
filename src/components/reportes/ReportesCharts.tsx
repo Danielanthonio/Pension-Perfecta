@@ -641,7 +641,143 @@ export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: Fila
 }
 
 // ---------------------------------------------------------------------------
-// 5 · Dona
+// 5 · Conversión: qué parte de una base llegó al final
+// ---------------------------------------------------------------------------
+
+export interface FilaConversion {
+  id: string;
+  nombre: string;
+  /** El universo que se mide —las agendas del rango—: la barra entera. */
+  base: number;
+  /** Cuántas de esas llegaron al final —las cerradas ganadas—: el relleno. */
+  logrado: number;
+}
+
+/**
+ * Una barra por entidad: el hueco es la BASE y el relleno lo CONSEGUIDO, con la
+ * tasa escrita dentro.
+ *
+ * Es el mismo vaso que se llena de `AvanceObjetivoChart`, con una diferencia de
+ * fondo: aquí no hay meta que cumplir, así que el color NO juzga —una tasa de
+ * cierre del 30 % puede ser excelente— y se queda fijo. Lo que se compara es la
+ * altura del relleno entre entidades y la fracción que ocupa en su propia barra;
+ * como la barra entera ES la base, un 100 % sobre dos agendas se ve enseguida
+ * pequeño al lado de un 40 % sobre cincuenta.
+ */
+export function ConversionChart({
+  filas,
+  baseLabel = "Base",
+  logradoLabel = "Conseguido",
+  unidadLograda = "cerradas",
+  color = "var(--rp-6)",
+}: {
+  filas: FilaConversion[];
+  /** Nombres para el tooltip; los mismos que use la leyenda del panel. */
+  baseLabel?: string;
+  logradoLabel?: string;
+  /** En plural: al uno se le quita la ese («1 cerrada»). */
+  unidadLograda?: string;
+  color?: string;
+}) {
+  const n = filas.length;
+  if (n === 0) return <Vacio>No hay entidades que medir en el período.</Vacio>;
+
+  const e = ejes(46, 16, 62);
+  const maxBase = Math.max(1, ...filas.map((f) => f.base));
+  // El 1,14 deja aire para el rótulo de la base, que va por encima del hueco.
+  const paso = pasoBonito(maxBase * 1.14);
+  const maxV = Math.ceil((maxBase * 1.14) / paso) * paso;
+  const bandW = e.plotW / n;
+  const barW = Math.min(58, Math.max(8, bandW * 0.44));
+  const xCenter = (i: number) => e.padL + bandW * i + bandW / 2;
+  const alto = (v: number) => (v / maxV) * e.plotH;
+  const rotarNombres = n > 6;
+  const conUnidad = (v: number) => `${v} ${v === 1 ? unidadLograda.replace(/s$/, "") : unidadLograda}`;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet" role="img">
+      <Rejilla e={e} max={maxV} ticks={Math.round(maxV / paso)} />
+
+      {filas.map((f, i) => {
+        // Sin base no hay tasa: dividir por cero daría Infinity y una barra fuera
+        // del lienzo.
+        const pct = f.base > 0 ? (f.logrado / f.base) * 100 : null;
+        const hHueco = f.base > 0 ? Math.max(alto(f.base), 3) : 0;
+        const hLleno = f.logrado > 0 ? Math.min(Math.max(alto(f.logrado), 2), hHueco) : 0;
+        const yHueco = e.baseline - hHueco;
+        const yLleno = e.baseline - hLleno;
+        // Las etiquetas van dentro del relleno si cabe; si el relleno es un dedo,
+        // saltan justo encima, donde caen sobre el gris del hueco.
+        const dentro = hLleno >= 34;
+        const cx = xCenter(i);
+        const tip =
+          `${f.nombre}\n` +
+          `${baseLabel}: ${f.base}\n` +
+          `${logradoLabel}: ${f.logrado}\n` +
+          `Tasa: ${pct === null ? "—" : `${Math.round(pct)} %`}`;
+        return (
+          <g key={f.id}>
+            {/* Zona de impacto a toda altura: el tooltip responde igual sobre el
+                hueco vacío que sobre el relleno. */}
+            <rect x={e.padL + bandW * i} y={PAD_T} width={bandW} height={e.plotH} fill="transparent">
+              <title>{tip}</title>
+            </rect>
+            {hHueco > 0 && (
+              <rect x={cx - barW / 2} y={yHueco} width={barW} height={hHueco} rx={3} fill={VIZ_TRACK_VAR}>
+                <title>{tip}</title>
+              </rect>
+            )}
+            {hLleno > 0 && (
+              <rect x={cx - barW / 2} y={yLleno} width={barW} height={hLleno} rx={3} fill={color}>
+                <title>{tip}</title>
+              </rect>
+            )}
+
+            {/* La base, en cantidad, coronando la barra. */}
+            {f.base > 0 && (
+              <text x={cx} y={yHueco - 6} textAnchor="middle" className="fill-slate-700 dark:fill-slate-200 tabular-nums" style={{ fontSize: 11, fontWeight: 700 }}>
+                {f.base}
+              </text>
+            )}
+            <text
+              x={cx}
+              y={dentro ? yLleno + 17 : yLleno - 16}
+              textAnchor="middle"
+              className={`tabular-nums ${dentro ? "fill-white" : "fill-slate-700 dark:fill-slate-200"}`}
+              style={{ fontSize: 11, fontWeight: 700 }}
+            >
+              {pct === null ? "—" : `${Math.round(pct)} %`}
+            </text>
+            <text
+              x={cx}
+              y={dentro ? yLleno + 30 : yLleno - 5}
+              textAnchor="middle"
+              fillOpacity={dentro ? 0.85 : 1}
+              className={`tabular-nums ${dentro ? "fill-white" : "fill-slate-500 dark:fill-slate-300"}`}
+              style={{ fontSize: 9, fontWeight: 600 }}
+            >
+              {conUnidad(f.logrado)}
+            </text>
+
+            <text
+              x={cx}
+              y={e.baseline + (rotarNombres ? 12 : 14)}
+              textAnchor={rotarNombres ? "end" : "middle"}
+              transform={rotarNombres ? `rotate(-38 ${cx} ${e.baseline + 12})` : undefined}
+              className="fill-slate-500 dark:fill-slate-400"
+              style={{ fontSize: 9 }}
+            >
+              {corta(f.nombre, rotarNombres ? 18 : 14)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6 · Dona
 // ---------------------------------------------------------------------------
 
 export interface SegmentoDona {
