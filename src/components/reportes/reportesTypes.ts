@@ -488,19 +488,17 @@ export function agendaEnRango(p: Prospect, rango: RangoAgendas): boolean {
 }
 
 /**
- * Una agenda está CERRADA cuando su proyecto llegó a «Cerrada Ganada»
- * (`firma_programada`).
+ * Financiamiento otorgado: lo que cierra de verdad.
  *
- * Cuenta también «Pagada Cerrada» (`pagado_comision`), que es el paso siguiente y
- * no otra cosa: mirar solo el primero haría desaparecer el cierre del informe el
- * día que se libera la comisión, y la tasa de un AM bajaría justo por cobrar. Es
- * el mismo criterio con el que el resto de la app agrupa ambos estados en
- * «Fin. Otorgado» (`FIN_OTORGADO_STAGE`).
+ * Son los dos estados que la app agrupa en esa etapa (`FIN_OTORGADO_STAGE`) —
+ * «Cerrada Ganada» (`firma_programada`) y «Pagada Cerrada» (`pagado_comision`)—.
+ * Mirar solo el primero haría desaparecer el cierre del informe el día que se
+ * libera la comisión, y la tasa de un AM bajaría justo por cobrar.
+ *
+ * Es exactamente la tarjeta «Fin. Otorgado» de la cabecera: el reporte de cierre
+ * no puede medir con una vara distinta a la que Dirección ya lee arriba.
  */
-export const esAgendaCerrada = (p: Prospect): boolean => METRICAS.otorgados.match(p);
-
-/** Cerrada ganada con la comisión ya liberada: subconjunto de `esAgendaCerrada`. */
-export const esAgendaPagada = (p: Prospect): boolean => p.status === "pagado_comision";
+export const esFinOtorgado = (p: Prospect): boolean => METRICAS.otorgados.match(p);
 
 /** Día corto para los rótulos de rango: '2026-08-09' → '9 ago'. */
 export function diaLabel(iso: string): string {

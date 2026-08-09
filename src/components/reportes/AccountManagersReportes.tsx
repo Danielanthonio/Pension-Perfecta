@@ -8,7 +8,7 @@
 //   3. Estados por AM        — línea de tiempo clicable arriba, barras abajo.
 //   4. AM x Estados (grupo)  — barras agrupadas, todas las métricas a la vez.
 //   5. AM «Agendas»          — asesorías del mes contra la meta que fija Dirección.
-//   6. Cierre de agendas     — de esas asesorías, cuántas acabaron en Cerrada Ganada.
+//   6. Cierre de agendas     — financiamientos otorgados contra las agendas del rango.
 //   7. Sub estados           — panel compartido con la pestaña ALIADOS.
 //
 // El AM del proyecto vive en `prospects.account_manager_id`, no en el aliado
@@ -64,8 +64,7 @@ import {
   construyeCubos,
   diaDeCita,
   diaLabel,
-  esAgendaCerrada,
-  esAgendaPagada,
+  esFinOtorgado,
   fmtNum,
   fmtPct,
   mesDe,
@@ -312,45 +311,58 @@ export function AccountManagersReportes({
   // haría que la tasa global no cuadrara con la suma de las barras. Solo se cae
   // del gráfico quien no tenga NINGUNA agenda en el rango — una barra a cero no
   // dice «cierra mal», dice «no tenía nada que cerrar».
-  const filasCierre = useMemo(
-    () =>
-      gruposAgenda
-        .map((g) => {
-          const agendas = g.items.filter((p) => agendaEnRango(p, rangoCierre));
-          const cerradas = agendas.filter(esAgendaCerrada);
-          // «Rechazado» va aparte de «Cerrado Perdido»: `isLostStatus` NO lo
-          // incluye, así que sumarlo a las perdidas sería mentir y dejarlo fuera
-          // lo metería en «en proceso», que es justo lo que no está.
-          const perdidas = agendas.filter(METRICAS.perdidos.match).length;
-          const rechazadas = agendas.filter(METRICAS.rechazados.match).length;
-          return {
-            id: g.id,
-            nombre: g.nombre,
-            base: agendas.length,
-            logrado: cerradas.length,
-            pagadas: cerradas.filter(esAgendaPagada).length,
-            perdidas,
-            rechazadas,
-            // Lo que ni se ganó ni se cayó: sigue vivo en el pipeline.
-            enProceso: agendas.length - cerradas.length - perdidas - rechazadas,
-          };
-        })
-        .filter((f) => f.base > 0)
-        // Por TASA, que es lo que dibuja el relleno de la barra. El empate lo
-        // rompe el volumen: entre dos al 50 %, delante quien cerró sobre más.
-        .sort((a, b) => b.logrado / b.base - a.logrado / a.base || b.base - a.base),
-    [gruposAgenda, rangoCierre]
-  );
+  // ⚠️ Los dos lados de la comparación NO salen de la misma lista, y es a
+  // propósito:
+  //
+  //   · Las AGENDAS salen de la cartera entera acotada por la fecha de la
+  //     REUNIÓN (`gruposAgenda`), igual que el panel de arriba.
+  //   · Los OTORGADOS salen de `grupos`, o sea de la misma lista y con la misma
+  //     regla de fecha que el resto de la pestaña. Es, cifra por cifra, la
+  //     tarjeta «Fin. Otorgado» de la cabecera.
+  //
+  // Exigir que el otorgado viniera de una agenda del rango era lo que rompía el
+  // número: de los 10 otorgados de producción, 8 no tienen asesoría registrada
+  // —el campo es de finales de julio de 2026 y casi ningún expediente pasó por
+  // él—, así que el panel enseñaba 2. Dirección mide el financiamiento otorgado
+  // contra las agendas, no el subconjunto que casualmente tiene las dos cosas.
+  //
+  // Consecuencia asumida: la tasa puede pasar del 100 % cuando un AM otorga más
+  // de lo que registró en agenda. El rótulo lo dice y la nota del panel lo
+  // explica; taparlo escondería justo lo que hay que arreglar en la captura.
+  const filasCierre = useMemo(() => {
+    const agendasPorAM = new Map(
+      gruposAgenda.map((g) => [g.id, { nombre: g.nombre, n: g.items.filter((p) => agendaEnRango(p, rangoCierre)).length }])
+    );
+    const otorgadosPorAM = new Map(
+      grupos.map((g) => [g.id, { nombre: g.nombre, n: g.items.filter(esFinOtorgado).length }])
+    );
+    // Unión de las dos listas: un AM con otorgados y sin agendas registradas
+    // tiene que salir igual — es precisamente el caso que hay que ver.
+    const ids = new Set([...agendasPorAM.keys(), ...otorgadosPorAM.keys()]);
+    return Array.from(ids)
+      .map((id) => ({
+        id,
+        nombre: agendasPorAM.get(id)?.nombre || otorgadosPorAM.get(id)?.nombre || "Account Manager",
+        base: agendasPorAM.get(id)?.n ?? 0,
+        logrado: otorgadosPorAM.get(id)?.n ?? 0,
+      }))
+      .filter((f) => f.base > 0 || f.logrado > 0)
+      // Por TASA, que es lo que dibuja el relleno de la barra. Sin agendas no hay
+      // tasa que ordenar (−1): esas filas van al final. El empate lo rompe el
+      // volumen de agendas.
+      .sort((a, b) => {
+        const ta = a.base > 0 ? a.logrado / a.base : -1;
+        const tb = b.base > 0 ? b.logrado / b.base : -1;
+        return tb - ta || b.base - a.base;
+      });
+  }, [gruposAgenda, grupos, rangoCierre]);
 
   // El CSV lee de aquí y no recalcula, igual que en el panel de agendas.
   const cierrePorAM = useMemo(() => new Map(filasCierre.map((f) => [f.id, f])), [filasCierre]);
 
   const totAgendasCierre = filasCierre.reduce((s, f) => s + f.base, 0);
-  const totCerradas = filasCierre.reduce((s, f) => s + f.logrado, 0);
-  const totEnProceso = filasCierre.reduce((s, f) => s + f.enProceso, 0);
-  const totPerdidasAgenda = filasCierre.reduce((s, f) => s + f.perdidas, 0);
-  const totRechazadasAgenda = filasCierre.reduce((s, f) => s + f.rechazadas, 0);
-  const tasaCierreAgendas = totAgendasCierre > 0 ? (totCerradas / totAgendasCierre) * 100 : null;
+  const totOtorgados = filasCierre.reduce((s, f) => s + f.logrado, 0);
+  const tasaCierreAgendas = totAgendasCierre > 0 ? (totOtorgados / totAgendasCierre) * 100 : null;
 
   // ── Filtro por AM ──────────────────────────────────────────────────────────
   const amDisponibles = useMemo(() => {
@@ -394,11 +406,9 @@ export function AccountManagersReportes({
         `Meta de agendas ${periodo}`,
         "Objetivo de agendas a la fecha",
         `Agendas del ${ventana.desde} al ${ventana.hasta}`,
+        // El otorgado ya va arriba, en las columnas del ranking: repetirlo aquí
+        // solo invitaría a que alguien encontrara dos cifras y dudara de las dos.
         `Agendas del rango (${rangoCierre.desde || "inicio"} al ${rangoCierre.hasta})`,
-        "Cerradas ganadas",
-        "En proceso",
-        "Perdidas",
-        "Rechazadas",
         "Tasa de cierre de agendas %",
       ],
     ];
@@ -419,11 +429,7 @@ export function AccountManagersReportes({
         esperadoPorAM.get(r.id) ?? 0,
         agendasPorAM.get(r.id) ?? 0,
         c?.base ?? 0,
-        c?.logrado ?? 0,
-        c?.enProceso ?? 0,
-        c?.perdidas ?? 0,
-        c?.rechazadas ?? 0,
-        // Sin agendas no hay tasa: un 0,0 se leería como "no cerró ninguna".
+        // Sin agendas no hay tasa: un 0,0 se leería como "no otorgó nada".
         c && c.base > 0 ? ((c.logrado / c.base) * 100).toFixed(1) : "",
       ]);
     });
@@ -739,50 +745,50 @@ export function AccountManagersReportes({
               <>El rango elegido empieza después de hoy: todavía no hay asesorías celebradas que medir.</>
             ) : rangoCierre.desde ? (
               <>
-                Asesorías con reunión del <strong>{diaLabel(rangoCierre.desde)}</strong> al{" "}
-                <strong>{diaLabel(rangoCierre.hasta)}</strong> y cuántas de ellas acabaron en Cerrada Ganada.
+                Financiamientos otorgados contra las asesorías celebradas del{" "}
+                <strong>{diaLabel(rangoCierre.desde)}</strong> al <strong>{diaLabel(rangoCierre.hasta)}</strong>.
               </>
             ) : (
               <>
-                Todas las asesorías celebradas hasta el <strong>{diaLabel(rangoCierre.hasta)}</strong> y cuántas de ellas
-                acabaron en Cerrada Ganada.
+                Financiamientos otorgados contra todas las asesorías celebradas hasta el{" "}
+                <strong>{diaLabel(rangoCierre.hasta)}</strong>.
               </>
             )
           }
         >
           <div className="flex flex-wrap items-center gap-2">
             <ChipTasa label="Agendas" value={fmtNum(totAgendasCierre, 0)} tone="sky" />
-            <ChipTasa label="Cerradas ganadas" value={fmtNum(totCerradas, 0)} tone="teal" />
+            <ChipTasa label="Fin. Otorgado" value={fmtNum(totOtorgados, 0)} tone="teal" />
             <ChipTasa
               label="Tasa de cierre"
               value={tasaCierreAgendas === null ? "—" : `${Math.round(tasaCierreAgendas)} %`}
               tone="teal"
             />
-            <ChipTasa label="En proceso" value={fmtNum(totEnProceso, 0)} tone="amber" />
           </div>
         </PanelHeader>
 
         {filasCierre.length === 0 ? (
-          <Vacio>No hay asesorías celebradas en el rango con los filtros activos.</Vacio>
+          <Vacio>No hay asesorías celebradas ni financiamientos otorgados en el rango con los filtros activos.</Vacio>
         ) : (
           <>
             <ConversionChart
               filas={filasCierre}
               baseLabel="Agendas del rango"
-              logradoLabel="Cerradas ganadas"
-              unidadLograda="cerradas"
+              logradoLabel="Fin. Otorgado"
+              unidadLograda="otorgados"
             />
             <Leyenda
               series={[
                 { id: "agendas", label: "Agendas del rango (la barra entera)", color: VIZ_TRACK_VAR, total: totAgendasCierre },
-                { id: "cerradas", label: "Cerradas ganadas", color: "var(--rp-6)", total: totCerradas },
+                { id: "otorgados", label: "Financiamiento otorgado", color: "var(--rp-6)", total: totOtorgados },
               ]}
             />
             <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              La barra entera son las agendas del rango —su cantidad va rotulada encima— y el relleno, las que llegaron a
-              Cerrada Ganada; dentro va la tasa. Una agenda cuenta el día de la reunión, y «Pagada Cerrada» cuenta como
-              cerrada: es el paso siguiente al cierre, no otra cosa. El orden es por tasa, así que conviene mirar también
-              la altura de la barra: cerrar 1 de 1 es 100 % y no es lo mismo que 20 de 50.
+              La barra entera son las agendas del rango —su cantidad va rotulada encima— y el relleno, los
+              financiamientos otorgados; dentro va la tasa. Otorgado son «Cerrada Ganada» y «Pagada Cerrada», los dos
+              estados de esa etapa: la segunda es el paso siguiente al cierre, no otra cosa. La agenda cuenta por el día
+              de la reunión y el otorgado por la misma regla de fecha que el resto de la pestaña, así que un AM puede
+              pasar del 100 %: significa que otorgó más de lo que tiene registrado en agenda.
             </p>
 
             <div className="rounded-xl border border-slate-200/70 dark:border-slate-800 overflow-hidden">
@@ -791,22 +797,14 @@ export function AccountManagersReportes({
                   Cierre de agendas por Account Manager
                 </h4>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                  Cerradas + En proceso + Perdidas + Rechazadas suman las agendas del rango.
+                  «Fin. Otorgado» es la misma cifra que la tarjeta de la cabecera, repartida por Account Manager.
                 </p>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs min-w-[700px]">
+                <table className="w-full text-xs min-w-[520px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
-                      {[
-                        "Account Manager",
-                        "Agendas",
-                        "Cerradas ganadas",
-                        "En proceso",
-                        "Perdidas",
-                        "Rechazadas",
-                        "Tasa de cierre",
-                      ].map((h, i) => (
+                      {["Account Manager", "Agendas", "Fin. Otorgado", "Tasa de cierre"].map((h, i) => (
                         <th
                           key={h}
                           className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 ${
@@ -820,50 +818,47 @@ export function AccountManagersReportes({
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                     {filasCierre.map((f) => {
-                      const tasa = (f.logrado / f.base) * 100;
+                      const tasa = f.base > 0 ? (f.logrado / f.base) * 100 : null;
                       return (
                         <tr key={f.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
                           <td className="px-4 py-2 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[220px]">
                             {f.nombre}
                           </td>
                           <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{f.base}</td>
-                          <td
-                            className="px-4 py-2 text-right font-bold tabular-nums text-slate-900 dark:text-white"
-                            title={`${f.pagadas} de ellas con la comisión ya pagada`}
-                          >
+                          <td className="px-4 py-2 text-right font-bold tabular-nums text-slate-900 dark:text-white">
                             {f.logrado}
                           </td>
-                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
-                            {f.enProceso}
-                          </td>
-                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
-                            {f.perdidas}
-                          </td>
-                          <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
-                            {f.rechazadas}
-                          </td>
                           <td className="px-4 py-2 text-right">
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tabular-nums bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400"
-                              title={`${f.logrado} de ${f.base} agendas`}
-                            >
-                              {tasa.toFixed(0)} %
-                            </span>
+                            {tasa === null ? (
+                              <span className="text-slate-400 dark:text-slate-500">Sin agendas</span>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                                  tasa > 100
+                                    ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
+                                    : "bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400"
+                                }`}
+                                title={
+                                  tasa > 100
+                                    ? `${f.logrado} otorgados sobre ${f.base} agendas registradas: hay otorgados sin asesoría capturada`
+                                    : `${f.logrado} de ${f.base} agendas`
+                                }
+                              >
+                                {tasa.toFixed(0)} %
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  {/* Los totales van aquí y no en más chips de cabecera: es donde se
-                      comprueba que las cuatro columnas suman las agendas. */}
+                  {/* Los totales van aquí y no en otro chip de cabecera: es donde se
+                      comprueba que la tasa global sale de estas dos columnas. */}
                   <tfoot>
                     <tr className="border-t border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 font-bold text-slate-700 dark:text-slate-200">
                       <td className="px-4 py-2">Total</td>
                       <td className="px-4 py-2 text-right tabular-nums">{totAgendasCierre}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{totCerradas}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{totEnProceso}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{totPerdidasAgenda}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{totRechazadasAgenda}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{totOtorgados}</td>
                       <td className="px-4 py-2 text-right tabular-nums">
                         {tasaCierreAgendas === null ? "—" : `${tasaCierreAgendas.toFixed(0)} %`}
                       </td>

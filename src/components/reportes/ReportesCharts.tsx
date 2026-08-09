@@ -647,9 +647,9 @@ export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: Fila
 export interface FilaConversion {
   id: string;
   nombre: string;
-  /** El universo que se mide —las agendas del rango—: la barra entera. */
+  /** El universo contra el que se mide —las agendas del rango—: la barra entera. */
   base: number;
-  /** Cuántas de esas llegaron al final —las cerradas ganadas—: el relleno. */
+  /** Lo conseguido —los financiamientos otorgados—: el relleno. */
   logrado: number;
 }
 
@@ -663,6 +663,13 @@ export interface FilaConversion {
  * altura del relleno entre entidades y la fracción que ocupa en su propia barra;
  * como la barra entera ES la base, un 100 % sobre dos agendas se ve enseguida
  * pequeño al lado de un 40 % sobre cincuenta.
+ *
+ * Los dos lados NO tienen por qué ser el mismo conjunto —otorgados contra
+ * agendas registradas—, así que el relleno PUEDE pasarse de la base. Cuando eso
+ * ocurre la barra se queda llena y el rótulo canta la tasa real (150 %), igual
+ * que hace `AvanceObjetivoChart` al superar el objetivo. Y si no hay base, se
+ * dibuja solo el relleno: sin denominador no hay vaso que llenar, pero la
+ * cantidad sigue siendo verdad y esconderla sería peor.
  */
 export function ConversionChart({
   filas,
@@ -683,7 +690,10 @@ export function ConversionChart({
   if (n === 0) return <Vacio>No hay entidades que medir en el período.</Vacio>;
 
   const e = ejes(46, 16, 62);
-  const maxBase = Math.max(1, ...filas.map((f) => f.base));
+  // El eje lo manda la base, que es el tope de cada barra. Solo cuenta el
+  // `logrado` de quien no tiene base: ahí el relleno se dibuja a su altura real y
+  // si no se midiera, se saldría del lienzo.
+  const maxBase = Math.max(1, ...filas.map((f) => (f.base > 0 ? f.base : f.logrado)));
   // El 1,14 deja aire para el rótulo de la base, que va por encima del hueco.
   const paso = pasoBonito(maxBase * 1.14);
   const maxV = Math.ceil((maxBase * 1.14) / paso) * paso;
@@ -699,11 +709,14 @@ export function ConversionChart({
       <Rejilla e={e} max={maxV} ticks={Math.round(maxV / paso)} />
 
       {filas.map((f, i) => {
-        // Sin base no hay tasa: dividir por cero daría Infinity y una barra fuera
-        // del lienzo.
+        // Sin base no hay tasa: dividir por cero daría Infinity y un rótulo que no
+        // significa nada.
         const pct = f.base > 0 ? (f.logrado / f.base) * 100 : null;
         const hHueco = f.base > 0 ? Math.max(alto(f.base), 3) : 0;
-        const hLleno = f.logrado > 0 ? Math.min(Math.max(alto(f.logrado), 2), hHueco) : 0;
+        // El relleno se topa en el hueco cuando lo hay —pasarse deja la barra
+        // llena y el porcentaje lo dice—; sin hueco va a su altura real.
+        const hCrudo = f.logrado > 0 ? Math.max(alto(f.logrado), 2) : 0;
+        const hLleno = f.base > 0 ? Math.min(hCrudo, hHueco) : hCrudo;
         const yHueco = e.baseline - hHueco;
         const yLleno = e.baseline - hLleno;
         // Las etiquetas van dentro del relleno si cabe; si el relleno es un dedo,
@@ -733,9 +746,18 @@ export function ConversionChart({
               </rect>
             )}
 
-            {/* La base, en cantidad, coronando la barra. */}
+            {/* La base, en cantidad, coronando la barra. Cuando el relleno llega
+                arriba —100 % o más— y no cabe dentro, sus rótulos salen justo
+                encima del hueco y se comerían este número: entonces se sube por
+                encima de ellos. */}
             {f.base > 0 && (
-              <text x={cx} y={yHueco - 6} textAnchor="middle" className="fill-slate-700 dark:fill-slate-200 tabular-nums" style={{ fontSize: 11, fontWeight: 700 }}>
+              <text
+                x={cx}
+                y={(dentro ? yHueco : Math.min(yHueco, yLleno - 24)) - 6}
+                textAnchor="middle"
+                className="fill-slate-700 dark:fill-slate-200 tabular-nums"
+                style={{ fontSize: 11, fontWeight: 700 }}
+              >
                 {f.base}
               </text>
             )}
@@ -746,7 +768,7 @@ export function ConversionChart({
               className={`tabular-nums ${dentro ? "fill-white" : "fill-slate-700 dark:fill-slate-200"}`}
               style={{ fontSize: 11, fontWeight: 700 }}
             >
-              {pct === null ? "—" : `${Math.round(pct)} %`}
+              {pct === null ? "Sin agendas" : `${Math.round(pct)} %`}
             </text>
             <text
               x={cx}
