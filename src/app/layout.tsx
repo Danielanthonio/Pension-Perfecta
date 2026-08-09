@@ -5,6 +5,7 @@ import { AppContextProvider } from "@/utils/context/AppContext";
 import ToastSimulator from "@/components/ToastSimulator";
 import GlobalChat from "@/components/GlobalChat";
 import BankingReminder from "@/components/BankingReminder";
+import ActividadTracker from "@/components/ActividadTracker";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,6 +29,9 @@ export default function RootLayout({
           {/* Recordatorio de datos de cobro: una vez por inicio de sesión,
               mientras el usuario no tenga registrado cómo se le paga. */}
           <BankingReminder />
+          {/* Mide el tiempo y la actividad del Account Manager para el reporte
+              de gestión. No pinta nada y solo actúa para ese rol. */}
+          <ActividadTracker />
         </AppContextProvider>
       </body>
     </html>

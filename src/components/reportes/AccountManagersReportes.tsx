@@ -10,6 +10,7 @@
 //   5. AM «Agendas»          — asesorías del mes contra la meta que fija Dirección.
 //   6. Cierre de agendas     — financiamientos otorgados contra las agendas del rango.
 //   7. Sub estados           — panel compartido con la pestaña ALIADOS.
+//   8. Actividad             — tiempo dentro de la plataforma y qué hace ahí.
 //
 // El AM del proyecto vive en `prospects.account_manager_id`, no en el aliado
 // (ver [[project-am-por-proyecto]]): un proyecto sin AM es mesa de dirección y se
@@ -49,6 +50,7 @@ import {
   VIZ_TRACK_VAR,
 } from "./ReportesCharts";
 import { SubEstadosPanel } from "./SubEstadosPanel";
+import { ActividadAMPanel } from "./ActividadAMPanel";
 import { useObjetivosAM } from "./useObjetivosAM";
 import type { ReportesFilters } from "./reportesFilters";
 import {
@@ -877,6 +879,13 @@ export function AccountManagersReportes({
         profiles={profiles}
         subtitulo="Dónde están parados los proyectos de estos account managers. Toca una subetapa para desplegarlos."
       />
+
+      {/* ── 8 · Actividad en plataforma ───────────────────────────────────── */}
+      {/* Va al final y no arriba a propósito: todo lo anterior mide RESULTADO
+          (proyectos, agendas, cierres) y esto mide ESFUERZO. Puesto debajo, se
+          lee como la explicación de lo de arriba — por qué un AM cierra poco —
+          y no como un indicador de gestión por sí solo. */}
+      <ActividadAMPanel filters={filters} />
     </div>
   );
 }

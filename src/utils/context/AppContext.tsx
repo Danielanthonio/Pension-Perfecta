@@ -493,6 +493,12 @@ interface AppContextType {
     motivo?: string | null;
   }) => Promise<void>;
   auditoriaDeAliado: (aliadoId: string) => Promise<AliadoAuditoriaRow[]>;
+  // Actividad del Account Manager (migración 20260809000000). Las dos son
+  // silenciosas y no devuelven nada: alimentan el panel «Actividad en plataforma»
+  // de Reportes y JAMÁS pueden hacer fallar la acción que las dispara.
+  // Solo escriben para el rol account_manager; para el resto la base las ignora.
+  registrarActividad: (tipo: string, detalle?: string | null, entidadId?: string | null) => void;
+  latidoActividad: (activo: boolean) => void;
   updateProfileAdmin: (id: string, updates: Partial<Omit<UserProfile, "id" | "created_at">>) => Promise<void>;
   changeAllyType: (allyId: string, tipo: "aliado" | "lider", empresaMultialiadoId?: string | null) => Promise<void>;
   assignAllyToLider: (allyId: string, liderIds: string[]) => Promise<void>;
@@ -513,7 +519,11 @@ interface AppContextType {
 // ajustar el tiempo de inactividad permitido y el aviso previo.
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos hasta cerrar sesión
 const IDLE_WARNING_MS = 30 * 1000; // muestra el aviso 30s antes de cerrar
-const IDLE_ACTIVITY_KEY = "pensionflow_last_activity"; // timestamp compartido entre pestañas
+// Exportado: el vigilante de actividad (`components/ActividadTracker`) lo lee para
+// saber si el latido que va a mandar cuenta como tiempo ACTIVO o como pantalla
+// abierta sin tocar. Aprovecha el mismo timestamp que ya mantiene el cierre por
+// inactividad en vez de montar un segundo detector de eventos.
+export const IDLE_ACTIVITY_KEY = "pensionflow_last_activity"; // timestamp compartido entre pestañas
 
 // Historial closer↔aliado en modo demo. En producción vive en la tabla
 // `closer_aliado_asignaciones`; aquí se replica en localStorage para que la
@@ -1923,6 +1933,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     setProspects(updatedProspects);
     saveToStorage("pensionflow_prospects", updatedProspects);
 
+    registrarActividad("sube_documento", fileType, prospectId);
+
     return newDoc;
   };
 
@@ -1978,6 +1990,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
             return p;
           })
         );
+
+        registrarActividad("borra_documento", doc.file_type || doc.file_name, prospectId);
       } catch (err) {
         console.error("Error deleting document from DB:", err);
       }
@@ -2658,6 +2672,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           "Eduardo Director"
         );
 
+        registrarActividad("crea_proyecto", newProspect.full_name, newProspect.id);
+
         return newProspect;
       } catch (error) {
         console.error("Error adding prospect to Supabase:", error);
@@ -2830,6 +2846,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         setProspects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, notes_director: updatedNotes, updated_at: new Date().toISOString() } : p))
         );
+
+        registrarActividad("papelera", target.full_name, id);
 
         await supabase.from("notifications").insert({
           user_id: user?.id,
@@ -3025,6 +3043,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         setProspects((prev) =>
           prev.map((p) => (p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p))
         );
+
+        registrarActividad("edita_cliente", updates.full_name, id);
       } catch (err) {
         console.error("Error editing prospect personal data:", err);
         throw err;
@@ -3075,6 +3095,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
 
       setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
 
+      registrarActividad("reasigna", `Aliado → ${newAliado.full_name}`, id);
+
       if (target) {
         await supabase.from("notifications").insert({
           user_id: newAliadoId,
@@ -3117,6 +3139,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       if (error) throw error;
 
       setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
+      registrarActividad("reasigna", newAm ? `AM → ${newAm.full_name}` : "AM → mesa de dirección", id);
 
       if (newAmId) {
         await supabase.from("notifications").insert({
@@ -3223,6 +3247,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           )
         );
 
+        // Se anota la SUBETAPA, que es como la nombra el resto de la app; el
+        // `status` crudo no le dice nada a quien lee el reporte.
+        registrarActividad("cambia_etapa", getStageAndSubStage(newStatus).subStage || newStatus, id);
+
         const target = prospects.find((p) => p.id === id);
         if (target) {
           let notifTitle = "Actualización de Estatus";
@@ -3285,6 +3313,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       const { error } = await supabase.from("prospects").update({ modalidad }).eq("id", id);
       if (error) throw error;
       setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, modalidad } : p)));
+      registrarActividad("modalidad", `Modalidad ${modalidad}`, id);
     } catch (error) {
       console.error("Error updating prospect modalidad in Supabase:", error);
     }
@@ -3475,6 +3504,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           })
         );
 
+        registrarActividad("simulacion", newStatus === "aportacion" ? "Con aportación" : "Aprobado listo", id);
+
         const target = prospects.find((p) => p.id === id);
         if (target) {
           const notifTitle = newStatus === "aportacion" ? "Dictamen Emitido (Aportación) 💰" : "Dictamen Emitido (Aprobado) ✅";
@@ -3582,6 +3613,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               : p
           )
         );
+
+        registrarActividad("agenda_asesoria", date === "LeadConnector" ? "Vía LeadConnector" : `${date} ${time}`, id);
 
         const target = prospects.find((p) => p.id === id);
         if (target) {
@@ -4388,6 +4421,49 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       p_motivo: input.motivo ?? null,
     });
     if (error) console.warn("No se pudo registrar en la auditoría del aliado:", error);
+  };
+
+  // ── Actividad del Account Manager ────────────────────────────────────────────
+  // Medición de esfuerzo, no de resultado: cuánto tiempo está el AM dentro de la
+  // plataforma y qué hace mientras. Lo lee el panel «Actividad en plataforma» del
+  // reporte de Account Manager (migración 20260809000000).
+  //
+  // Tres reglas que no se negocian:
+  //   1. NUNCA rompen lo que las dispara. Son `void` y se tragan el error: si la
+  //      bitácora falla, el cambio de etapa ya ocurrió y lo único que se pierde
+  //      es el renglón del registro.
+  //   2. NUNCA se esperan. Se llaman sin `await` para no meter un viaje de red en
+  //      medio de una acción del usuario.
+  //   3. El tiempo lo pone el servidor. Aquí solo se dice "estoy" o "hice esto";
+  //      la duración, el reloj y su tope viven en Postgres.
+  const puedeRegistrarActividad = () =>
+    !isDemoMode && !isProvisionalSession && !!supabase && user?.role === "account_manager";
+
+  const llamadaActividad = async (rpc: string, params: Record<string, unknown>, queja: string) => {
+    try {
+      const { error } = await supabase!.rpc(rpc, params);
+      if (error) console.warn(queja, error.message);
+    } catch (e) {
+      console.warn(queja, e);
+    }
+  };
+
+  const registrarActividad = (tipo: string, detalle?: string | null, entidadId?: string | null): void => {
+    if (!puedeRegistrarActividad()) return;
+    void llamadaActividad(
+      "actividad_registrar",
+      { p_tipo: tipo, p_detalle: detalle ?? null, p_entidad: entidadId ?? null },
+      "No se pudo registrar la actividad:"
+    );
+  };
+
+  const latidoActividad = (activo: boolean): void => {
+    if (!puedeRegistrarActividad()) return;
+    void llamadaActividad(
+      "actividad_latido",
+      { p_activo: activo },
+      "No se pudo registrar el latido de actividad:"
+    );
   };
 
   const credencialesAliado = async (
@@ -5397,6 +5473,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         credencialesAliado,
         registrarAuditoriaAliado,
         auditoriaDeAliado,
+        registrarActividad,
+        latidoActividad,
         updateProfileAdmin,
         changeAllyType,
         assignAllyToLider,
