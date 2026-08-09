@@ -1,10 +1,23 @@
 "use client";
 
+// Módulo Reportes.
+//
+// Desde el 2026-08-08 la página es un contenedor con botonera de ROL: cada
+// pestaña es un tablero de gestión distinto (ALIADOS, ACCOUNT MANAGER, CLOSER),
+// más el panorama GENERAL que ya existía y que no se toca.
+//
+// El reparto de responsabilidades:
+//   · GENERAL  — embudo comercial, ingreso de proyectos y cola de finanzas. Vive
+//                aquí porque es de siempre y no tiene dueño de rol.
+//   · ALIADOS / ACCOUNT MANAGER — en `@/components/reportes`, calculados en el
+//                navegador sobre `prospects` (que el contexto ya recorta por rol).
+//   · CLOSER   — el tablero del módulo Closers, embebido. Sus métricas se agregan
+//                en Postgres y no se reimplementan aquí.
+
 import React, { useState, useMemo, Suspense } from "react";
 import {
   useApp,
   Prospect,
-  UserProfile,
   isLostStatus,
 } from "@/utils/context/AppContext";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
@@ -12,7 +25,6 @@ import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter }
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
 import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "../_pipelineBuckets";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Users,
@@ -26,7 +38,17 @@ import {
   Landmark,
   ArrowRight,
   TrendingUp,
+  Target,
+  Briefcase,
+  LayoutDashboard,
 } from "lucide-react";
+import { AliadosReportes } from "@/components/reportes/AliadosReportes";
+import { AccountManagersReportes } from "@/components/reportes/AccountManagersReportes";
+import { ClosersReportes } from "@/components/reportes/ClosersReportes";
+import { ReportesFiltroBar } from "@/components/reportes/ReportesFiltroBar";
+import { Donut, DonutLegend, REPORTES_VIZ_STYLE } from "@/components/reportes/ReportesCharts";
+import { useReportesFilters, type ReportesFilters } from "@/components/reportes/reportesFilters";
+import { type RolReporte, ROL_LABEL } from "@/components/reportes/reportesTypes";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCurrency = (v: number) =>
@@ -34,78 +56,13 @@ const fmtCurrency = (v: number) =>
 const financiamientoOf = (p: Prospect) => p.simulation?.totalCredito || p.simulation?.financiamiento || 0;
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-// Variables CSS de color para los charts (categóricas validadas, alternan en .dark).
+// Variables CSS de color para los charts del panel GENERAL (categóricas validadas,
+// alternan en .dark). Las pestañas por rol traen su propia paleta (`--rp-*`).
 const VIZ_STYLE = `
 .viz-root{--cat-1:#2a78d6;--cat-2:#008300;--cat-3:#e87ba4;--cat-4:#eda100;--cat-muted:#94a3b8;}
 .dark .viz-root{--cat-1:#3987e5;--cat-3:#d55181;--cat-4:#c98500;--cat-muted:#64748b;}
 `;
 const CAT_VARS = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--cat-4)"];
-
-// ── Dona SVG (segmentos con separación + total al centro) ─────────────────────
-function Donut({ segments, centerTop, centerBottom, size = 176 }: {
-  segments: { label: string; value: number; color: string }[];
-  centerTop: string;
-  centerBottom: string;
-  size?: number;
-}) {
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  const r = 60;
-  const C = 2 * Math.PI * r;
-  let acc = 0;
-  return (
-    <svg viewBox="0 0 160 160" width={size} height={size} className="shrink-0">
-      <circle cx="80" cy="80" r={r} fill="none" stroke="currentColor" strokeWidth="20" className="text-slate-100 dark:text-slate-800" />
-      {total > 0 &&
-        segments.map((s, i) => {
-          const frac = s.value / total;
-          const visible = Math.max(frac * C - 2, 0.001);
-          const el = (
-            <circle
-              key={i}
-              cx="80"
-              cy="80"
-              r={r}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="20"
-              strokeDasharray={`${visible} ${C - visible}`}
-              strokeDashoffset={-acc * C}
-              transform="rotate(-90 80 80)"
-              strokeLinecap="butt"
-            >
-              <title>{`${s.label}: ${s.value} (${((frac) * 100).toFixed(1)}%)`}</title>
-            </circle>
-          );
-          acc += frac;
-          return el;
-        })}
-      <text x="80" y="74" textAnchor="middle" className="fill-slate-900 dark:fill-white" style={{ fontSize: 22, fontWeight: 700 }}>
-        {centerTop}
-      </text>
-      <text x="80" y="92" textAnchor="middle" className="fill-slate-400 dark:fill-slate-500" style={{ fontSize: 9, fontWeight: 600, letterSpacing: 0.5 }}>
-        {centerBottom}
-      </text>
-    </svg>
-  );
-}
-
-function DonutLegend({ segments, total }: { segments: { label: string; value: number; color: string }[]; total: number }) {
-  return (
-    <ul className="space-y-2 min-w-0 flex-1">
-      {segments.map((s) => (
-        <li key={s.label} className="flex items-center gap-2 text-[11px]">
-          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-          <span className="font-medium text-slate-600 dark:text-slate-300 truncate flex-1" title={s.label}>{s.label}</span>
-          <span className="font-bold tabular-nums text-slate-800 dark:text-slate-100">{s.value}</span>
-          <span className="tabular-nums text-slate-400 dark:text-slate-500 w-12 text-right">
-            {total > 0 ? ((s.value / total) * 100).toFixed(1) : "0.0"}%
-          </span>
-        </li>
-      ))}
-      {segments.length === 0 && <li className="text-[11px] text-slate-400 dark:text-slate-500">Sin datos.</li>}
-    </ul>
-  );
-}
 
 // ── Área SVG (serie temporal de proyectos ingresados) ─────────────────────────
 function AreaChart({ points }: { points: { label: string; value: number; full: string }[] }) {
@@ -159,14 +116,13 @@ function AreaChart({ points }: { points: { label: string; value: number; full: s
   );
 }
 
-// ── Página ───────────────────────────────────────────────────────────────────
-function ReportesContent() {
+// ── Panel GENERAL (el reporte de siempre) ────────────────────────────────────
+function GeneralPanel({ filters }: { filters: ReportesFilters }) {
   const { user, prospects, profiles, isProspectDeleted, isProspectPurged } = useApp();
   const isAM = user?.role === "account_manager";
-  const searchParams = useSearchParams();
 
-  const startDate = searchParams.get("desde") || "";
-  const endDate = searchParams.get("hasta") || "";
+  const startDate = filters.desde;
+  const endDate = filters.hasta;
 
   const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
   const [modalidadFilter, setModalidadFilter] = useState<ModalidadFilterValue>("all");
@@ -364,26 +320,11 @@ function ReportesContent() {
     `px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${active ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`;
 
   return (
-    <div className="viz-root space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
-      <style>{VIZ_STYLE}</style>
-
-      {/* Encabezado + acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-2">
-            <FileBarChart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
-            Reportes
-          </h2>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Panorama del embudo, ingreso de proyectos y estado de cierre / finanzas.</p>
-        </div>
-        <div className="flex items-center gap-2 print:hidden shrink-0">
-          <button onClick={exportCsv} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95">
-            <Download className="h-4 w-4" strokeWidth={2.4} /> Exportar CSV
-          </button>
-          <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95">
-            <Printer className="h-4 w-4" strokeWidth={2.4} /> Imprimir
-          </button>
-        </div>
+    <div className="space-y-5">
+      <div className="flex justify-end print:hidden">
+        <button onClick={exportCsv} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95">
+          <Download className="h-4 w-4" strokeWidth={2.4} /> Exportar CSV
+        </button>
       </div>
 
       {/* Filtros */}
@@ -607,6 +548,104 @@ function ReportesContent() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Botonera de rol ──────────────────────────────────────────────────────────
+// Los colores son los del boceto: aliados verde, account manager azul, closer
+// ámbar. El general se queda en gris porque no es un rol, es el panorama.
+const TABS: { id: RolReporte; Icon: typeof Users; activo: string; inactivo: string }[] = [
+  {
+    id: "general",
+    Icon: LayoutDashboard,
+    activo: "bg-slate-700 dark:bg-slate-600 text-white border-slate-700 dark:border-slate-600 shadow-md",
+    inactivo: "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500",
+  },
+  {
+    id: "aliados",
+    Icon: Users,
+    activo: "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20",
+    inactivo: "bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 hover:border-emerald-400",
+  },
+  {
+    id: "account_managers",
+    Icon: Briefcase,
+    activo: "bg-blue-500 text-white border-blue-500 shadow-md shadow-blue-500/20",
+    inactivo: "bg-blue-50/60 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:border-blue-400",
+  },
+  {
+    id: "closers",
+    Icon: Target,
+    activo: "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20",
+    inactivo: "bg-amber-50/60 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:border-amber-400",
+  },
+];
+
+// ── Página ───────────────────────────────────────────────────────────────────
+function ReportesContent() {
+  const { user } = useApp();
+  const { filters, setFilters, qs } = useReportesFilters();
+  const isAM = user?.role === "account_manager";
+
+  // El tablero de closers es de Dirección: mide captación, que no es operación de
+  // un AM, y su RLS tampoco le daría los datos. Se le quita la pestaña entera en
+  // vez de enseñarle una vacía.
+  const tabs = useMemo(() => (isAM ? TABS.filter((t) => t.id !== "closers") : TABS), [isAM]);
+  const rol: RolReporte = tabs.some((t) => t.id === filters.rol) ? filters.rol : "general";
+  const conFiltroBar = rol === "aliados" || rol === "account_managers";
+
+  return (
+    <div className="viz-root reportes-viz closers-viz space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
+      <style>{VIZ_STYLE + REPORTES_VIZ_STYLE}</style>
+
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-2">
+            <FileBarChart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
+            Reportes
+          </h2>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+            Reportes de gestión por rol. Elige a quién quieres medir.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 print:hidden shrink-0">
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
+          >
+            <Printer className="h-4 w-4" strokeWidth={2.4} /> Imprimir
+          </button>
+        </div>
+      </div>
+
+      {/* Botonera de rol */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:hidden">
+        {tabs.map(({ id, Icon, activo, inactivo }) => {
+          const on = rol === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setFilters({ rol: id })}
+              aria-pressed={on}
+              className={`rounded-2xl border-2 px-4 py-3.5 flex items-center justify-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] transition-all active:scale-[0.98] ${
+                on ? activo : inactivo
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" strokeWidth={2.4} />
+              <span className="truncate">{ROL_LABEL[id]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {conFiltroBar && <ReportesFiltroBar filters={filters} setFilters={setFilters} />}
+
+      {rol === "general" && <GeneralPanel filters={filters} />}
+      {rol === "aliados" && <AliadosReportes filters={filters} setFilters={setFilters} />}
+      {rol === "account_managers" && <AccountManagersReportes filters={filters} setFilters={setFilters} />}
+      {rol === "closers" && <ClosersReportes qs={qs} />}
     </div>
   );
 }
