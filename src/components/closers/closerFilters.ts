@@ -23,6 +23,9 @@ const PRESETS: RangoPreset[] = [
   "7d",
   "30d",
   "mes_actual",
+  // No tiene botón en el módulo Closers, pero sí se valida: el período viaja en
+  // la URL desde Reportes y sin esto se perdería al cambiar de pestaña.
+  "mes_a_la_fecha",
   "mes_anterior",
   "anio_actual",
   "anio_anterior",

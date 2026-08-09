@@ -32,6 +32,7 @@ const PRESETS: RangoPreset[] = [
   "7d",
   "30d",
   "mes_actual",
+  "mes_a_la_fecha",
   "mes_anterior",
   "anio_actual",
   "anio_anterior",
@@ -62,6 +63,15 @@ export interface ReportesFilters {
   segmento: SegmentoAliado;
   /** Métrica que ordena los rankings y decide la altura de las barras. */
   metrica: MetricaId;
+  /**
+   * Métrica del panel «AM · Agenda», INDEPENDIENTE de la del ranking.
+   *
+   * Iban juntas y era un error: cada métrica guarda su propia meta, así que
+   * mover el ranking cambiaba en silencio el juego de objetivos que se estaba
+   * mirando, y dos personas con la misma pantalla veían cifras distintas sin
+   * pista de por qué (2026-08-09).
+   */
+  metricaObjetivo: MetricaId;
   /** Curva de total corrido en vez de cantidad del período. */
   acumulado: boolean;
   /** Entidades seleccionadas en el reporte activo (aliados o AM). Vacío = todas. */
@@ -110,6 +120,7 @@ export function useReportesFilters(rolPorDefecto: RolReporte = "general") {
       fin: leer<FinFiltro>("fin", FINS, "todos"),
       segmento: leer<SegmentoAliado>("seg", SEGMENTOS, "todos"),
       metrica: leer<MetricaId>("met", METRICAS, "proyectos"),
+      metricaObjetivo: leer<MetricaId>("mob", METRICAS, "proyectos"),
       // `acum` ausente = false. El boceto de AM pide expresamente la cantidad del
       // período, así que acumular es una elección explícita, no el arranque.
       acumulado: searchParams.get("acum") === "1",
@@ -148,6 +159,7 @@ export function useReportesFilters(rolPorDefecto: RolReporte = "general") {
       if (patch.fin !== undefined) put("fin", patch.fin, "todos");
       if (patch.segmento !== undefined) put("seg", patch.segmento, "todos");
       if (patch.metrica !== undefined) put("met", patch.metrica, "proyectos");
+      if (patch.metricaObjetivo !== undefined) put("mob", patch.metricaObjetivo, "proyectos");
       if (patch.acumulado !== undefined) put("acum", patch.acumulado ? "1" : "", "");
       if (patch.entidades !== undefined) put("ent", patch.entidades.join(","), "");
 

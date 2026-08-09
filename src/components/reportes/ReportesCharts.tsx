@@ -503,7 +503,14 @@ export function GrupoBarrasChart({
 // 4 · Objetivo vs. real (boceto «AM Agenda»)
 // ---------------------------------------------------------------------------
 
-export function ObjetivoRealChart({ filas }: { filas: { id: string; nombre: string; objetivo: number; real: number }[] }) {
+export function ObjetivoRealChart({
+  filas,
+  prorrateado = false,
+}: {
+  /** `esperado` = meta prorrateada a la fecha. Con el mes cerrado vale lo mismo que `objetivo`. */
+  filas: { id: string; nombre: string; objetivo: number; real: number; esperado: number }[];
+  prorrateado?: boolean;
+}) {
   const n = filas.length;
   if (n === 0) return <Vacio>No hay account managers que medir en el período.</Vacio>;
 
@@ -523,19 +530,25 @@ export function ObjetivoRealChart({ filas }: { filas: { id: string; nombre: stri
         // pinta neutro. Pintarlo ámbar diría "va por debajo del objetivo" cuando
         // lo único que pasa es que Dirección todavía no ha fijado ninguno.
         const sinMeta = f.objetivo <= 0;
-        const cumple = !sinMeta && f.real >= f.objetivo;
+        // A mitad de mes se juzga contra lo PRORRATEADO, no contra la meta
+        // entera: si no, el día 9 de 31 todo el mundo sale en rojo por no haber
+        // hecho ya el mes completo, y el color deja de informar.
+        const vara = prorrateado ? f.esperado : f.objetivo;
+        const cumple = !sinMeta && f.real >= vara;
+        const xObj = xCenter(i) - parW / 2;
         const barras = [
-          { key: "obj", label: "Objetivo", v: f.objetivo, fill: VIZ_MUTED_VAR, x: xCenter(i) - parW / 2 },
-          // Con meta, el color da la lectura de un vistazo: verde la alcanza,
+          { key: "obj", label: "Objetivo del mes", v: f.objetivo, fill: VIZ_MUTED_VAR, x: xObj },
+          // Con meta, el color da la lectura de un vistazo: verde va al ritmo,
           // ámbar se queda corto.
           {
             key: "real",
             label: "Real",
             v: f.real,
             fill: sinMeta ? "var(--rp-1)" : cumple ? "var(--rp-6)" : "var(--rp-4)",
-            x: xCenter(i) - parW / 2 + parW / 2 + 2,
+            x: xObj + parW / 2 + 2,
           },
         ];
+        const yEsperado = e.baseline - Math.max((f.esperado / maxV) * e.plotH, 0);
         return (
           <g key={f.id}>
             {barras.map((b) => {
@@ -553,6 +566,34 @@ export function ObjetivoRealChart({ filas }: { filas: { id: string; nombre: stri
                 </g>
               );
             })}
+
+            {/* Marca de "lo que tocaría a estas alturas". Cruza las dos barras
+                para que se vea de un golpe quién llega y quién no. */}
+            {prorrateado && f.esperado > 0 && (
+              <g>
+                <line
+                  x1={xObj - 3}
+                  y1={yEsperado}
+                  x2={xObj + parW + 3}
+                  y2={yEsperado}
+                  stroke="var(--rp-8)"
+                  strokeWidth="1.8"
+                  strokeDasharray="4 3"
+                >
+                  <title>{`${f.nombre} · esperado a la fecha: ${f.esperado} de ${f.objetivo}`}</title>
+                </line>
+                <text
+                  x={xObj + parW + 6}
+                  y={yEsperado + 3}
+                  textAnchor="start"
+                  className="tabular-nums"
+                  fill="var(--rp-8)"
+                  style={{ fontSize: 8, fontWeight: 700 }}
+                >
+                  {f.esperado}
+                </text>
+              </g>
+            )}
             <text
               x={xCenter(i)}
               y={e.baseline + (rotarNombres ? 12 : 14)}

@@ -385,6 +385,35 @@ export function mesDe(iso: string | null | undefined): string {
   return d.substring(0, 7);
 }
 
+/**
+ * Cuánto lleva recorrido un mes 'YYYY-MM' a día de hoy.
+ *
+ * Un mes ya cerrado va al 100 %; el que está en curso, por los días
+ * transcurridos incluido hoy (día 9 de 31 → 29 %); uno futuro, a 0 %. Todo en
+ * UTC, igual que el resto de los cortes de día de la app.
+ */
+export function avanceDelMes(periodo: string, hoyIso?: string): { dia: number; dias: number; fraccion: number } {
+  const hoy = hoyIso || new Date().toISOString().substring(0, 10);
+  const mesHoy = hoy.substring(0, 7);
+  const [y, m] = periodo.split("-").map(Number);
+  const dias = y && m ? new Date(Date.UTC(y, m, 0)).getUTCDate() : 30;
+
+  if (periodo < mesHoy) return { dia: dias, dias, fraccion: 1 };
+  if (periodo > mesHoy) return { dia: 0, dias, fraccion: 0 };
+  const dia = Number(hoy.substring(8, 10)) || 1;
+  return { dia, dias, fraccion: Math.min(dia / dias, 1) };
+}
+
+/**
+ * Meta prorrateada a la fecha: lo que tocaría llevar a estas alturas del mes.
+ * Se redondea hacia arriba para no premiar el ir justo — a día 9 de 31 con meta
+ * 100, lo exigible es 30, no 29,03.
+ */
+export function objetivoALaFecha(objetivo: number, periodo: string, hoyIso?: string): number {
+  if (objetivo <= 0) return 0;
+  return Math.ceil(objetivo * avanceDelMes(periodo, hoyIso).fraccion);
+}
+
 export function mesLabel(periodo: string): string {
   const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const [y, m] = periodo.split("-").map(Number);

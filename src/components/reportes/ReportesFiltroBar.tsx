@@ -20,7 +20,7 @@ import {
   SEGMENTO_LABEL,
 } from "./reportesTypes";
 
-const PRESETS: RangoPreset[] = ["hoy", "7d", "30d", "mes_actual", "mes_anterior", "anio_actual", "anio_anterior", "todo"];
+const PRESETS: RangoPreset[] = ["hoy", "7d", "30d", "mes_actual", "mes_a_la_fecha", "mes_anterior", "anio_actual", "anio_anterior", "todo"];
 const FINS: FinFiltro[] = ["todos", "modalidad_10", "modalidad_40", "credito_nomina"];
 const SEGMENTOS: SegmentoAliado[] = ["todos", "independiente", "empresa"];
 

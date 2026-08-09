@@ -241,6 +241,7 @@ export type RangoPreset =
   | "7d"
   | "30d"
   | "mes_actual"
+  | "mes_a_la_fecha"
   | "mes_anterior"
   | "anio_actual"
   | "anio_anterior"
@@ -252,6 +253,7 @@ export const RANGO_LABEL: Record<RangoPreset, string> = {
   "7d": "Últimos 7 días",
   "30d": "Últimos 30 días",
   mes_actual: "Mes actual",
+  mes_a_la_fecha: "Mes a la fecha",
   mes_anterior: "Mes anterior",
   anio_actual: "Año actual",
   anio_anterior: "Año anterior",
@@ -275,6 +277,12 @@ export function resolveRango(preset: RangoPreset, hoy: Date): { desde: string; h
       return { desde: iso(new Date(Date.UTC(y, m, d - 29))), hasta: today };
     case "mes_actual":
       return { desde: iso(new Date(Date.UTC(y, m, 1))), hasta: iso(new Date(Date.UTC(y, m + 1, 0))) };
+    // Del 1 a HOY. Para contar `created_at` da lo mismo que "Mes actual" (nadie
+    // captura en el futuro); lo que cambia es que el rango deja de decir que
+    // llega a fin de mes, y de ahí cuelga el prorrateo de metas del reporte de
+    // Agenda: comparar lo que se lleva contra lo que tocaría a estas alturas.
+    case "mes_a_la_fecha":
+      return { desde: iso(new Date(Date.UTC(y, m, 1))), hasta: today };
     case "mes_anterior":
       return { desde: iso(new Date(Date.UTC(y, m - 1, 1))), hasta: iso(new Date(Date.UTC(y, m, 0))) };
     case "anio_actual":
