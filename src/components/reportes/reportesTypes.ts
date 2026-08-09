@@ -386,7 +386,7 @@ export function mesDe(iso: string | null | undefined): string {
 }
 
 /**
- * Mes 'YYYY-MM' de una cita de asesoría, en hora de México.
+ * Día 'YYYY-MM-DD' de una cita de asesoría, en hora de México.
  *
  * `prospects.asesoria_at` guarda el INSTANTE de la reunión anclado a CDMX
  * (-06:00 fijo: México no aplica horario de verano desde 2022). Cortarlo en UTC
@@ -395,40 +395,67 @@ export function mesDe(iso: string | null | undefined): string {
  * leen los campos UTC, exactamente lo que hace `citaInputs` del stepper para
  * recuperar la hora que se tecleó.
  */
-export function mesDeCita(asesoriaAt: string | null | undefined): string | null {
+export function diaDeCita(asesoriaAt: string | null | undefined): string | null {
   if (!asesoriaAt) return null;
   const t = new Date(asesoriaAt).getTime();
   if (isNaN(t)) return null;
-  return new Date(t - 6 * 60 * 60 * 1000).toISOString().substring(0, 7);
+  return new Date(t - 6 * 60 * 60 * 1000).toISOString().substring(0, 10);
+}
+
+export interface VentanaMes {
+  /** Primer y último día CONTADOS, ya recortados al mes y topados en hoy. */
+  desde: string;
+  hasta: string;
+  dias: number;
+  diasMes: number;
+  fraccion: number;
+  /** La ventana no cubre el mes entero, así que la meta va prorrateada. */
+  parcial: boolean;
 }
 
 /**
- * Cuánto lleva recorrido un mes 'YYYY-MM' a día de hoy.
+ * Qué trozo del mes `periodo` cae dentro del rango que pide el informe.
  *
- * Un mes ya cerrado va al 100 %; el que está en curso, por los días
- * transcurridos incluido hoy (día 9 de 31 → 29 %); uno futuro, a 0 %. Todo en
- * UTC, igual que el resto de los cortes de día de la app.
+ * La meta de agendas es MENSUAL, pero el informe se mira por rangos. Esta
+ * función cruza las dos cosas: recorta el rango al mes y lo topa en HOY, porque
+ * una asesoría agendada para dentro de dos semanas todavía no está "llevada" —
+ * la pregunta que responde el panel es cuántas van A LA FECHA contra cuántas
+ * tocaría llevar a la fecha.
+ *
+ * Sin rango (preset «Todo») la ventana es el mes entero, igualmente topada en
+ * hoy. Con un mes ya cerrado sale completa y el prorrateo desaparece solo.
  */
-export function avanceDelMes(periodo: string, hoyIso?: string): { dia: number; dias: number; fraccion: number } {
+export function ventanaDelMes(periodo: string, desde: string, hasta: string, hoyIso?: string): VentanaMes {
   const hoy = hoyIso || new Date().toISOString().substring(0, 10);
-  const mesHoy = hoy.substring(0, 7);
   const [y, m] = periodo.split("-").map(Number);
-  const dias = y && m ? new Date(Date.UTC(y, m, 0)).getUTCDate() : 30;
+  const diasMes = y && m ? new Date(Date.UTC(y, m, 0)).getUTCDate() : 30;
+  const primero = `${periodo}-01`;
+  const ultimo = `${periodo}-${String(diasMes).padStart(2, "0")}`;
 
-  if (periodo < mesHoy) return { dia: dias, dias, fraccion: 1 };
-  if (periodo > mesHoy) return { dia: 0, dias, fraccion: 0 };
-  const dia = Number(hoy.substring(8, 10)) || 1;
-  return { dia, dias, fraccion: Math.min(dia / dias, 1) };
+  const ini = desde && desde > primero ? desde : primero;
+  let fin = hasta && hasta < ultimo ? hasta : ultimo;
+  if (fin > hoy) fin = hoy;
+
+  const dias = fin < ini ? 0 : Math.round((Date.parse(fin) - Date.parse(ini)) / 86400000) + 1;
+  return { desde: ini, hasta: fin, dias, diasMes, fraccion: dias / diasMes, parcial: dias < diasMes };
 }
 
 /**
- * Meta prorrateada a la fecha: lo que tocaría llevar a estas alturas del mes.
- * Se redondea hacia arriba para no premiar el ir justo — a día 9 de 31 con meta
- * 100, lo exigible es 30, no 29,03.
+ * Meta prorrateada a la ventana: lo que tocaría llevar a la fecha. Se redondea
+ * hacia arriba para no premiar el ir justo — 9 días de 31 con meta 100 exigen
+ * 30, no 29,03 — y nunca pasa de la meta entera del mes.
  */
-export function objetivoALaFecha(objetivo: number, periodo: string, hoyIso?: string): number {
-  if (objetivo <= 0) return 0;
-  return Math.ceil(objetivo * avanceDelMes(periodo, hoyIso).fraccion);
+export function objetivoEnVentana(objetivo: number, ventana: VentanaMes): number {
+  if (objetivo <= 0 || ventana.dias <= 0) return 0;
+  return Math.min(objetivo, Math.ceil(objetivo * ventana.fraccion));
+}
+
+/** Día corto para los rótulos de rango: '2026-08-09' → '9 ago'. */
+export function diaLabel(iso: string): string {
+  const CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d || m < 1 || m > 12) return iso;
+  return `${d} ${CORTOS[m - 1]}`;
 }
 
 export function mesLabel(periodo: string): string {

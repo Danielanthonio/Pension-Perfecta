@@ -198,7 +198,7 @@ const ejes = (padL: number, padR: number, padB: number): Ejes => ({
   baseline: PAD_T + (H - PAD_T - padB),
 });
 
-function Rejilla({ e, max, ticks = 4 }: { e: Ejes; max: number; ticks?: number }) {
+function Rejilla({ e, max, ticks = 4, sufijo = "" }: { e: Ejes; max: number; ticks?: number; sufijo?: string }) {
   const vals = Array.from(new Set(Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks))));
   return (
     <>
@@ -209,6 +209,7 @@ function Rejilla({ e, max, ticks = 4 }: { e: Ejes; max: number; ticks?: number }
             <line x1={e.padL} y1={yy} x2={W - e.padR} y2={yy} className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="1" />
             <text x={e.padL - 8} y={yy + 3} textAnchor="end" className="fill-slate-400 dark:fill-slate-500 tabular-nums" style={{ fontSize: 9 }}>
               {v}
+              {sufijo}
             </text>
           </g>
         );
@@ -500,100 +501,101 @@ export function GrupoBarrasChart({
 }
 
 // ---------------------------------------------------------------------------
-// 4 · Objetivo vs. real (boceto «AM Agenda»)
+// 4 · Avance contra el objetivo a la fecha (boceto «AM Agenda»)
 // ---------------------------------------------------------------------------
 
-export function ObjetivoRealChart({
-  filas,
-  prorrateado = false,
-}: {
-  /** `esperado` = meta prorrateada a la fecha. Con el mes cerrado vale lo mismo que `objetivo`. */
-  filas: { id: string; nombre: string; objetivo: number; real: number; esperado: number }[];
-  prorrateado?: boolean;
-}) {
+export interface FilaAvance {
+  id: string;
+  nombre: string;
+  /** Meta del mes entero, tal como la teclea Dirección. */
+  objetivo: number;
+  /** Esa meta prorrateada al rango del informe: el objetivo A LA FECHA. */
+  esperado: number;
+  /** Lo conseguido dentro de ese mismo rango. */
+  real: number;
+}
+
+/**
+ * Una sola barra por entidad: su porcentaje de avance sobre el objetivo a la fecha.
+ *
+ * Antes iban dos barras enfrentadas —meta y real— y la comparación había que
+ * hacerla a ojo, columna contra columna, con el agravante de que un AM con meta
+ * 200 parecía peor que uno con meta 20 aunque fuera igual de bien. En porcentaje
+ * la referencia es la misma para todos, el 100 % de la rejilla, y quién llega se
+ * ve de un golpe. La cantidad no se pierde: va escrita bajo el porcentaje como
+ * «conseguidas / objetivo a la fecha».
+ */
+export function AvanceObjetivoChart({ filas, unidad = "agendas" }: { filas: FilaAvance[]; unidad?: string }) {
   const n = filas.length;
   if (n === 0) return <Vacio>No hay account managers que medir en el período.</Vacio>;
 
   const e = ejes(46, 16, 62);
-  const maxV = Math.max(1, ...filas.flatMap((f) => [f.objetivo, f.real]));
+  // Sin objetivo a la fecha no hay porcentaje que calcular: dividir por cero
+  // daría Infinity y una barra fuera del lienzo.
+  const pctDe = (f: FilaAvance) => (f.esperado > 0 ? (f.real / f.esperado) * 100 : null);
+  const maxPct = Math.max(0, ...filas.map((f) => pctDe(f) ?? 0));
+  // Techo con aire: las dos etiquetas van ENCIMA de la barra y necesitan sitio.
+  // Nunca baja de 120 para que la línea del 100 % quede dentro aunque nadie llegue.
+  const bruto = Math.max(120, maxPct * 1.18);
+  // El techo se redondea a un paso redondo y la rejilla se dibuja con ESE paso:
+  // así el eje va de 20 en 20 en vez de soltar 0 · 33 · 65 · 98, y el 100 % —que
+  // es la vara— cae siempre justo encima de una línea.
+  const paso = bruto <= 200 ? 20 : bruto <= 500 ? 50 : 100;
+  const maxV = Math.ceil(bruto / paso) * paso;
   const bandW = e.plotW / n;
-  const parW = Math.min(bandW * 0.68, 96);
-  const barW = Math.max(6, parW / 2 - 4);
+  const barW = Math.min(52, Math.max(6, bandW * 0.46));
   const xCenter = (i: number) => e.padL + bandW * i + bandW / 2;
+  const yFor = (v: number) => PAD_T + e.plotH - (v / maxV) * e.plotH;
   const rotarNombres = n > 6;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet" role="img">
-      <Rejilla e={e} max={maxV} />
+      <Rejilla e={e} max={maxV} ticks={Math.round(maxV / paso)} sufijo="%" />
+
       {filas.map((f, i) => {
-        // Sin meta puesta no hay nada que cumplir ni que incumplir: el real se
-        // pinta neutro. Pintarlo ámbar diría "va por debajo del objetivo" cuando
-        // lo único que pasa es que Dirección todavía no ha fijado ninguno.
-        const sinMeta = f.objetivo <= 0;
-        // A mitad de mes se juzga contra lo PRORRATEADO, no contra la meta
-        // entera: si no, el día 9 de 31 todo el mundo sale en rojo por no haber
-        // hecho ya el mes completo, y el color deja de informar.
-        const vara = prorrateado ? f.esperado : f.objetivo;
-        const cumple = !sinMeta && f.real >= vara;
-        const xObj = xCenter(i) - parW / 2;
-        const barras = [
-          { key: "obj", label: "Objetivo del mes", v: f.objetivo, fill: VIZ_MUTED_VAR, x: xObj },
-          // Con meta, el color da la lectura de un vistazo: verde va al ritmo,
-          // ámbar se queda corto.
-          {
-            key: "real",
-            label: "Real",
-            v: f.real,
-            fill: sinMeta ? "var(--rp-1)" : cumple ? "var(--rp-6)" : "var(--rp-4)",
-            x: xObj + parW / 2 + 2,
-          },
-        ];
-        const yEsperado = e.baseline - Math.max((f.esperado / maxV) * e.plotH, 0);
+        const pct = pctDe(f);
+        // Sin meta puesta no hay nada que cumplir ni que incumplir: no se pinta
+        // barra. Dibujarla a cero diría "va fatal" cuando lo único que pasa es
+        // que Dirección todavía no le ha fijado objetivo.
+        const h = pct === null || pct <= 0 ? 0 : Math.max((Math.min(pct, maxV) / maxV) * e.plotH, 2);
+        const fill = pct === null ? VIZ_MUTED_VAR : pct >= 100 ? "var(--rp-6)" : pct >= 70 ? "var(--rp-4)" : "var(--rp-8)";
+        const yTope = e.baseline - h;
+        const tip =
+          `${f.nombre}\n` +
+          `Llevan: ${f.real} ${unidad}\n` +
+          `Objetivo a la fecha: ${f.esperado}\n` +
+          `Meta del mes: ${f.objetivo}\n` +
+          `Avance: ${pct === null ? "sin objetivo" : `${Math.round(pct)} %`}`;
         return (
           <g key={f.id}>
-            {barras.map((b) => {
-              const h = b.v > 0 ? Math.max((b.v / maxV) * e.plotH, 2) : 0;
-              return (
-                <g key={b.key}>
-                  {h > 0 && (
-                    <rect x={b.x} y={e.baseline - h} width={barW} height={h} rx={3} fill={b.fill}>
-                      <title>{`${f.nombre} · ${b.label}: ${b.v}`}</title>
-                    </rect>
-                  )}
-                  <text x={b.x + barW / 2} y={e.baseline - h - 5} textAnchor="middle" className="fill-slate-600 dark:fill-slate-300 tabular-nums" style={{ fontSize: 9, fontWeight: 700 }}>
-                    {b.v}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Marca de "lo que tocaría a estas alturas". Cruza las dos barras
-                para que se vea de un golpe quién llega y quién no. */}
-            {prorrateado && f.esperado > 0 && (
-              <g>
-                <line
-                  x1={xObj - 3}
-                  y1={yEsperado}
-                  x2={xObj + parW + 3}
-                  y2={yEsperado}
-                  stroke="var(--rp-8)"
-                  strokeWidth="1.8"
-                  strokeDasharray="4 3"
-                >
-                  <title>{`${f.nombre} · esperado a la fecha: ${f.esperado} de ${f.objetivo}`}</title>
-                </line>
-                <text
-                  x={xObj + parW + 6}
-                  y={yEsperado + 3}
-                  textAnchor="start"
-                  className="tabular-nums"
-                  fill="var(--rp-8)"
-                  style={{ fontSize: 8, fontWeight: 700 }}
-                >
-                  {f.esperado}
-                </text>
-              </g>
+            {/* Zona de impacto a toda altura: el tooltip funciona igual cuando la
+                barra es un hilo o cuando no hay barra que señalar. */}
+            <rect x={e.padL + bandW * i} y={PAD_T} width={bandW} height={e.plotH} fill="transparent">
+              <title>{tip}</title>
+            </rect>
+            {h > 0 && (
+              <rect x={xCenter(i) - barW / 2} y={yTope} width={barW} height={h} rx={3} fill={fill}>
+                <title>{tip}</title>
+              </rect>
             )}
+            <text
+              x={xCenter(i)}
+              y={yTope - 16}
+              textAnchor="middle"
+              className="fill-slate-700 dark:fill-slate-200 tabular-nums"
+              style={{ fontSize: 11, fontWeight: 700 }}
+            >
+              {pct === null ? "Sin meta" : `${Math.round(pct)} %`}
+            </text>
+            <text
+              x={xCenter(i)}
+              y={yTope - 5}
+              textAnchor="middle"
+              className="fill-slate-400 dark:fill-slate-500 tabular-nums"
+              style={{ fontSize: 9, fontWeight: 600 }}
+            >
+              {pct === null ? `${f.real} ${unidad}` : `${f.real} / ${f.esperado}`}
+            </text>
             <text
               x={xCenter(i)}
               y={e.baseline + (rotarNombres ? 12 : 14)}
@@ -607,6 +609,13 @@ export function ObjetivoRealChart({
           </g>
         );
       })}
+
+      {/* La meta a la fecha es el 100 %, la misma vara para todos. Va la última
+          para que ninguna barra la tape. */}
+      <line x1={e.padL} y1={yFor(100)} x2={W - e.padR} y2={yFor(100)} stroke="var(--rp-8)" strokeWidth="1.6" strokeDasharray="5 3" />
+      <text x={W - e.padR} y={yFor(100) - 5} textAnchor="end" fill="var(--rp-8)" style={{ fontSize: 9, fontWeight: 700 }}>
+        objetivo a la fecha · 100 %
+      </text>
     </svg>
   );
 }

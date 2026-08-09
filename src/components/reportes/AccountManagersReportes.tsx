@@ -30,10 +30,10 @@ import { useApp } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
 import { STEP_DEFS, STEP_STATUSES } from "@/components/ui/projectStepper";
 import {
+  AvanceObjetivoChart,
   ChipTasa,
   GrupoBarrasChart,
   Leyenda,
-  ObjetivoRealChart,
   PanelHeader,
   RankingChart,
   SerieChart,
@@ -55,16 +55,17 @@ import {
   SERIES_AM,
   agrupaPor,
   aplicaFiltros,
-  avanceDelMes,
   calcTasas,
   construyeCubos,
+  diaDeCita,
+  diaLabel,
   fmtNum,
   fmtPct,
   mesDe,
-  mesDeCita,
   mesLabel,
-  objetivoALaFecha,
+  objetivoEnVentana,
   serieDe,
+  ventanaDelMes,
 } from "./reportesTypes";
 
 const GRANOS: Grano[] = ["dia", "semana", "mes", "anio"];
@@ -205,10 +206,12 @@ export function AccountManagersReportes({
   // llegó a tenerlo y era ruido: la meta de agenda es una sola cosa.
   const { objetivos, error: errorObjetivos, puedeEditar, guardar } = useObjetivosAM(periodo, "agenda");
 
-  // Cuánto del mes va corrido. Un mes cerrado va al 100 %, así que en «Mes
-  // anterior» el prorrateo desaparece solo y se compara contra la meta entera.
-  const avance = useMemo(() => avanceDelMes(periodo), [periodo]);
-  const enCurso = avance.fraccion < 1;
+  // Qué trozo del mes pide el informe. Se cuentan SOLO las agendas de esa
+  // ventana y la meta mensual se prorratea a ella: pedir «Mes a la fecha» tiene
+  // que enseñar las agendas de esos días contra la parte de meta que les toca,
+  // no el mes entero. La ventana se topa en hoy porque una reunión agendada para
+  // dentro de dos semanas todavía no está conseguida.
+  const ventana = useMemo(() => ventanaDelMes(periodo, filters.desde, filters.hasta), [periodo, filters.desde, filters.hasta]);
 
   // ⚠️ Las agendas NO pueden salir de `grupos`, que está acotado al rango de la
   // pestaña por `created_at`. Una asesoría de agosto puede ser de un cliente
@@ -234,10 +237,10 @@ export function AccountManagersReportes({
   // Solo los AM de verdad llevan meta: a la mesa de dirección no se le pone
   // objetivo de agenda, así que se queda fuera de este gráfico.
   //
-  // Una agenda cuenta en el mes de la REUNIÓN (`asesoria_at`), no en el de la
-  // captura. Y cuenta aunque el proyecto ya haya avanzado: la columna no se borra
-  // al pasar a Firma o a Fin. Otorgado, así que la asesoría celebrada sigue
-  // sumando en su mes en vez de desaparecer del histórico.
+  // Una agenda cuenta el día de la REUNIÓN (`asesoria_at`), no el de la captura.
+  // Y cuenta aunque el proyecto ya haya avanzado: la fecha no se borra al pasar
+  // a Firma o a Fin. Otorgado, así que la asesoría celebrada sigue sumando en su
+  // día en vez de desaparecer del histórico.
   const filasAgenda = useMemo(
     () =>
       gruposAgenda
@@ -248,24 +251,42 @@ export function AccountManagersReportes({
             id: g.id,
             nombre: g.nombre,
             objetivo,
-            esperado: objetivoALaFecha(objetivo, periodo),
-            real: g.items.filter((p) => mesDeCita(p.asesoria_at) === periodo).length,
+            esperado: objetivoEnVentana(objetivo, ventana),
+            real:
+              ventana.dias === 0
+                ? 0
+                : g.items.filter((p) => {
+                    const d = diaDeCita(p.asesoria_at);
+                    return d !== null && d >= ventana.desde && d <= ventana.hasta;
+                  }).length,
           };
         })
-        .sort((a, b) => b.real - a.real),
-    [gruposAgenda, objetivos, periodo]
+        // Se ordena por PORCENTAJE, que es lo que dibuja la barra: por cantidad,
+        // quien no tiene meta se colaba por delante de quien sí la tiene y va
+        // corto, y la lectura de izquierda a derecha dejaba de significar nada.
+        // Sin objetivo va al final (−1), no primero.
+        .sort((a, b) => {
+          const pa = a.esperado > 0 ? a.real / a.esperado : -1;
+          const pb = b.esperado > 0 ? b.real / b.esperado : -1;
+          return pb - pa || b.real - a.real;
+        }),
+    [gruposAgenda, objetivos, ventana]
   );
 
   // El CSV lee de aquí y no recalcula: si divergieran, el archivo diría una cosa
   // y la pantalla otra.
   const agendasPorAM = useMemo(() => new Map(filasAgenda.map((f) => [f.id, f.real])), [filasAgenda]);
+  const esperadoPorAM = useMemo(() => new Map(filasAgenda.map((f) => [f.id, f.esperado])), [filasAgenda]);
 
-  const promedioReal = filasAgenda.length > 0 ? filasAgenda.reduce((s, f) => s + f.real, 0) / filasAgenda.length : null;
-  const objetivoMedio = filasAgenda.length > 0 ? filasAgenda.reduce((s, f) => s + f.objetivo, 0) / filasAgenda.length : null;
-  const esperadoMedio = filasAgenda.length > 0 ? filasAgenda.reduce((s, f) => s + f.esperado, 0) / filasAgenda.length : null;
-  // "Cumplen" se mide contra la vara que aplica hoy: el mes entero si ya cerró,
-  // lo prorrateado si sigue corriendo.
-  const cumplen = filasAgenda.filter((f) => f.objetivo > 0 && f.real >= (enCurso ? f.esperado : f.objetivo)).length;
+  // Totales, no promedios: el promedio de una meta ("100" cuando la suma es 500)
+  // se lee como si esa fuera la meta y descuadra contra la tabla de abajo.
+  const totObjetivo = filasAgenda.reduce((s, f) => s + f.objetivo, 0);
+  const totEsperado = filasAgenda.reduce((s, f) => s + f.esperado, 0);
+  const totReal = filasAgenda.reduce((s, f) => s + f.real, 0);
+  const avanceGlobal = totEsperado > 0 ? (totReal / totEsperado) * 100 : null;
+  // La vara es siempre el objetivo A LA FECHA: con el mes cerrado vale lo mismo
+  // que la meta entera, así que no hace falta distinguir los dos casos.
+  const cumplen = filasAgenda.filter((f) => f.esperado > 0 && f.real >= f.esperado).length;
   const conObjetivo = filasAgenda.filter((f) => f.objetivo > 0).length;
 
   // ── Filtro por AM ──────────────────────────────────────────────────────────
@@ -307,8 +328,9 @@ export function AccountManagersReportes({
         "T. aprobación %",
         "T. condicionamiento %",
         "T. cierre %",
-        `Objetivo de agendas ${periodo}`,
-        `Agendas de ${periodo}`,
+        `Meta de agendas ${periodo}`,
+        "Objetivo de agendas a la fecha",
+        `Agendas del ${ventana.desde} al ${ventana.hasta}`,
       ],
     ];
     ranking.forEach((r) => {
@@ -324,6 +346,7 @@ export function AccountManagersReportes({
         (t.condicionamiento ?? 0).toFixed(1),
         (t.cierre ?? 0).toFixed(1),
         objetivos.get(r.id) ?? 0,
+        esperadoPorAM.get(r.id) ?? 0,
         agendasPorAM.get(r.id) ?? 0,
       ]);
     });
@@ -535,28 +558,30 @@ export function AccountManagersReportes({
         <PanelHeader
           icon={CalendarCheck}
           tone="amber"
-          title="Agendas · objetivo contra real"
+          title="Agendas · avance contra el objetivo"
           subtitle={
-            <>
-              Asesorías con fecha de reunión en <strong>{mesLabel(periodo)}</strong>
-              {enCurso ? `, al día ${avance.dia} de ${avance.dias} (${Math.round(avance.fraccion * 100)} % del mes)` : " (mes cerrado)"}.{" "}
-              {enCurso
-                ? "La meta del mes la fija Dirección; la línea marca cuántas tocaría llevar a la fecha."
-                : "Se compara contra la meta completa del mes."}
-            </>
+            ventana.dias === 0 ? (
+              <>
+                El rango elegido no toca ningún día ya transcurrido de <strong>{mesLabel(periodo)}</strong>.
+              </>
+            ) : (
+              <>
+                Asesorías con reunión del <strong>{diaLabel(ventana.desde)}</strong> al{" "}
+                <strong>{diaLabel(ventana.hasta)}</strong> · {ventana.dias} de {ventana.diasMes} días de{" "}
+                {mesLabel(periodo)}.{" "}
+                {ventana.parcial
+                  ? "La meta del mes la fija Dirección y aquí va prorrateada a esos días."
+                  : "Se compara contra la meta completa del mes, que fija Dirección."}
+              </>
+            )
           }
         >
           <div className="flex flex-wrap items-center gap-2">
-            <ChipTasa label="Objetivo del mes" value={objetivoMedio === null ? "—" : fmtNum(objetivoMedio, 0)} tone="sky" />
-            {enCurso && (
-              <ChipTasa label="Deberían llevar" value={esperadoMedio === null ? "—" : fmtNum(esperadoMedio, 0)} tone="amber" />
-            )}
-            <ChipTasa label="Llevan" value={promedioReal === null ? "—" : fmtNum(promedioReal, 0)} tone="teal" />
-            <ChipTasa
-              label={enCurso ? "Van al ritmo" : "Cumplen la meta"}
-              value={conObjetivo > 0 ? `${cumplen} / ${conObjetivo}` : "—"}
-              tone="amber"
-            />
+            <ChipTasa label="Meta del mes" value={fmtNum(totObjetivo, 0)} tone="sky" />
+            <ChipTasa label="Objetivo a la fecha" value={fmtNum(totEsperado, 0)} tone="amber" />
+            <ChipTasa label="Llevan" value={fmtNum(totReal, 0)} tone="teal" />
+            <ChipTasa label="Avance" value={avanceGlobal === null ? "—" : `${Math.round(avanceGlobal)} %`} tone="teal" />
+            <ChipTasa label="Van al ritmo" value={conObjetivo > 0 ? `${cumplen} / ${conObjetivo}` : "—"} tone="amber" />
           </div>
         </PanelHeader>
 
@@ -570,20 +595,20 @@ export function AccountManagersReportes({
           <Vacio>No hay account managers a los que medir agendas.</Vacio>
         ) : (
           <>
-            <ObjetivoRealChart filas={filasAgenda} prorrateado={enCurso} />
+            <AvanceObjetivoChart filas={filasAgenda} />
             <Leyenda
               series={[
-                { id: "obj", label: "Objetivo de agendas del mes", color: VIZ_MUTED_VAR, total: filasAgenda.reduce((s, f) => s + f.objetivo, 0) },
-                ...(enCurso
-                  ? [{ id: "esp", label: "Deberían llevar a la fecha (línea)", color: "var(--rp-8)", total: filasAgenda.reduce((s, f) => s + f.esperado, 0) }]
-                  : []),
-                { id: "real", label: "Agendas del mes", color: "var(--rp-1)", total: filasAgenda.reduce((s, f) => s + f.real, 0) },
+                { id: "ok", label: "Al día (100 % o más)", color: "var(--rp-6)" },
+                { id: "cerca", label: "Por debajo (70–99 %)", color: "var(--rp-4)" },
+                { id: "lejos", label: "Muy por debajo (menos de 70 %)", color: "var(--rp-8)" },
+                { id: "sin", label: "Sin objetivo puesto", color: VIZ_MUTED_VAR },
               ]}
             />
             <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              Una agenda cuenta en el mes de la reunión y sigue contando aunque el proyecto ya haya avanzado. La
-              barra cambia de color según {enCurso ? "el ritmo" : "la meta"}: verde {enCurso ? "va al día" : "la alcanza"},
-              ámbar se queda corto, azul es que todavía no tiene objetivo puesto.
+              La barra es el porcentaje de avance del account manager: agendas conseguidas en el rango contra el
+              objetivo a la fecha, que es la meta del mes repartida entre esos días. Bajo el porcentaje van las
+              cantidades. Una agenda cuenta el día de la reunión y sigue contando aunque el proyecto ya haya avanzado;
+              lo agendado para más adelante no cuenta todavía como conseguido.
             </p>
 
             {puedeEditar && (
@@ -600,7 +625,7 @@ export function AccountManagersReportes({
                   <table className="w-full text-xs min-w-[620px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
-                        {["Account Manager", "Objetivo del mes", ...(enCurso ? ["Deberían llevar"] : []), "Llevan", "Avance"].map((h, i) => (
+                        {["Account Manager", "Meta del mes", "Objetivo a la fecha", "Llevan", "Avance"].map((h, i) => (
                           <th
                             key={h}
                             className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 ${
@@ -614,7 +639,7 @@ export function AccountManagersReportes({
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                       {filasAgenda.map((f) => (
-                        <FilaObjetivo key={f.id} fila={f} enCurso={enCurso} onGuardar={(v) => guardar(f.id, v)} />
+                        <FilaObjetivo key={f.id} fila={f} onGuardar={(v) => guardar(f.id, v)} />
                       ))}
                     </tbody>
                   </table>
@@ -641,25 +666,21 @@ export function AccountManagersReportes({
  */
 function FilaObjetivo({
   fila,
-  enCurso,
   onGuardar,
 }: {
   fila: { id: string; nombre: string; objetivo: number; real: number; esperado: number };
-  enCurso: boolean;
   onGuardar: (valor: number) => void;
 }) {
   const [borrador, setBorrador] = useState(String(fila.objetivo));
 
-  // Si la meta cambia por fuera (otro mes, otra métrica, recarga), el campo sigue.
+  // Si la meta cambia por fuera (otro mes, recarga), el campo sigue.
   React.useEffect(() => {
     setBorrador(String(fila.objetivo));
   }, [fila.objetivo]);
 
-  // Con el mes corriendo se mide el RITMO (real ÷ esperado a la fecha); con el
-  // mes cerrado, el cumplimiento (real ÷ meta). Son dos preguntas distintas y la
-  // cabecera de la columna cambia con ellas.
-  const vara = enCurso ? fila.esperado : fila.objetivo;
-  const avance = fila.objetivo > 0 && vara > 0 ? (fila.real / vara) * 100 : fila.objetivo > 0 ? 100 : null;
+  // Siempre contra el objetivo A LA FECHA: con el mes ya cerrado ese objetivo es
+  // la meta entera, así que la misma fórmula sirve para las dos situaciones.
+  const avance = fila.esperado > 0 ? (fila.real / fila.esperado) * 100 : null;
 
   return (
     <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
@@ -678,11 +699,9 @@ function FilaObjetivo({
           className="w-20 px-2 py-1 rounded-lg text-xs text-right tabular-nums bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500"
         />
       </td>
-      {enCurso && (
-        <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
-          {fila.objetivo > 0 ? fila.esperado : "—"}
-        </td>
-      )}
+      <td className="px-4 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
+        {fila.objetivo > 0 ? fila.esperado : "—"}
+      </td>
       <td className="px-4 py-2 text-right font-bold tabular-nums text-slate-900 dark:text-white">{fila.real}</td>
       <td className="px-4 py-2 text-right">
         {avance === null ? (
@@ -696,7 +715,7 @@ function FilaObjetivo({
                   ? "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400"
                   : "bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400"
             }`}
-            title={enCurso ? `${fila.real} de ${fila.esperado} esperados a la fecha (meta del mes: ${fila.objetivo})` : `${fila.real} de ${fila.objetivo}`}
+            title={`${fila.real} de ${fila.esperado} a la fecha (meta del mes: ${fila.objetivo})`}
           >
             {avance.toFixed(0)} %
           </span>
