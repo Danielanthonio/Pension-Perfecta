@@ -36,7 +36,12 @@ export default function BankingReminder() {
 
   const banking = getBankingCompletion(user);
   const hiddenRoute = /^\/(login|register|update-password)(\/|$)/.test(pathname);
-  const shouldRemind = !!user && !isLoading && !isProvisionalSession && !hiddenRoute && !banking.complete;
+  // El rol `finanzas` administra el dinero de los demás pero no cobra en el
+  // libro mayor (`comision_eventos.rol_beneficiario` no lo admite, ver
+  // 20260808000001): pedirle datos de cobro que nadie va a usar es solo ruido.
+  const cobraEnPlataforma = user?.role !== "finanzas";
+  const shouldRemind =
+    !!user && !isLoading && !isProvisionalSession && !hiddenRoute && cobraEnPlataforma && !banking.complete;
 
   useEffect(() => {
     if (!shouldRemind || !user) {

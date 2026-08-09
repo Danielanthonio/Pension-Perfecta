@@ -38,6 +38,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   account_manager: "Account Manager",
   director: "Director",
   closer: "Closer",
+  finanzas: "Finanzas",
 };
 
 export default function LoginPage() {
@@ -146,9 +147,14 @@ export default function LoginPage() {
       setSuccessMsg("¡Acceso concedido! Redirigiendo a tu panel...");
       setTimeout(() => {
         // El portal de /dashboard es solo del aliado; todo lo demás (dirección,
-        // account manager y closer) vive bajo /admin, cada uno con su menú.
+        // account manager, closer y finanzas) vive bajo /admin, cada uno con su
+        // menú. Finanzas va directo a su módulo: /admin es el Dashboard del
+        // pipeline, que no le toca, y el guardia del layout lo rebotaría igual —
+        // esto solo le ahorra ver el parpadeo del "Redireccionando…".
         if (realRole === "aliado") {
           router.push("/dashboard");
+        } else if (realRole === "finanzas") {
+          router.push("/admin/finanzas");
         } else {
           router.push("/admin");
         }
@@ -361,6 +367,21 @@ export default function LoginPage() {
                     </div>
                     <div className="w-8 h-8 rounded-full bg-white/5 group-hover/btn:bg-indigo-500/10 flex items-center justify-center transition-colors">
                       <ArrowRight className="h-4 w-4 text-indigo-400 group-hover/btn:translate-x-0.5 transition-transform" />
+                    </div>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => handleRoleSelect("finanzas")}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-between px-6 py-4.5 bg-gradient-to-r from-white/[0.03] to-white/[0.01] hover:from-amber-500/[0.06] hover:to-amber-500/[0.02] border border-white/5 hover:border-amber-500/20 text-white rounded-2xl transition-all duration-300 group/btn shadow-lg"
+                  >
+                    <div className="text-left">
+                      <span className="block font-bold text-base text-slate-100 group-hover/btn:text-amber-400 transition-colors">Entrar como Finanzas</span>
+                      <span className="block text-[11px] text-slate-400 mt-1">Comisiones, cortes y pagos del equipo</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white/5 group-hover/btn:bg-amber-500/10 flex items-center justify-center transition-colors">
+                      <ArrowRight className="h-4 w-4 text-amber-400 group-hover/btn:translate-x-0.5 transition-transform" />
                     </div>
                   </motion.button>
                 </div>

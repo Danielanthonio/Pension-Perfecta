@@ -26,7 +26,6 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useApp } from "@/utils/context/AppContext";
 import { CLOSER_VIZ_STYLE } from "@/components/closers/CloserChart";
 import { Notificacion, pastilla, segmentado } from "./FinanzasUI";
 import { useFinanzas } from "./useFinanzas";
@@ -67,7 +66,6 @@ const PESTANAS: { id: PestanaFinanzas; label: string; Icono: typeof BarChart3 }[
 ];
 
 export default function FinanzasOverview() {
-  const { profiles } = useApp();
   const { filters, setFilters } = useFinanzasFilters();
   const [vistaGrafico, setVistaGrafico] = useState<VistaGrafico>("rol");
   const [seriesOcultas, setSeriesOcultas] = useState<Set<string>>(new Set());
@@ -111,27 +109,25 @@ export default function FinanzasOverview() {
   }, [filters.desde, filters.hasta]);
 
   // Quién puede recibir un ajuste manual: cualquiera que cobre en el sistema.
+  //
+  // Sale de `fin.directorio` y no del `profiles` del navegador: una cuenta con
+  // rol `finanzas` no tiene lectura de `profiles` a propósito (20260808000001) y
+  // este selector le saldría vacío, dejando el ajuste manual inservible para
+  // justo el rol que existe para hacerlos.
   const beneficiarios = useMemo(
     () =>
-      profiles
-        .filter((p) => ["director", "account_manager", "closer", "aliado"].includes(p.role))
-        .map((p) => ({
-          id: p.id,
-          nombre: p.full_name,
-          rol: ROL_LABEL[(p.role === "director" ? "director" : p.role) as keyof typeof ROL_LABEL] || p.role,
-        }))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    [profiles]
+      fin.directorio.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        rol: ROL_LABEL[p.rol as keyof typeof ROL_LABEL] || p.rol,
+      })),
+    [fin.directorio]
   );
 
   // Cuentas que pueden ser el beneficiario de las comisiones de Dirección.
   const directores = useMemo(
-    () =>
-      profiles
-        .filter((p) => p.role === "director")
-        .map((p) => ({ id: p.id, nombre: p.full_name }))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    [profiles]
+    () => fin.directorio.filter((p) => p.rol === "director").map((p) => ({ id: p.id, nombre: p.nombre })),
+    [fin.directorio]
   );
 
   const toggleSerie = (id: string) => {

@@ -32,6 +32,7 @@ import {
   Loader2,
   Save,
   Target,
+  Wallet,
 } from "lucide-react";
 
 const COUNTRIES = [
@@ -79,7 +80,7 @@ export default function GestionUsuarios() {
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | "aliado" | "director" | "account_manager" | "closer">("all");
+  const [roleFilter, setRoleFilter] = useState<"all" | "aliado" | "director" | "account_manager" | "closer" | "finanzas">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   // Filtro de atribución (§13): "all" | "con" | "sin" | el id de un closer.
   const [closerFilter, setCloserFilter] = useState<string>("all");
@@ -101,7 +102,7 @@ export default function GestionUsuarios() {
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+52");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"aliado" | "director" | "account_manager" | "closer">("aliado");
+  const [role, setRole] = useState<"aliado" | "director" | "account_manager" | "closer" | "finanzas">("aliado");
   const [isActive, setIsActive] = useState(true);
   const [passwordProvisional, setPasswordProvisional] = useState("");
   // Closer que incorpora al aliado. Obligatorio al dar de alta un ALIADO (§5):
@@ -471,7 +472,8 @@ export default function GestionUsuarios() {
     {
       nombre: (p) => p.full_name,
       correo: (p) => p.email,
-      rol: (p) => (p.role === "director" ? 0 : p.role === "account_manager" ? 1 : p.role === "closer" ? 2 : 3),
+      rol: (p) =>
+        p.role === "director" ? 0 : p.role === "account_manager" ? 1 : p.role === "finanzas" ? 2 : p.role === "closer" ? 3 : 4,
       estado: (p) => (p.is_active === false ? 0 : 1),
     },
     "nombre",
@@ -499,6 +501,7 @@ export default function GestionUsuarios() {
   const totalAllies = profiles.filter((p) => p.role === "aliado").length;
   const totalAMs = profiles.filter((p) => p.role === "account_manager").length;
   const totalClosers = profiles.filter((p) => p.role === "closer").length;
+  const totalFinanzas = profiles.filter((p) => p.role === "finanzas").length;
   const aliadosConCloser = profiles.filter((p) => p.role === "aliado" && !!p.closer_origen_id).length;
   const aliadosSinCloser = profiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
 
@@ -558,6 +561,16 @@ export default function GestionUsuarios() {
         accent: "border-l-indigo-500",
         avatar: "bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:text-indigo-400 dark:border-indigo-800/40",
         badge: "bg-indigo-50 text-indigo-700 border-indigo-150 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-850",
+      };
+    }
+    if (r === "finanzas") {
+      return {
+        label: "Finanzas y Comisiones",
+        short: "Finanzas",
+        Icon: Wallet,
+        accent: "border-l-amber-500",
+        avatar: "bg-amber-500/10 text-amber-600 border-amber-200 dark:text-amber-400 dark:border-amber-800/40",
+        badge: "bg-amber-50 text-amber-700 border-amber-150 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-850",
       };
     }
     return {
@@ -810,6 +823,19 @@ export default function GestionUsuarios() {
                     >
                       Directores ({totalDirectors})
                     </button>
+                    {/* Solo se ofrece cuando existe al menos una cuenta: es un rol
+                        de una o dos personas y una pestaña siempre en cero solo
+                        estorba en una botonera que ya va apretada. */}
+                    {totalFinanzas > 0 && (
+                      <button
+                        onClick={() => setRoleFilter("finanzas")}
+                        className={`flex-1 sm:flex-none px-3.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                          roleFilter === "finanzas" ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        Finanzas ({totalFinanzas})
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1329,7 +1355,7 @@ export default function GestionUsuarios() {
                   <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                     Rol Asignado
                   </label>
-                  <div className={`grid grid-cols-1 gap-3 ${isCurrentUserAM ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+                  <div className={`grid grid-cols-1 gap-3 ${isCurrentUserAM ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
                     <button
                       type="button"
                       onClick={() => setRole("aliado")}
@@ -1378,7 +1404,31 @@ export default function GestionUsuarios() {
                     >
                       <Target className="h-4 w-4" /> Closer
                     </button>
+                    {/* Finanzas: el inverso de todos los demás. No ve pipeline, ni
+                        aliados, ni usuarios — solo el libro mayor, completo. Solo
+                        Dirección lo puede crear (la base impone lo mismo:
+                        20260803000000 limita al AM a aliado y closer). */}
+                    {!isCurrentUserAM && (
+                      <button
+                        type="button"
+                        onClick={() => setRole("finanzas")}
+                        className={`py-2.5 px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                          role === "finanzas"
+                            ? "bg-amber-50 dark:bg-amber-950/30 border-amber-500 text-amber-600 dark:text-amber-400"
+                            : "bg-slate-50 dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-450 hover:bg-slate-100/40 dark:hover:bg-slate-800/40"
+                        }`}
+                      >
+                        <Wallet className="h-4 w-4" /> Finanzas
+                      </button>
+                    )}
                   </div>
+                  {role === "finanzas" && (
+                    <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Esta cuenta entrará únicamente al módulo de <strong>Finanzas y Comisiones</strong>, con acceso
+                      completo a él: producción, liquidaciones, cortes, pagos y tarifas. No verá el pipeline, ni la
+                      gestión de aliados, ni la de usuarios.
+                    </p>
+                  )}
                 </div>
               )}
 

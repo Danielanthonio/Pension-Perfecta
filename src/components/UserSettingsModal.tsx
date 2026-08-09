@@ -443,7 +443,15 @@ export default function UserSettingsModal({ isOpen, onClose, initialTab }: UserS
                     <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
                       <Shield className={`h-4 w-4 shrink-0 ${textColor}`} />
                       <span className="text-[13px] font-semibold tracking-[0.01em] text-slate-700 dark:text-slate-300">
-                        {user.role === "director" ? "Director de Operaciones" : user.role === "account_manager" ? "Account Manager" : "Aliado Comercial"}
+                        {user.role === "director"
+                          ? "Director de Operaciones"
+                          : user.role === "account_manager"
+                            ? "Account Manager"
+                            : user.role === "finanzas"
+                              ? "Finanzas y Comisiones"
+                              : user.role === "closer"
+                                ? "Closer"
+                                : "Aliado Comercial"}
                       </span>
                     </div>
                   </div>

@@ -38,6 +38,10 @@ const roleHint = (role: string, aliadoTipo?: string) =>
     ? "Dirección"
     : role === "account_manager"
     ? "Account Manager"
+    : role === "finanzas"
+    ? "Finanzas"
+    : role === "closer"
+    ? "Closer"
     : aliadoTipo === "lider"
     ? "Líder de grupo"
     : "Aliado";
@@ -46,7 +50,13 @@ const roleHint = (role: string, aliadoTipo?: string) =>
 const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const roleAccent = (role: string) =>
-  role === "director" ? "bg-teal-500" : role === "account_manager" ? "bg-blue-500" : "bg-emerald-500";
+  role === "director"
+    ? "bg-teal-500"
+    : role === "account_manager"
+    ? "bg-blue-500"
+    : role === "finanzas"
+    ? "bg-amber-500"
+    : "bg-emerald-500";
 
 export default function GlobalChat() {
   const { user, messagingContacts, prospects, isDemoMode } = useApp();

@@ -67,11 +67,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // El rol CLOSER no toca expedientes. Este endpoint vive fuera de los layouts
-    // y del RLS (opera con una cuenta de servicio de Google Drive), así que sería
-    // el único camino por el que un closer alcanzaría documentos de clientes:
-    // basta una sesión válida y un id de archivo para `downloadFile`/`deleteFile`.
-    // Se le niega explícitamente.
+    // Los roles que NO tocan expedientes: `closer` (mide captación) y `finanzas`
+    // (administra el libro mayor). Este endpoint vive fuera de los layouts y del
+    // RLS (opera con una cuenta de servicio de Google Drive), así que sería el
+    // único camino por el que alcanzarían documentos de clientes: basta una
+    // sesión válida y un id de archivo para `downloadFile`/`deleteFile`. Se les
+    // niega explícitamente.
     //
     // ⚠️ PENDIENTE APARTE (preexistente, no introducido aquí): este endpoint
     // sigue sin comprobar la PROPIEDAD del documento — cualquier otro rol
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    if (callerProfile?.role === "closer") {
+    if (callerProfile?.role === "closer" || callerProfile?.role === "finanzas") {
       return NextResponse.json(
         { error: "Tu rol no tiene acceso a los expedientes de clientes." },
         { status: 403 }

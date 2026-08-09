@@ -56,6 +56,25 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   const cleanPath = pathname.replace(/\/$/, "");
   const isAM = user?.role === "account_manager";
   const isCloser = user?.role === "closer";
+  const isFinanzas = user?.role === "finanzas";
+
+  // El rol `finanzas` es el inverso del AM: ve el libro mayor completo y nada
+  // más. Una sola entrada, como el closer (ver 20260808000001).
+  if (isFinanzas) {
+    return (
+      <Link
+        href={`/admin/finanzas${qs}`}
+        onClick={onLinkClick}
+        title="Finanzas"
+        className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase px-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md`}
+      >
+        <span className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-white/15 ${collapsed ? "md:mr-0 mr-3" : "mr-3"}`}>
+          <Wallet className="h-4 w-4 stroke-[2.5]" />
+        </span>
+        <span className={collapsed ? "md:hidden" : ""}>Finanzas</span>
+      </Link>
+    );
+  }
 
   // Un closer solo mide su captación: no ve el pipeline, ni la gestión de
   // aliados, ni los usuarios. Su menú tiene una sola entrada, a su propia ficha.
@@ -418,9 +437,18 @@ export default function AdminLayout({
   // consola completa de Dirección por omisión. Al añadir el rol `closer` eso
   // habría sido un agujero directo: aquí se listan los roles admitidos y todo lo
   // demás sale.
-  const puedeVerAdmin = user?.role === "director" || user?.role === "account_manager" || user?.role === "closer";
+  const puedeVerAdmin =
+    user?.role === "director" ||
+    user?.role === "account_manager" ||
+    user?.role === "closer" ||
+    user?.role === "finanzas";
   // El closer solo tiene una sección; el resto de /admin no es para él.
   const closerFueraDeSuZona = user?.role === "closer" && !pathname.replace(/\/$/, "").startsWith("/admin/closers");
+  // Y el rol `finanzas` solo tiene la suya. Ojo con el aterrizaje: tras iniciar
+  // sesión, el login manda a /admin (el Dashboard del pipeline), así que sin este
+  // guardia lo primero que vería es justo la pantalla que no le toca.
+  const finanzasFueraDeSuZona = user?.role === "finanzas" && pathname.replace(/\/$/, "") !== "/admin/finanzas";
+  const fueraDeSuZona = closerFueraDeSuZona || finanzasFueraDeSuZona;
 
   useEffect(() => {
     if (mounted && !isLoading) {
@@ -432,17 +460,19 @@ export default function AdminLayout({
         router.push("/login");
       } else if (closerFueraDeSuZona) {
         router.push(`/admin/closers/${user.id}`);
+      } else if (finanzasFueraDeSuZona) {
+        router.push("/admin/finanzas");
       }
     }
-  }, [user, mounted, isLoading, router, puedeVerAdmin, closerFueraDeSuZona]);
+  }, [user, mounted, isLoading, router, puedeVerAdmin, closerFueraDeSuZona, finanzasFueraDeSuZona]);
 
-  if (!mounted || isLoading || !user || !puedeVerAdmin || closerFueraDeSuZona) {
+  if (!mounted || isLoading || !user || !puedeVerAdmin || fueraDeSuZona) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-400">
-            {isLoading ? "Cargando Plataforma..." : !user || !puedeVerAdmin || closerFueraDeSuZona ? "Redireccionando..." : "Cargando Consola Director..."}
+            {isLoading ? "Cargando Plataforma..." : !user || !puedeVerAdmin || fueraDeSuZona ? "Redireccionando..." : "Cargando Consola Director..."}
           </span>
         </div>
       </div>
@@ -469,7 +499,8 @@ export default function AdminLayout({
 
   const isAM = user.role === "account_manager";
   const isCloser = user.role === "closer";
-  const rolLabel = isAM ? "Account Manager" : isCloser ? "Closer" : "Director";
+  const isFinanzas = user.role === "finanzas";
+  const rolLabel = isAM ? "Account Manager" : isCloser ? "Closer" : isFinanzas ? "Finanzas" : "Director";
   const themeColor = "bg-gradient-to-r from-emerald-600 to-teal-650";
   const selectionColor = "selection:bg-emerald-500";
 
@@ -573,11 +604,11 @@ export default function AdminLayout({
           <div className="flex items-center gap-2">
             <span className="inline-flex h-2.5 w-2.5 rounded-full animate-pulse bg-teal-500" />
             <span>
-              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : isCloser ? "Closer" : "Dirección"}: <span className="text-teal-400">{user.full_name} ({isAM ? "Account Manager" : isCloser ? "Closer" : "Director de Operaciones"})</span>
+              💡 MODO EVALUACIÓN • Vista {isAM ? "Account Manager" : isCloser ? "Closer" : isFinanzas ? "Finanzas" : "Dirección"}: <span className="text-teal-400">{user.full_name} ({isAM ? "Account Manager" : isCloser ? "Closer" : isFinanzas ? "Finanzas y Comisiones" : "Director de Operaciones"})</span>
             </span>
           </div>
-          {/* El closer no tiene portal de aliado al que saltar. */}
-          {!isCloser && (
+          {/* Ni el closer ni Finanzas tienen portal de aliado al que saltar. */}
+          {!isCloser && !isFinanzas && (
             <button
               onClick={handleRoleSwitch}
               className="px-3 py-0.5 text-white rounded-lg transition-colors flex items-center gap-1.5 active:scale-95 transform font-bold shadow-sm text-[10px] bg-teal-600 hover:bg-teal-700"
@@ -693,8 +724,11 @@ export default function AdminLayout({
 
             {/* Aviso persistente: faltan datos de cobro. Va ANTES del nudge de
                 perfil y lo desplaza, porque sin datos bancarios el usuario
-                simplemente no puede recibir su dinero: es lo más urgente. */}
-            {user && !getBankingCompletion(user).complete && (
+                simplemente no puede recibir su dinero: es lo más urgente.
+                A Finanzas no se le pide: no devenga comisiones en el libro mayor
+                (`rol_beneficiario` no lo admite), así que insistirle con unos
+                datos de cobro que nadie va a usar es solo ruido. */}
+            {user && !isFinanzas && !getBankingCompletion(user).complete && (
               <button
                 onClick={() => {
                   setSettingsTab("banking");
@@ -712,8 +746,10 @@ export default function AdminLayout({
               </button>
             )}
 
-            {/* Nudge: completar perfil (recordatorio persistente, no bloqueante) */}
-            {user && getBankingCompletion(user).complete && !getProfileCompletion(user).verified && (
+            {/* Nudge: completar perfil (recordatorio persistente, no bloqueante).
+                Cede el sitio al aviso de datos de cobro cuando ese aplica; para
+                Finanzas, que no lo tiene, este es el único. */}
+            {user && (isFinanzas || getBankingCompletion(user).complete) && !getProfileCompletion(user).verified && (
               <button
                 onClick={() => {
                   setSettingsTab("personal");

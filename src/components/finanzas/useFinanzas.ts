@@ -128,6 +128,21 @@ function normalizaCorte(row: any): CorteRow {
   } as CorteRow;
 }
 
+/** Roles que pueden COBRAR: los únicos que tiene sentido ofrecer en un selector. */
+const ROLES_QUE_COBRAN = ["director", "account_manager", "closer", "aliado"];
+
+/**
+ * Directorio a partir de los perfiles que el navegador ya tiene. Es la vía de la
+ * previsualización local (donde no hay base) y el respaldo si `fin_directorio()`
+ * no responde.
+ */
+function directorioDePerfiles(lista: { id: string; full_name: string; role: string }[]) {
+  return lista
+    .filter((p) => ROLES_QUE_COBRAN.includes(p.role))
+    .map((p) => ({ id: p.id, nombre: p.full_name || "Sin nombre", rol: p.role }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
 const MENSAJE_GENERICO =
   "No se pudo completar la operación. Vuelve a intentarlo en unos segundos.";
 
@@ -160,7 +175,11 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
   }, [isDemoMode, isProvisionalSession]);
 
   const isLocal = isDemoMode || isProvisionalSession || !supabase;
-  const esDireccion = user?.role === "director";
+  // Quién puede pedir datos. Además de la Dirección, el rol `finanzas`, que existe
+  // exactamente para esto y no ve ninguna otra pantalla (20260808000001). Quién
+  // puede de VERDAD lo dice la base: aquí solo se evita disparar ocho RPC que
+  // van a ser rechazadas.
+  const puedeEntrar = user?.role === "director" || user?.role === "finanzas";
 
   const [resumen, setResumen] = useState<FinanzasResumen>({ ...RESUMEN_VACIO });
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionRow[]>([]);
@@ -170,6 +189,16 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
   const [cortes, setCortes] = useState<CorteRow[]>([]);
   const [tarifas, setTarifas] = useState<TarifaRow[]>([]);
   const [config, setConfig] = useState<FinanzasConfig>({ ...CONFIG_POR_DEFECTO });
+  /**
+   * Personas que pueden aparecer en los selectores de la pantalla: a quién se le
+   * hace un ajuste manual y quién cobra las comisiones de Dirección.
+   *
+   * Viene de la RPC `fin_directorio()` y NO del `profiles` del navegador: una
+   * cuenta con rol `finanzas` no tiene lectura de `profiles` a propósito (el RLS
+   * es ciego a columnas y le entregaría la fila entera, contraseña provisional
+   * incluida), así que esos dos selectores le saldrían vacíos.
+   */
+  const [directorio, setDirectorio] = useState<{ id: string; nombre: string; rol: string }[]>([]);
   /**
    * Si esta cuenta está en `comision_config.acceso_ids` (20260802000003). El rol
    * ya no basta: `admin` lo tienen varias cuentas del equipo y el libro mayor
@@ -186,7 +215,7 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
   );
 
   const load = useCallback(async () => {
-    if (!esDireccion) {
+    if (!puedeEntrar) {
       setLoading(false);
       return;
     }
@@ -204,6 +233,7 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
       setCortes(demoStore.cortes());
       setTarifas(tarifasVigentes());
       setConfig(demoStore.config());
+      setDirectorio(directorioDePerfiles(profiles));
       // En la previsualización no hay lista de acceso: entra quien abra el módulo.
       setAutorizado(true);
       setLoading(false);
@@ -275,6 +305,22 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
         director_beneficiario_id: (cfg.data as any)?.director_beneficiario_id ?? null,
         arranque: (cfg.data as any)?.arranque ?? CONFIG_POR_DEFECTO.arranque,
       });
+
+      // El directorio va aparte y con su propio catch a propósito: si la
+      // migración del rol `finanzas` todavía no está aplicada, esta RPC no existe
+      // y eso NO puede tumbar el libro mayor entero para la Dirección. En ese
+      // caso cae al `profiles` que el navegador ya tiene, que para una cuenta de
+      // dirección viene completo.
+      try {
+        const { data: dir, error: errDir } = await supabase!.rpc("fin_directorio");
+        if (errDir) throw errDir;
+        setDirectorio(
+          ((dir || []) as any[]).map((r) => ({ id: r.id, nombre: r.nombre || "Sin nombre", rol: r.rol }))
+        );
+      } catch (e) {
+        console.warn("No se pudo cargar el directorio de beneficiarios; se usan los perfiles en memoria:", e);
+        setDirectorio(directorioDePerfiles(profiles));
+      }
     } catch (e: any) {
       console.error("Error cargando el módulo de Finanzas:", e);
       setError("No se pudieron cargar las comisiones. Vuelve a intentarlo en unos segundos.");
@@ -286,9 +332,10 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
     } finally {
       setLoading(false);
     }
-    // `profiles`/`prospects` solo importan en la ruta local.
+    // `prospects` solo importa en la ruta local; `profiles` además hace de
+    // respaldo del directorio.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLocal, supabase, esDireccion, argsBase, desde, hasta, grano, rol, estado, dimension, profiles, prospects]);
+  }, [isLocal, supabase, puedeEntrar, argsBase, desde, hasta, grano, rol, estado, dimension, profiles, prospects]);
 
   useEffect(() => {
     load();
@@ -981,6 +1028,7 @@ export function useFinanzas({ desde, hasta, grano, rol, estado, dimension }: Use
     cortes,
     tarifas,
     config,
+    directorio,
     autorizado,
     loading,
     sincronizando,

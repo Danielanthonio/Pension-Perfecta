@@ -7,9 +7,11 @@ import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 // `closer` es la capa que va ANTES del aliado: prospecta y cierra aliados nuevos.
-// En la BD se guarda literal ('closer'), sin el mapeo director↔admin que sí tienen
+// `finanzas` es el inverso del resto: NO ve pipeline, ni aliados, ni usuarios —
+// solo el módulo de Finanzas y Comisiones, completo (ver 20260808000001).
+// Ambos se guardan literales en la BD, sin el mapeo director↔admin que sí tienen
 // los otros roles. Ver 20260801000000_closers.sql.
-export type UserRole = "aliado" | "director" | "account_manager" | "closer";
+export type UserRole = "aliado" | "director" | "account_manager" | "closer" | "finanzas";
 
 export interface UserProfile {
   id: string;
@@ -1997,7 +1999,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
               ? "Account Manager"
               : role === "closer"
                 ? "Closer Comercial"
-                : "Director Operaciones",
+                : role === "finanzas"
+                  ? "Finanzas"
+                  : "Director Operaciones",
         email,
         phone: "5500000000",
         role,
@@ -5198,7 +5202,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   //   · aliado → él mismo + los AMs asignados a SUS proyectos
   const exposedProfiles = React.useMemo(() => {
     if (!user) return [];
-    if (user.role === "director") return profiles;
+    // `finanzas` no se recorta aquí y no hace falta: en producción su RLS solo le
+    // entrega su propia fila y las de dirección, así que la lista ya llega
+    // recortada por la base. Filtrarla otra vez solo rompería la previsualización
+    // local, donde no hay RLS y el motor demo del módulo se alimenta de esta
+    // misma lista. Los selectores de personas del módulo NO salen de aquí: van
+    // por `fin_directorio()` justamente para no depender de esto.
+    if (user.role === "director" || user.role === "finanzas") return profiles;
     if (user.role === "account_manager") {
       const myAllyIds = new Set(
         prospects.filter(p => p.account_manager_id === user.id).map(p => p.aliado_id)
@@ -5293,6 +5303,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           p.role === "director" ||
           (p.role === "aliado" && (p.closer_origen_id === user.id || p.closer_actual_id === user.id))
       );
+    }
+    if (user.role === "finanzas") {
+      // Solo con dirección: es de quien recibe las instrucciones de pago y a
+      // quien le reporta. No habla con aliados —no los ve— ni con los AM.
+      return others.filter(p => p.role === "director");
     }
     return [] as UserProfile[];
   }, [user, profiles, prospects]);
