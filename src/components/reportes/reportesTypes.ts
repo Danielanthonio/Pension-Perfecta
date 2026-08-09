@@ -386,6 +386,23 @@ export function mesDe(iso: string | null | undefined): string {
 }
 
 /**
+ * Mes 'YYYY-MM' de una cita de asesoría, en hora de México.
+ *
+ * `prospects.asesoria_at` guarda el INSTANTE de la reunión anclado a CDMX
+ * (-06:00 fijo: México no aplica horario de verano desde 2022). Cortarlo en UTC
+ * empujaría toda cita de las 18:00 en adelante al día siguiente —y en el último
+ * día del mes, al mes siguiente—, así que se corre el instante seis horas y se
+ * leen los campos UTC, exactamente lo que hace `citaInputs` del stepper para
+ * recuperar la hora que se tecleó.
+ */
+export function mesDeCita(asesoriaAt: string | null | undefined): string | null {
+  if (!asesoriaAt) return null;
+  const t = new Date(asesoriaAt).getTime();
+  if (isNaN(t)) return null;
+  return new Date(t - 6 * 60 * 60 * 1000).toISOString().substring(0, 7);
+}
+
+/**
  * Cuánto lleva recorrido un mes 'YYYY-MM' a día de hoy.
  *
  * Un mes ya cerrado va al 100 %; el que está en curso, por los días

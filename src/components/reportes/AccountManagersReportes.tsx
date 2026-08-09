@@ -7,7 +7,7 @@
 //   2. Ranking AM            — barras + tasas generales.
 //   3. Estados por AM        — línea de tiempo clicable arriba, barras abajo.
 //   4. AM x Estados (grupo)  — barras agrupadas, todas las métricas a la vez.
-//   5. AM «Agenda»           — objetivo (lo teclea Dirección) contra real.
+//   5. AM «Agendas»          — asesorías del mes contra la meta que fija Dirección.
 //   6. Sub estados           — panel compartido con la pestaña ALIADOS.
 //
 // El AM del proyecto vive en `prospects.account_manager_id`, no en el aliado
@@ -61,6 +61,7 @@ import {
   fmtNum,
   fmtPct,
   mesDe,
+  mesDeCita,
   mesLabel,
   objetivoALaFecha,
   serieDe,
@@ -199,26 +200,47 @@ export function AccountManagersReportes({
     const pedido = mesDe(filters.hasta || null);
     return pedido > mesActual ? mesActual : pedido;
   }, [filters.hasta]);
-  // La métrica del objetivo es la SUYA, no la del ranking. Iban juntas y era un
-  // error: cada métrica guarda su propia meta, así que reordenar el ranking
-  // cambiaba en silencio el juego de objetivos y dos personas con la misma
-  // pantalla veían cifras distintas sin pista de por qué.
-  const metricaObj = METRICAS[filters.metricaObjetivo];
-  const { objetivos, error: errorObjetivos, puedeEditar, guardar } = useObjetivosAM(periodo, filters.metricaObjetivo);
+  // Este panel mide AGENDAS y solo agendas: cuántas asesorías tiene el AM en el
+  // mes contra las que Dirección le puso de meta. No lleva selector de métrica —
+  // llegó a tenerlo y era ruido: la meta de agenda es una sola cosa.
+  const { objetivos, error: errorObjetivos, puedeEditar, guardar } = useObjetivosAM(periodo, "agenda");
 
   // Cuánto del mes va corrido. Un mes cerrado va al 100 %, así que en «Mes
   // anterior» el prorrateo desaparece solo y se compara contra la meta entera.
   const avance = useMemo(() => avanceDelMes(periodo), [periodo]);
   const enCurso = avance.fraccion < 1;
 
+  // ⚠️ Las agendas NO pueden salir de `grupos`, que está acotado al rango de la
+  // pestaña por `created_at`. Una asesoría de agosto puede ser de un cliente
+  // capturado en junio, y con «Mes a la fecha» ese proyecto ni siquiera estaría
+  // en la lista: se perderían agendas reales. Este panel parte de la cartera
+  // ENTERA (con los filtros de producto, segmento y AM, pero sin fecha) y se
+  // acota él mismo por la fecha de la REUNIÓN.
+  const gruposAgenda = useMemo(() => {
+    const vivos = prospects.filter((p) => !isProspectDeleted(p) && !isProspectPurged(p));
+    const porSeleccion =
+      filters.entidades.length === 0
+        ? vivos
+        : vivos.filter((p) => filters.entidades.includes(p.account_manager_id || SIN_AM));
+    const sinFecha = aplicaFiltros(porSeleccion, { ...filters, desde: "", hasta: "" }, perfilPorId);
+    return agrupaPor(
+      sinFecha,
+      (p) => p.account_manager_id || null,
+      (id) => perfilPorId.get(id)?.full_name || "Account Manager",
+      "Mesa de dirección"
+    );
+  }, [prospects, filters, perfilPorId, isProspectDeleted, isProspectPurged]);
+
   // Solo los AM de verdad llevan meta: a la mesa de dirección no se le pone
   // objetivo de agenda, así que se queda fuera de este gráfico.
   //
-  // El REAL se acota a ese mismo mes, no al rango de la pestaña: enfrentar la
-  // producción de un año contra una meta mensual daría un cumplimiento inventado.
+  // Una agenda cuenta en el mes de la REUNIÓN (`asesoria_at`), no en el de la
+  // captura. Y cuenta aunque el proyecto ya haya avanzado: la columna no se borra
+  // al pasar a Firma o a Fin. Otorgado, así que la asesoría celebrada sigue
+  // sumando en su mes en vez de desaparecer del histórico.
   const filasAgenda = useMemo(
     () =>
-      grupos
+      gruposAgenda
         .filter((g) => g.id !== SIN_AM)
         .map((g) => {
           const objetivo = objetivos.get(g.id) ?? 0;
@@ -227,12 +249,16 @@ export function AccountManagersReportes({
             nombre: g.nombre,
             objetivo,
             esperado: objetivoALaFecha(objetivo, periodo),
-            real: g.items.filter((p) => metricaObj.match(p) && (p.created_at || "").substring(0, 7) === periodo).length,
+            real: g.items.filter((p) => mesDeCita(p.asesoria_at) === periodo).length,
           };
         })
         .sort((a, b) => b.real - a.real),
-    [grupos, objetivos, metricaObj, periodo]
+    [gruposAgenda, objetivos, periodo]
   );
+
+  // El CSV lee de aquí y no recalcula: si divergieran, el archivo diría una cosa
+  // y la pantalla otra.
+  const agendasPorAM = useMemo(() => new Map(filasAgenda.map((f) => [f.id, f.real])), [filasAgenda]);
 
   const promedioReal = filasAgenda.length > 0 ? filasAgenda.reduce((s, f) => s + f.real, 0) / filasAgenda.length : null;
   const objetivoMedio = filasAgenda.length > 0 ? filasAgenda.reduce((s, f) => s + f.objetivo, 0) / filasAgenda.length : null;
@@ -281,7 +307,8 @@ export function AccountManagersReportes({
         "T. aprobación %",
         "T. condicionamiento %",
         "T. cierre %",
-        `Objetivo ${periodo} (${METRICAS[filters.metricaObjetivo].label})`,
+        `Objetivo de agendas ${periodo}`,
+        `Agendas de ${periodo}`,
       ],
     ];
     ranking.forEach((r) => {
@@ -297,6 +324,7 @@ export function AccountManagersReportes({
         (t.condicionamiento ?? 0).toFixed(1),
         (t.cierre ?? 0).toFixed(1),
         objetivos.get(r.id) ?? 0,
+        agendasPorAM.get(r.id) ?? 0,
       ]);
     });
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
@@ -507,24 +535,23 @@ export function AccountManagersReportes({
         <PanelHeader
           icon={CalendarCheck}
           tone="amber"
-          title="Agenda · objetivo contra real"
+          title="Agendas · objetivo contra real"
           subtitle={
             <>
-              <strong>{mesLabel(periodo)}</strong>
-              {enCurso ? ` · día ${avance.dia} de ${avance.dias} (${Math.round(avance.fraccion * 100)} % del mes)` : " · mes cerrado"}.
-              Panel mensual: el real es solo de ese mes.{" "}
+              Asesorías con fecha de reunión en <strong>{mesLabel(periodo)}</strong>
+              {enCurso ? `, al día ${avance.dia} de ${avance.dias} (${Math.round(avance.fraccion * 100)} % del mes)` : " (mes cerrado)"}.{" "}
               {enCurso
-                ? "Con el mes en curso se compara contra la parte proporcional de la meta, no contra el mes entero."
-                : "Se compara contra la meta completa."}
+                ? "La meta del mes la fija Dirección; la línea marca cuántas tocaría llevar a la fecha."
+                : "Se compara contra la meta completa del mes."}
             </>
           }
         >
           <div className="flex flex-wrap items-center gap-2">
             <ChipTasa label="Objetivo del mes" value={objetivoMedio === null ? "—" : fmtNum(objetivoMedio, 0)} tone="sky" />
             {enCurso && (
-              <ChipTasa label="Esperado a la fecha" value={esperadoMedio === null ? "—" : fmtNum(esperadoMedio, 0)} tone="amber" />
+              <ChipTasa label="Deberían llevar" value={esperadoMedio === null ? "—" : fmtNum(esperadoMedio, 0)} tone="amber" />
             )}
-            <ChipTasa label="Promedio real" value={promedioReal === null ? "—" : fmtNum(promedioReal, 0)} tone="teal" />
+            <ChipTasa label="Llevan" value={promedioReal === null ? "—" : fmtNum(promedioReal, 0)} tone="teal" />
             <ChipTasa
               label={enCurso ? "Van al ritmo" : "Cumplen la meta"}
               value={conObjetivo > 0 ? `${cumplen} / ${conObjetivo}` : "—"}
@@ -533,21 +560,6 @@ export function AccountManagersReportes({
           </div>
         </PanelHeader>
 
-        {/* Botonera PROPIA del panel: cada métrica lleva su propia meta, así que
-            esto no puede colgar del selector del ranking. */}
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
-            Meta medida en
-          </span>
-          <div className={`${segmented} flex-wrap`}>
-            {METRICAS_RANKING.map((id) => (
-              <button key={id} onClick={() => setFilters({ metricaObjetivo: id })} className={pill(filters.metricaObjetivo === id)}>
-                {METRICAS[id].label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {errorObjetivos && (
           <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
             <p className="text-[11px] text-amber-800 dark:text-amber-300">{errorObjetivos}</p>
@@ -555,40 +567,40 @@ export function AccountManagersReportes({
         )}
 
         {filasAgenda.length === 0 ? (
-          <Vacio>No hay account managers con proyectos en el período.</Vacio>
+          <Vacio>No hay account managers a los que medir agendas.</Vacio>
         ) : (
           <>
             <ObjetivoRealChart filas={filasAgenda} prorrateado={enCurso} />
             <Leyenda
               series={[
-                { id: "obj", label: "Objetivo del mes", color: VIZ_MUTED_VAR, total: filasAgenda.reduce((s, f) => s + f.objetivo, 0) },
+                { id: "obj", label: "Objetivo de agendas del mes", color: VIZ_MUTED_VAR, total: filasAgenda.reduce((s, f) => s + f.objetivo, 0) },
                 ...(enCurso
-                  ? [{ id: "esp", label: "Esperado a la fecha (línea)", color: "var(--rp-8)", total: filasAgenda.reduce((s, f) => s + f.esperado, 0) }]
+                  ? [{ id: "esp", label: "Deberían llevar a la fecha (línea)", color: "var(--rp-8)", total: filasAgenda.reduce((s, f) => s + f.esperado, 0) }]
                   : []),
-                { id: "real", label: "Real", color: "var(--rp-1)", total: filasAgenda.reduce((s, f) => s + f.real, 0) },
+                { id: "real", label: "Agendas del mes", color: "var(--rp-1)", total: filasAgenda.reduce((s, f) => s + f.real, 0) },
               ]}
             />
             <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              La barra del real cambia de color según {enCurso ? "el ritmo esperado" : "la meta"}: verde
-              {enCurso ? " va al día" : " la alcanza"}, ámbar se queda corto, azul es que todavía no tiene objetivo
-              puesto.
+              Una agenda cuenta en el mes de la reunión y sigue contando aunque el proyecto ya haya avanzado. La
+              barra cambia de color según {enCurso ? "el ritmo" : "la meta"}: verde {enCurso ? "va al día" : "la alcanza"},
+              ámbar se queda corto, azul es que todavía no tiene objetivo puesto.
             </p>
 
             {puedeEditar && (
               <div className="rounded-xl border border-slate-200/70 dark:border-slate-800 overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
                   <h4 className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                    Objetivos de {mesLabel(periodo)} · {metricaObj.label}
+                    Objetivo de agendas · {mesLabel(periodo)}
                   </h4>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                    Se guarda al salir del campo. Cada métrica y cada mes llevan su propia meta.
+                    Se guarda al salir del campo. Cada mes lleva su propia meta y queda histórica.
                   </p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs min-w-[620px]">
                     <thead>
                       <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
-                        {["Account Manager", "Objetivo del mes", ...(enCurso ? ["Esperado hoy"] : []), "Real", "Avance"].map((h, i) => (
+                        {["Account Manager", "Objetivo del mes", ...(enCurso ? ["Deberían llevar"] : []), "Llevan", "Avance"].map((h, i) => (
                           <th
                             key={h}
                             className={`px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 ${
