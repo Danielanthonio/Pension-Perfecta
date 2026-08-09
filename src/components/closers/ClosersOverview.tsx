@@ -81,13 +81,7 @@ const pill = (active: boolean) =>
 
 const segmented = "flex items-center gap-0.5 rounded-xl bg-slate-100 dark:bg-slate-800/70 p-0.5 ring-1 ring-inset ring-slate-200/70 dark:ring-slate-700/50";
 
-/**
- * `embebido` lo usa la pestaña CLOSER del módulo Reportes: allí la página ya
- * pone su propio encabezado, y repetir el título "Closers" con su botón de
- * exportar dejaría dos cabeceras pegadas. Todo lo demás —filtros, gráfico,
- * tabla— es idéntico.
- */
-export default function ClosersOverview({ embebido = false }: { embebido?: boolean } = {}) {
+export default function ClosersOverview() {
   const { user, profiles } = useApp();
   const { filters, setFilters, qs } = useCloserFilters();
 
@@ -322,7 +316,7 @@ export default function ClosersOverview({ embebido = false }: { embebido?: boole
     return (
       <div className="closers-viz space-y-5 animate-fade-in">
         <style>{CLOSER_VIZ_STYLE}</style>
-        {!embebido && <Encabezado onExport={null} />}
+        <Encabezado onExport={null} />
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm px-6 py-16 text-center">
           <div className="mx-auto h-12 w-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
             <Target className="h-6 w-6" strokeWidth={2.2} />
@@ -351,22 +345,7 @@ export default function ClosersOverview({ embebido = false }: { embebido?: boole
     <div className="closers-viz space-y-5 animate-fade-in text-slate-800 dark:text-slate-100">
       <style>{CLOSER_VIZ_STYLE}</style>
 
-      {embebido ? (
-        // Sin cabecera propia, pero el CSV no se pierde: se sube a la fila de
-        // filtros, que es lo único que queda arriba del tablero.
-        filasOrdenadas.length > 0 && (
-          <div className="flex justify-end print:hidden">
-            <button
-              onClick={exportCsv}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95"
-            >
-              <Download className="h-4 w-4" strokeWidth={2.4} /> Exportar CSV
-            </button>
-          </div>
-        )
-      ) : (
-        <Encabezado onExport={filasOrdenadas.length > 0 ? exportCsv : null} />
-      )}
+      <Encabezado onExport={filasOrdenadas.length > 0 ? exportCsv : null} />
 
       {error && (
         <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 flex items-center justify-between gap-3">

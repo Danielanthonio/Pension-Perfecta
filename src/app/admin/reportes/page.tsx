@@ -11,8 +11,10 @@
 //                aquí porque es de siempre y no tiene dueño de rol.
 //   · ALIADOS / ACCOUNT MANAGER — en `@/components/reportes`, calculados en el
 //                navegador sobre `prospects` (que el contexto ya recorta por rol).
-//   · CLOSER   — el tablero del módulo Closers, embebido. Sus métricas se agregan
-//                en Postgres y no se reimplementan aquí.
+//   · CLOSER   — el mismo informe que la ficha de un closer (aliados, CF, CNF,
+//                PPE y evolución), general o por closer. Sus métricas se agregan
+//                en Postgres y no se reimplementan aquí. El resto del tablero
+//                —tabla de rendimiento, comparativas— vive en el módulo Closers.
 
 import React, { useState, useMemo, Suspense } from "react";
 import {
