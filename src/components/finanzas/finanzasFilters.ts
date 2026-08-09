@@ -65,6 +65,91 @@ export interface FinanzasFilters {
 const PRESET_POR_DEFECTO: RangoPreset = "mes_actual";
 const GRANO_POR_DEFECTO: Grano = "semana";
 
+/**
+ * Filtros de «Mis comisiones», la vista personal del Account Manager y del
+ * Closer (20260810000000).
+ *
+ * Comparte los nombres de parámetro con la vista de Dirección (`rango`, `desde`,
+ * `hasta`, `tab`, `estado`) a propósito: las dos pantallas viven en la misma
+ * ruta y cambiar de rol no tiene por qué invalidar un enlace guardado. Lo que no
+ * comparte es la lista de pestañas —aquí no hay cortes, ni producción, ni
+ * bitácora— ni el filtro de ROL o de PERSONA, que en una pantalla donde solo
+ * existe uno mismo no significan nada.
+ */
+export type PestanaMisComisiones = "resumen" | "movimientos" | "depositos" | "tarifas";
+
+const PESTANAS_MIAS: PestanaMisComisiones[] = ["resumen", "movimientos", "depositos", "tarifas"];
+
+export interface MisComisionesFilters {
+  pestana: PestanaMisComisiones;
+  preset: RangoPreset;
+  desde: string;
+  hasta: string;
+  grano: Grano;
+  estado: EstadoComision | null;
+}
+
+export function useMisComisionesFilters() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const filters = useMemo<MisComisionesFilters>(() => {
+    const rawPreset = searchParams.get("rango") as RangoPreset | null;
+    const preset: RangoPreset = rawPreset && PRESETS.includes(rawPreset) ? rawPreset : PRESET_POR_DEFECTO;
+
+    let desde = searchParams.get("desde") || "";
+    let hasta = searchParams.get("hasta") || "";
+    if (preset !== "personalizado") {
+      const r = resolveRango(preset, new Date());
+      desde = r.desde;
+      hasta = r.hasta;
+    }
+
+    const rawGrano = searchParams.get("grano") as Grano | null;
+    const rawPestana = searchParams.get("tab") as PestanaMisComisiones | null;
+    const rawEstado = searchParams.get("estado") as EstadoComision | null;
+
+    return {
+      pestana: rawPestana && PESTANAS_MIAS.includes(rawPestana) ? rawPestana : "resumen",
+      preset,
+      desde,
+      hasta,
+      grano: rawGrano && GRANOS.includes(rawGrano) ? rawGrano : GRANO_POR_DEFECTO,
+      estado: rawEstado && ESTADOS.includes(rawEstado) ? rawEstado : null,
+    };
+  }, [searchParams]);
+
+  const setFilters = useCallback(
+    (patch: Partial<MisComisionesFilters>) => {
+      const p = new URLSearchParams(searchParams.toString());
+      const put = (key: string, value: string | null, vacio: string) => {
+        if (!value || value === vacio) p.delete(key);
+        else p.set(key, value);
+      };
+
+      if (patch.pestana !== undefined) put("tab", patch.pestana, "resumen");
+      if (patch.preset !== undefined) {
+        put("rango", patch.preset, PRESET_POR_DEFECTO);
+        if (patch.preset !== "personalizado") {
+          p.delete("desde");
+          p.delete("hasta");
+        }
+      }
+      if (patch.desde !== undefined) put("desde", patch.desde, "");
+      if (patch.hasta !== undefined) put("hasta", patch.hasta, "");
+      if (patch.grano !== undefined) put("grano", patch.grano, GRANO_POR_DEFECTO);
+      if (patch.estado !== undefined) put("estado", patch.estado, "");
+
+      const qs = p.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
+
+  return { filters, setFilters };
+}
+
 export function useFinanzasFilters() {
   const searchParams = useSearchParams();
   const router = useRouter();

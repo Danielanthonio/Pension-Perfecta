@@ -77,33 +77,64 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   }
 
   // Un closer solo mide su captación: no ve el pipeline, ni la gestión de
-  // aliados, ni los usuarios. Su menú tiene una sola entrada, a su propia ficha.
+  // aliados, ni los usuarios. Su menú tiene DOS entradas —su ficha y su propia
+  // liquidación— y ninguna de las dos enseña nada de nadie más.
   if (isCloser) {
-    const href = `/admin/closers/${user?.id ?? ""}${qs}`;
+    const items = [
+      {
+        href: `/admin/closers/${user?.id ?? ""}${qs}`,
+        active: cleanPath.startsWith("/admin/closers"),
+        Icon: Target,
+        label: "Mis métricas",
+      },
+      {
+        href: `/admin/finanzas${qs}`,
+        active: cleanPath === "/admin/finanzas",
+        Icon: Wallet,
+        label: "Mis comisiones",
+      },
+    ];
     return (
-      <Link
-        href={href}
-        onClick={onLinkClick}
-        title="Mis métricas"
-        className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase px-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md`}
-      >
-        <span className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-white/15 ${collapsed ? "md:mr-0 mr-3" : "mr-3"}`}>
-          <Target className="h-4 w-4 stroke-[2.5]" />
-        </span>
-        <span className={collapsed ? "md:hidden" : ""}>Mis métricas</span>
-      </Link>
+      <>
+        {items.map(({ href, active, Icon, label }) => (
+          <Link
+            key={href}
+            href={href}
+            onClick={onLinkClick}
+            title={label}
+            className={`group flex items-center py-2 text-xs font-extrabold rounded-xl transition-all tracking-wide uppercase px-2 ${
+              active
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            <span
+              className={`flex items-center justify-center h-8 w-8 rounded-lg shrink-0 ${collapsed ? "md:mr-0 mr-3" : "mr-3"} ${
+                active ? "bg-white/15" : "bg-slate-800/70 group-hover:bg-slate-700/70"
+              }`}
+            >
+              <Icon className="h-4 w-4 stroke-[2.5]" />
+            </span>
+            <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+          </Link>
+        ))}
+      </>
     );
   }
 
   const items = [
     { href: `/admin${qs}`, active: cleanPath === "/admin", Icon: LayoutDashboard, label: "Dashboard" },
     { href: `/admin/reportes${qs}`, active: cleanPath === "/admin/reportes", Icon: FileBarChart, label: "Reportes" },
-    // Finanzas y Comisiones: exclusivo de la Dirección (§2 del brief). Un Account
-    // Manager no lo ve —ni aquí ni consultando la base: las tablas de comisiones
-    // solo tienen SELECT para dirección y las RPC lo comprueban por dentro—.
-    ...(!isAM
-      ? [{ href: `/admin/finanzas${qs}`, active: cleanPath === "/admin/finanzas", Icon: Wallet, label: "Finanzas" }]
-      : []),
+    // Finanzas y Comisiones. La Dirección entra al libro mayor completo; el
+    // Account Manager entra a la MISMA ruta y aterriza en su propia liquidación
+    // (20260810000000), por eso cambia la etiqueta: prometer «Finanzas» a quien
+    // solo va a ver lo suyo genera una decepción en el primer clic.
+    {
+      href: `/admin/finanzas${qs}`,
+      active: cleanPath === "/admin/finanzas",
+      Icon: Wallet,
+      label: isAM ? "Mis Comisiones" : "Finanzas",
+    },
     { href: `/admin/clientes${qs}`, active: cleanPath === "/admin/clientes", Icon: Contact, label: "Gestión Clientes" },
     { href: `/admin/agenda-futura${qs}`, active: cleanPath === "/admin/agenda-futura", Icon: CalendarClock, label: "Agenda Futura" },
     { href: `/admin/aliados${qs}`, active: cleanPath === "/admin/aliados", Icon: Users, label: "Gestión Aliados" },
@@ -442,8 +473,17 @@ export default function AdminLayout({
     user?.role === "account_manager" ||
     user?.role === "closer" ||
     user?.role === "finanzas";
-  // El closer solo tiene una sección; el resto de /admin no es para él.
-  const closerFueraDeSuZona = user?.role === "closer" && !pathname.replace(/\/$/, "").startsWith("/admin/closers");
+  // El closer solo tiene dos secciones —su ficha de métricas y su propia
+  // liquidación—; el resto de /admin no es para él. Su zona se lista aquí en
+  // POSITIVO, por el mismo motivo que `puedeVerAdmin`: una ruta nueva no debe
+  // caerle dentro por omisión.
+  const ZONA_CLOSER = ["/admin/closers", "/admin/finanzas"];
+  const closerFueraDeSuZona =
+    user?.role === "closer" &&
+    !ZONA_CLOSER.some((z) => {
+      const ruta = pathname.replace(/\/$/, "");
+      return ruta === z || ruta.startsWith(`${z}/`);
+    });
   // Y el rol `finanzas` solo tiene la suya. Ojo con el aterrizaje: tras iniciar
   // sesión, el login manda a /admin (el Dashboard del pipeline), así que sin este
   // guardia lo primero que vería es justo la pantalla que no le toca.
@@ -568,10 +608,18 @@ export default function AdminLayout({
       };
     }
     if (cleanPath === "/admin/finanzas") {
-      return {
-        title: "Finanzas y Comisiones",
-        subtitle: "Revisa la producción, aprueba las comisiones y controla los pagos del equipo.",
-      };
+      // La ruta es la misma para todos, pero lo que hay dentro no: el AM y el
+      // closer ven solo su liquidación, así que el encabezado no puede prometer
+      // «los pagos del equipo».
+      return isAM || isCloser
+        ? {
+            title: "Mis Comisiones",
+            subtitle: "Lo que has generado, en qué punto va cada pago y las tarifas con las que se calcula.",
+          }
+        : {
+            title: "Finanzas y Comisiones",
+            subtitle: "Revisa la producción, aprueba las comisiones y controla los pagos del equipo.",
+          };
     }
     if (cleanPath === "/admin/asignacion-closer") {
       return {

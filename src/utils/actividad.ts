@@ -87,7 +87,11 @@ const MODULOS: { prefijo: string; label: string }[] = [
   { prefijo: "/admin/classroom", label: "Classroom" },
   { prefijo: "/admin/clientes", label: "Gestión de clientes" },
   { prefijo: "/admin/closers", label: "Closers" },
-  { prefijo: "/admin/finanzas", label: "Finanzas" },
+  // La ruta es la misma para todos, pero solo se registra la actividad de los
+  // Account Managers, y lo que ellos encuentran ahí es su propia liquidación
+  // (20260810000000). Rotularlo «Finanzas» a secas haría leer al reporte que el
+  // AM entró al libro mayor de la empresa, que es justo lo que no puede ver.
+  { prefijo: "/admin/finanzas", label: "Mis comisiones" },
   { prefijo: "/admin/aliados", label: "Aliados" },
   { prefijo: "/admin/nuevo", label: "Alta de proyecto" },
   { prefijo: "/admin/reportes", label: "Reportes" },
