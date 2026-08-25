@@ -43,6 +43,7 @@ import MeetingModalityModal from "@/components/MeetingModalityModal";
 import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex, STEP_STATUSES, STEP_DEFS, resolveStepDates } from "@/components/ui/projectStepper";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
+import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -2322,9 +2323,20 @@ export default function ProspectoDetalle() {
           const leaders = aliadoProfile?.lider_ids?.length ? profiles.filter((p) => aliadoProfile.lider_ids!.includes(p.id)) : [];
           const empresa = prospect.empresa_multialiado_id ? empresasMultialiado.find((e) => e.id === prospect.empresa_multialiado_id) : null;
           const created = new Date(prospect.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+          // Quién TECLEÓ el alta. Ojo: NO es el aliado — el eslabón de al lado dice
+          // de quién ES el proyecto, y el AM puede capturarlo a nombre del aliado.
+          // Antes esta cadena etiquetaba al aliado como "el que lo creó", que era
+          // justamente el dato que no se podía distinguir.
+          const creadorMeta = getCreadorMeta(prospect.created_by_role);
+          const creadorProfile = prospect.created_by ? profiles.find((p) => p.id === prospect.created_by) : null;
+          const creadorName = creadorProfile?.full_name || prospect.created_by_name || (creadorMeta ? creadorMeta.label : "Sin registro");
           const chain = [
-            { label: "Aliado que lo creó", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B", Icon: User,
+            { label: "Aliado del proyecto", name: aliadoProfile?.full_name || prospect.aliado_name || "Asesor B2B", Icon: User,
               wrap: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400" },
+            { label: creadorMeta ? `Creado por · ${creadorMeta.label}` : "Creado por",
+              name: creadorMeta ? creadorName : "Sin registro",
+              Icon: (creadorMeta ?? CREADOR_SIN_REGISTRO).Icon,
+              wrap: (creadorMeta ?? CREADOR_SIN_REGISTRO).wrap },
             { label: "Account Manager", name: amName, Icon: ShieldCheck,
               wrap: "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400" },
             { label: empresa ? "Líder / Empresa" : "Líder asignado",

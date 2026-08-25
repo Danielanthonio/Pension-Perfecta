@@ -25,6 +25,7 @@ import {
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
+import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
 import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "../_pipelineBuckets";
 import Link from "next/link";
@@ -270,6 +271,60 @@ function GeneralPanel({ filters }: { filters: ReportesFilters }) {
   }, [pipeline, profiles]);
   const amTotal = amSegments.reduce((s, x) => s + x.value, 0);
 
+  // ── Origen del alta: ¿quién TECLEÓ el proyecto? ────────────────────────────────
+  // La meta declarada es que los aliados capturen sus propios proyectos. Esto es el
+  // termómetro: `created_by_role` es el rol de quien dio de alta, sellado en la base
+  // al insertar (migración 20260824000000). Los proyectos anteriores a esa medición
+  // que no se pudieron reconstruir salen como "Sin registro" — no se reparten ni se
+  // adivinan, porque inflarían cualquiera de los dos lados.
+  const origen = useMemo(() => {
+    const counts = new Map<string, { label: string; color: string; value: number }>();
+    let aliado = 0;
+    let conRegistro = 0;
+    for (const p of filteredByDate) {
+      const meta = getCreadorMeta(p.created_by_role);
+      const key = meta ? meta.kind : "sin_registro";
+      const label = meta ? meta.label : CREADOR_SIN_REGISTRO.label;
+      const color = meta ? meta.color : CREADOR_SIN_REGISTRO.color;
+      if (!counts.has(key)) counts.set(key, { label, color, value: 0 });
+      counts.get(key)!.value++;
+      if (meta) conRegistro++;
+      if (meta?.kind === "aliado") aliado++;
+    }
+    const ORDEN = ["aliado", "account_manager", "direccion", "closer", "finanzas", "sin_registro"];
+    const segments = ORDEN.filter((k) => counts.has(k)).map((k) => counts.get(k)!);
+    // El % de adopción se mide SOLO sobre los proyectos con autoría conocida: si no,
+    // el histórico sin registro lo hundiría artificialmente.
+    const pctAliado = conRegistro > 0 ? (aliado / conRegistro) * 100 : 0;
+    return { segments, total: filteredByDate.length, aliado, conRegistro, pctAliado };
+  }, [filteredByDate]);
+
+  // Evolución mensual de la adopción: qué porcentaje de las altas de cada mes las
+  // hizo el propio aliado. Es la serie que debe subir.
+  const adopcionMensual = useMemo(() => {
+    const map = new Map<string, { d: Date; total: number; aliado: number }>();
+    for (const p of filteredByDate) {
+      if (!p.created_at) continue;
+      const meta = getCreadorMeta(p.created_by_role);
+      if (!meta) continue; // sin autoría no suma ni al numerador ni al denominador
+      const d = new Date(p.created_at);
+      const k = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!map.has(k)) map.set(k, { d: new Date(d.getFullYear(), d.getMonth(), 1), total: 0, aliado: 0 });
+      const row = map.get(k)!;
+      row.total++;
+      if (meta.kind === "aliado") row.aliado++;
+    }
+    return Array.from(map.values())
+      .sort((a, b) => a.d.getTime() - b.d.getTime())
+      .slice(-8)
+      .map((x) => ({
+        label: `${MESES[x.d.getMonth()]} ${String(x.d.getFullYear()).slice(2)}`,
+        total: x.total,
+        aliado: x.aliado,
+        pct: x.total > 0 ? (x.aliado / x.total) * 100 : 0,
+      }));
+  }, [filteredByDate]);
+
   // ── Fin. Otorgado esperando que finanzas libere la comisión (firma_programada) ──
   // Nota: firma_programada = Fin. Otorgado ejecutado pero aún NO pagado (pagado_comision);
   // por eso el worklist "esperando finanzas" filtra solo firma_programada.
@@ -304,6 +359,9 @@ function GeneralPanel({ filters }: { filters: ReportesFilters }) {
     rows.push(["Embudo", "Proyectos", f.proyectos], ["Embudo", "Evaluados", f.evaluados], ["Embudo", "Aprobados", f.aprobados], ["Embudo", "Condicionados", f.condicionados], ["Embudo", "Rechazados", f.rechazados], ["Embudo", "Fin. Otorgado", f.otorgados], ["Embudo", "Financiamiento aprobado", Math.round(f.finAprobado)], ["Embudo", "Financiamiento otorgado", Math.round(f.finOtorgado)]);
     tipoSegments.forEach((s) => rows.push(["Tipo de financiamiento", s.label, s.value]));
     amSegments.forEach((s) => rows.push(["Contribución AM (proyectos)", s.label, s.value]));
+    origen.segments.forEach((seg) => rows.push(["Origen del alta (creado por)", seg.label, seg.value]));
+    rows.push(["Origen del alta (creado por)", "% creado por el aliado", `${origen.pctAliado.toFixed(1)}%`]);
+    adopcionMensual.forEach((m) => rows.push(["Adopción mensual (% altas del aliado)", m.label, `${m.pct.toFixed(1)}%`]));
     breakdownRows.forEach((r) => rows.push(["Aprobados por etapa", r.label, r.count]));
     rows.push(["Finanzas", "En Fin. Otorgado (esperando finanzas)", enFinanzas.length], ["Finanzas", "Monto esperando finanzas", Math.round(finTotalMonto)]);
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
@@ -412,6 +470,79 @@ function GeneralPanel({ filters }: { filters: ReportesFilters }) {
             <DonutLegend segments={tipoSegments} total={tipoTotal} />
           </div>
         </div>
+      </div>
+
+      {/* 2.5 · Origen del alta — ¿quién teclea los proyectos? ─────────────────────
+          Mide la adopción de la plataforma por parte de los aliados. La meta es que
+          la barra suba: cada proyecto que hoy captura el Account Manager es uno que
+          el aliado todavía no captura solo. */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-1 ring-inset ring-emerald-500/10">
+            <Target className="h-4 w-4" strokeWidth={2.2} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Origen del alta · adopción de la plataforma</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">
+              Quién capturó cada proyecto. Distinto del aliado dueño: el Account Manager puede dar de alta a nombre de un aliado.
+            </p>
+          </div>
+        </div>
+
+        {origen.total === 0 ? (
+          <div className="py-16 text-center text-[11px] font-medium text-slate-400 dark:text-slate-500">Sin proyectos en el periodo.</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Dona por rol de quien capturó */}
+            <div className="flex flex-col items-center gap-4">
+              <Donut segments={origen.segments} centerTop={String(origen.total)} centerBottom="PROYECTOS" />
+              <DonutLegend segments={origen.segments} total={origen.total} />
+            </div>
+
+            {/* Indicador de adopción + evolución mensual */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 p-4">
+                <div className="flex items-end justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500">Creados por el propio aliado</span>
+                    <span className="block text-3xl font-bold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400 leading-none mt-1.5">
+                      {origen.pctAliado.toFixed(0)}%
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
+                    {origen.aliado} de {origen.conRegistro} con autoría registrada
+                    {origen.total > origen.conRegistro && (
+                      <span className="text-slate-400 dark:text-slate-500"> · {origen.total - origen.conRegistro} sin registro</span>
+                    )}
+                  </span>
+                </div>
+                <div className="mt-3 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(origen.pctAliado, 100)}%` }} />
+                </div>
+                <p className="mt-2 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                  Objetivo: 100%. El resto son altas que hoy hace la plataforma por ellos.
+                </p>
+              </div>
+
+              {adopcionMensual.length > 0 && (
+                <div>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500 mb-2">Evolución mensual</span>
+                  <div className="flex items-end justify-between gap-2 h-[150px]">
+                    {adopcionMensual.map((m) => (
+                      <div key={m.label} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full" title={`${m.label}: ${m.aliado} de ${m.total} altas las hizo el aliado`}>
+                        <span className="text-[10px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{m.pct.toFixed(0)}%</span>
+                        <div className="w-full max-w-[40px] flex-1 flex flex-col justify-end rounded-t-md bg-slate-150 dark:bg-slate-800 overflow-hidden">
+                          <div className="w-full bg-emerald-500 transition-all duration-500" style={{ height: `${Math.max(m.pct, 2)}%` }} />
+                        </div>
+                        <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500">{m.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3 · Tres paneles: aprobados por etapa · contribución AM · Fin. Otorgado mensual */}

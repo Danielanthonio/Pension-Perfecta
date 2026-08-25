@@ -31,6 +31,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
+import { CreadorPorCell, getCreadorRoleLabel } from "@/components/ui/creadorProyecto";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
@@ -466,6 +467,8 @@ function ClientesAdminContent() {
       nombre: (p) => p.full_name,
       tipo: (p) => p.tipo_financiamiento || "",
       aliado: (p) => p.aliado_name || "",
+      // Ordena por ROL primero (así se agrupan las altas de aliados) y por nombre después.
+      creador: (p) => `${getCreadorRoleLabel(p.created_by_role)} · ${p.created_by_name || ""}`,
       am: (p) => getAmName(p) || "",
       etapa: (p) => stageIndex(p.status),
       expediente: (p) => p.documents.length,
@@ -489,6 +492,7 @@ function ClientesAdminContent() {
     { id: "nombre", label: "Nombre" },
     { id: "tipo", label: "Tipo de financiamiento" },
     { id: "aliado", label: "Aliado" },
+    { id: "creador", label: "Creado por" },
     { id: "am", label: "Account Manager" },
     { id: "etapa", label: "Etapa" },
     { id: "expediente", label: "Documentos" },
@@ -845,6 +849,7 @@ function ClientesAdminContent() {
                       <SortHeader col="nombre" label="Prospecto" sort={sortA} className="pl-5" />
                       <SortHeader col="tipo" label="Tipo de financiamiento" sort={sortA} />
                       <SortHeader col="aliado" label="Aliado" sort={sortA} />
+                      <SortHeader col="creador" label="Creado por" sort={sortA} />
                       <SortHeader col="am" label="Account Manager" sort={sortA} />
                       <SortHeader col="expediente" label="Expediente" sort={sortA} align="center" />
                       <SortHeader col="etapa" label="Etapa · Subetapa" sort={sortA} />
@@ -908,6 +913,12 @@ function ClientesAdminContent() {
                           <td className="px-4 py-2.5">
                             <span className="font-semibold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{p.aliado_name || "Asesor Comercial"}</span>
                             <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate max-w-[150px] mt-0.5">Líder: {leaderNames}</span>
+                          </td>
+                          {/* Creado por — quién TECLEÓ el alta (aliado / AM / Dirección).
+                              Es el termómetro de adopción de la plataforma: no se
+                              deduce de `aliado_name`, que es de quién ES el proyecto. */}
+                          <td className="px-4 py-2.5">
+                            <CreadorPorCell name={p.created_by_name} role={p.created_by_role} />
                           </td>
                           {/* Account Manager — editable (reasignar el dueño de la gestión) */}
                           <td className="px-4 py-2.5">
@@ -1073,7 +1084,7 @@ function ClientesAdminContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={8} className="px-6 pt-1 pb-6 border-b-0">
+                            <td colSpan={9} className="px-6 pt-1 pb-6 border-b-0">
                               <TimelinePanel
                                 status={p.status}
                                 dates={statusDates[p.id]}

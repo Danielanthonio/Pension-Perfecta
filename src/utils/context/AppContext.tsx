@@ -325,6 +325,15 @@ export interface Prospect {
   // capturar el aliado su propio proyecto; si lo captura un AM, queda de ese AM;
   // si lo captura Dirección, queda null (gestión directa / mesa de dirección).
   account_manager_id?: string | null;
+  // Quién CAPTURÓ el proyecto. Distinto de `aliado_id` (de quién ES) y de
+  // `account_manager_id` (quién lo GESTIONA): el AM puede dar de alta a nombre
+  // de un aliado y hasta ahora eso era indistinguible de un alta del aliado.
+  // El rol es un SNAPSHOT del que tenía al capturar, y el nombre también, para
+  // que el reporte de Dirección no dependa de RLS sobre `profiles`.
+  // Ver migración 20260824000000_creador_de_proyecto.sql.
+  created_by?: string | null;
+  created_by_role?: string | null;
+  created_by_name?: string | null;
   simulation?: Simulation;
   sim_emitted_at?: string | null;
   documents: DocumentItem[];
@@ -1011,6 +1020,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       reeval_date: dbProspect.reeval_date || null,
       asesoria_at: dbProspect.asesoria_at || null,
       account_manager_id: dbProspect.account_manager_id ?? null,
+      created_by: dbProspect.created_by ?? null,
+      created_by_role: dbProspect.created_by_role ?? null,
+      created_by_name: dbProspect.created_by_name ?? null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,
@@ -2426,6 +2438,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         aliado_name: ownerName,
         empresa_multialiado_id: ownerEmpresa,
         account_manager_id: projectAmId,
+        // Espejo del trigger `set_prospect_creator`: la autoría es de quien
+        // captura, con el rol que trae puesto en ese momento.
+        created_by: creatorId,
+        created_by_role: user?.role || null,
+        created_by_name: user?.full_name || null,
         status: "evaluacion_pendiente",
         documents: docs,
         google_drive_folder: driveFolderId,

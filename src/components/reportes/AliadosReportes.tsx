@@ -59,6 +59,16 @@ import {
   serieDe,
 } from "./reportesTypes";
 
+/**
+ * El aliado capturó SU PROPIO proyecto: quien lo tecleó (`created_by`) es el
+ * mismo aliado dueño y lo hizo con sombrero de aliado. Si lo capturó su Account
+ * Manager a su nombre, el proyecto sigue siendo del aliado pero NO cuenta como
+ * uso de la plataforma. Los proyectos anteriores a la medición (`created_by` en
+ * null) no cuentan: ver 20260824000000_creador_de_proyecto.sql.
+ */
+const esAltaPropiaDelAliado = (p: { created_by?: string | null; created_by_role?: string | null; aliado_id: string }) =>
+  !!p.created_by && p.created_by === p.aliado_id && p.created_by_role === "aliado";
+
 const GRANOS: Grano[] = ["dia", "semana", "mes", "anio"];
 /** Barras que caben sin que el eje X se vuelva ilegible. El resto se dice, no se esconde. */
 const TOPE_RANKING = 20;
@@ -198,7 +208,7 @@ export function AliadosReportes({
     };
     const cols = METRICAS_RANKING.map((id) => METRICAS[id].label);
     const rows: (string | number)[][] = [
-      [agrupar === "empresa" ? "Empresa" : "Aliado", ...cols, "T. aprobación %", "T. condicionamiento %", "T. cierre %"],
+      [agrupar === "empresa" ? "Empresa" : "Aliado", ...cols, "T. aprobación %", "T. condicionamiento %", "T. cierre %", "Altas propias", "Altas propias %"],
     ];
     grupos
       .slice()
@@ -211,6 +221,8 @@ export function AliadosReportes({
           (t.aprobacion ?? 0).toFixed(1),
           (t.condicionamiento ?? 0).toFixed(1),
           (t.cierre ?? 0).toFixed(1),
+          g.items.filter(esAltaPropiaDelAliado).length,
+          g.items.length > 0 ? ((g.items.filter(esAltaPropiaDelAliado).length / g.items.length) * 100).toFixed(1) : "0.0",
         ]);
       });
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
@@ -363,7 +375,7 @@ export function AliadosReportes({
             <table className="w-full text-xs min-w-[680px]">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
-                  {[agrupar === "empresa" ? "Empresa" : "Aliado", ...METRICAS_RANKING.map((id) => METRICAS[id].short), "T. aprob.", "T. cierre"].map(
+                  {[agrupar === "empresa" ? "Empresa" : "Aliado", ...METRICAS_RANKING.map((id) => METRICAS[id].short), "T. aprob.", "T. cierre", "Altas propias"].map(
                     (h, i) => (
                       <th
                         key={h + i}
@@ -396,6 +408,20 @@ export function AliadosReportes({
                       ))}
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-700 dark:text-slate-200">{fmtPct(t.aprobacion)}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-700 dark:text-slate-200">{fmtPct(t.cierre)}</td>
+                      {/* Adopción: cuántos de esos proyectos los tecleó el propio aliado. */}
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                        {(() => {
+                          const todos = g?.items || [];
+                          const propias = todos.filter(esAltaPropiaDelAliado).length;
+                          const pct = todos.length > 0 ? (propias / todos.length) * 100 : 0;
+                          return (
+                            <span className={propias === 0 ? "text-slate-400 dark:text-slate-500" : "text-emerald-600 dark:text-emerald-400"}>
+                              {propias}
+                              <span className="text-slate-400 dark:text-slate-500 font-medium"> · {pct.toFixed(0)}%</span>
+                            </span>
+                          );
+                        })()}
+                      </td>
                     </tr>
                   );
                 })}
