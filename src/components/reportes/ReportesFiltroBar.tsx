@@ -1,11 +1,17 @@
 "use client";
 
-// Barra de filtros común a las pestañas ALIADOS y ACCOUNT MANAGER.
+// Barra de filtros común a las pestañas del módulo Reportes.
 //
 // Va ARRIBA de todo lo que acota, en una sola fila: en los bocetos los filtros
 // están repetidos dentro de cada tarjeta, pero tres botoneras iguales en la misma
 // pantalla invitan a que una diga una cosa y la de al lado otra. Aquí se filtra
 // una vez y todos los reportes de la pestaña responden a lo mismo.
+//
+// Cada bloque se puede apagar: la pestaña GENERAL solo monta el PERÍODO, porque
+// su propio panel ya trae "Modalidad de aprobación" —que filtra por `modalidad`
+// (la que fija Dirección al aprobar) y NO es lo mismo que Producto, que filtra
+// por el tipo de financiamiento resuelto—. Dos botoneras parecidas, una al lado
+// de la otra, es justo lo que este archivo evita.
 
 import React, { useState } from "react";
 import { Calendar } from "lucide-react";
@@ -27,10 +33,12 @@ const SEGMENTOS: SegmentoAliado[] = ["todos", "independiente", "empresa"];
 export function ReportesFiltroBar({
   filters,
   setFilters,
+  mostrarProducto = true,
   mostrarSegmento = true,
 }: {
   filters: ReportesFilters;
   setFilters: (patch: Partial<ReportesFilters>) => void;
+  mostrarProducto?: boolean;
   mostrarSegmento?: boolean;
 }) {
   const [rangoAbierto, setRangoAbierto] = useState(filters.preset === "personalizado");
@@ -89,7 +97,9 @@ export function ReportesFiltroBar({
         </div>
       )}
 
+      {(mostrarProducto || mostrarSegmento) && (
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-1 border-t border-slate-100 dark:border-slate-800">
+        {mostrarProducto && (
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500"
@@ -105,6 +115,7 @@ export function ReportesFiltroBar({
             ))}
           </div>
         </div>
+        )}
 
         {mostrarSegmento && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -124,6 +135,7 @@ export function ReportesFiltroBar({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

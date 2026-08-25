@@ -8,7 +8,10 @@
 //
 // El reparto de responsabilidades:
 //   · GENERAL  — embudo comercial, ingreso de proyectos y cola de finanzas. Vive
-//                aquí porque es de siempre y no tiene dueño de rol.
+//                aquí porque es de siempre y no tiene dueño de rol. Desde el
+//                2026-08-24 también monta la botonera de PERÍODO (solo esa parte
+//                de `ReportesFiltroBar`): el panel siempre supo leer el rango de
+//                la URL, pero no había forma de elegirlo sin salir de la pestaña.
 //   · ALIADOS / ACCOUNT MANAGER — en `@/components/reportes`, calculados en el
 //                navegador sobre `prospects` (que el contexto ya recorta por rol).
 //   · CLOSER   — el mismo informe que la ficha de un closer (aliados, CF, CNF,
@@ -120,7 +123,13 @@ function AreaChart({ points }: { points: { label: string; value: number; full: s
 }
 
 // ── Panel GENERAL (el reporte de siempre) ────────────────────────────────────
-function GeneralPanel({ filters }: { filters: ReportesFilters }) {
+function GeneralPanel({
+  filters,
+  setFilters,
+}: {
+  filters: ReportesFilters;
+  setFilters: (patch: Partial<ReportesFilters>) => void;
+}) {
   const { user, prospects, profiles, isProspectDeleted, isProspectPurged } = useApp();
   const isAM = user?.role === "account_manager";
 
@@ -388,6 +397,13 @@ function GeneralPanel({ filters }: { filters: ReportesFilters }) {
       </div>
 
       {/* Filtros */}
+      {/* El período va aquí y no en la cáscara de la página para que quede pegado
+          a los otros dos filtros del panel: los tres acotan lo mismo. Solo se monta
+          el bloque de PERÍODO —Producto se omite a propósito, porque "Modalidad de
+          aprobación" (justo debajo) ya filtra por producto con otro criterio y dos
+          botoneras casi iguales acabarían diciendo cosas distintas. */}
+      <ReportesFiltroBar filters={filters} setFilters={setFilters} mostrarProducto={false} mostrarSegmento={false} />
+
       <div className="flex flex-col lg:flex-row gap-3 print:hidden">
         {!isAM && (
           <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-3.5 flex items-center justify-between gap-3">
@@ -775,7 +791,7 @@ function ReportesContent() {
 
       {conFiltroBar && <ReportesFiltroBar filters={filters} setFilters={setFilters} />}
 
-      {rol === "general" && <GeneralPanel filters={filters} />}
+      {rol === "general" && <GeneralPanel filters={filters} setFilters={setFilters} />}
       {rol === "aliados" && <AliadosReportes filters={filters} setFilters={setFilters} />}
       {rol === "account_managers" && <AccountManagersReportes filters={filters} setFilters={setFilters} />}
       {rol === "closers" && <ClosersReportes qs={qs} />}
