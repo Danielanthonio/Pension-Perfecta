@@ -27,6 +27,7 @@ import {
   Route,
   Trophy,
   TrendingUp,
+  UserRoundCheck,
   Users,
 } from "lucide-react";
 import { useApp } from "@/utils/context/AppContext";
@@ -49,6 +50,7 @@ import {
   VIZ_MUTED_VAR,
   VIZ_TRACK_VAR,
 } from "./ReportesCharts";
+import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
 import { SubEstadosPanel } from "./SubEstadosPanel";
 import { ActividadAMPanel } from "./ActividadAMPanel";
 import { useObjetivosAM } from "./useObjetivosAM";
@@ -79,6 +81,12 @@ import {
 
 const GRANOS: Grano[] = ["dia", "semana", "mes", "anio"];
 const SIN_AM = "__sin__";
+
+// Colores del origen del alta: los mismos que la dona del panel GENERAL, para que
+// «creado por el aliado» sea del mismo verde en todo el módulo.
+const C_ALIADO = getCreadorMeta("aliado")?.color ?? "#059669";
+const C_AM = getCreadorMeta("account_manager")?.color ?? "#2a78d6";
+const C_OTROS = CREADOR_SIN_REGISTRO.color;
 
 export function AccountManagersReportes({
   filters,
@@ -147,6 +155,54 @@ export function AccountManagersReportes({
         .sort((a, b) => b.valor - a.valor || b.proyectos - a.proyectos),
     [grupos, metrica, colorPorAM]
   );
+
+  // ── 2.5 · Origen del alta: de la cartera de cada AM, ¿quién la capturó? ────
+  // Tres cubetas por AM, excluyentes y que suman el total de su cartera:
+  //   · El aliado   — `created_by_role === 'aliado'`: el aliado entró a la
+  //                   plataforma y subió su proyecto. Esto es lo que debe crecer.
+  //   · Él mismo    — lo tecleó el AM que hoy lo gestiona (`created_by === g.id`).
+  //   · Otros       — Dirección, o un AM distinto del que hoy lo lleva (pasa tras
+  //                   una reasignación). Al 2026-08-24 son casos contados, pero
+  //                   sumarlos a «él mismo» le colgaría a un AM trabajo ajeno.
+  // Un proyecto sin autoría registrada no entra en ninguna: se cuenta aparte para
+  // que los porcentajes no mientan.
+  const origenPorAM = useMemo(() => {
+    const filas = grupos
+      .map((g) => {
+        let aliado = 0;
+        let propio = 0;
+        let otros = 0;
+        let sinDato = 0;
+        for (const p of g.items) {
+          if (!p.created_by_role) sinDato++;
+          else if (p.created_by_role === "aliado") aliado++;
+          else if (p.created_by && p.created_by === g.id) propio++;
+          else otros++;
+        }
+        const base = aliado + propio + otros;
+        const pct = (n: number) => (base > 0 ? (n / base) * 100 : 0);
+        return {
+          id: g.id,
+          nombre: g.nombre,
+          aliado,
+          propio,
+          otros,
+          sinDato,
+          base,
+          total: g.items.length,
+          pctAliado: pct(aliado),
+          pctPropio: pct(propio),
+          pctOtros: pct(otros),
+        };
+      })
+      .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
+
+    const sum = (k: "aliado" | "propio" | "otros" | "sinDato" | "base") => filas.reduce((acc, f) => acc + f[k], 0);
+    const base = sum("base");
+    const total = { aliado: sum("aliado"), propio: sum("propio"), otros: sum("otros"), sinDato: sum("sinDato"), base };
+    const pct = (n: number) => (base > 0 ? (n / base) * 100 : 0);
+    return { filas, total, pctAliado: pct(total.aliado), pctPropio: pct(total.propio), pctOtros: pct(total.otros) };
+  }, [grupos]);
 
   // ── 1 · Productividad ──────────────────────────────────────────────────────
   const cubos = useMemo(
@@ -412,8 +468,15 @@ export function AccountManagersReportes({
         // solo invitaría a que alguien encontrara dos cifras y dudara de las dos.
         `Agendas del rango (${rangoCierre.desde || "inicio"} al ${rangoCierre.hasta})`,
         "Tasa de cierre de agendas %",
+        "Altas del aliado",
+        "Altas del aliado %",
+        "Altas del AM",
+        "Altas del AM %",
+        "Altas de otros",
+        "Sin autoría registrada",
       ],
     ];
+    const origenPorId = new Map(origenPorAM.filas.map((f) => [f.id, f]));
     ranking.forEach((r) => {
       const g = grupos.find((x) => x.id === r.id);
       const list = g?.items || [];
@@ -433,6 +496,13 @@ export function AccountManagersReportes({
         c?.base ?? 0,
         // Sin agendas no hay tasa: un 0,0 se leería como "no otorgó nada".
         c && c.base > 0 ? ((c.logrado / c.base) * 100).toFixed(1) : "",
+        origenPorId.get(r.id)?.aliado ?? 0,
+        // Sin autoría registrada no hay porcentaje que reportar (mismo criterio).
+        (origenPorId.get(r.id)?.base ?? 0) > 0 ? (origenPorId.get(r.id)!.pctAliado).toFixed(1) : "",
+        origenPorId.get(r.id)?.propio ?? 0,
+        (origenPorId.get(r.id)?.base ?? 0) > 0 ? (origenPorId.get(r.id)!.pctPropio).toFixed(1) : "",
+        origenPorId.get(r.id)?.otros ?? 0,
+        origenPorId.get(r.id)?.sinDato ?? 0,
       ]);
     });
     const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
@@ -557,6 +627,118 @@ export function AccountManagersReportes({
             { id: "cierre", label: "T. cierre (eje derecho)", color: "var(--rp-7)" },
           ]}
         />
+      </div>
+
+      {/* ── 2.5 · Origen del alta ─────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-5 space-y-4">
+        <PanelHeader
+          icon={UserRoundCheck}
+          tone="emerald"
+          title="Origen del alta por Account Manager"
+          subtitle="De los proyectos que gestiona cada AM, cuántos los capturó el aliado en la plataforma y cuántos los tecleó él."
+        />
+
+        {origenPorAM.total.base === 0 ? (
+          <Vacio>Sin proyectos con autoría registrada en el período.</Vacio>
+        ) : (
+          <>
+            {/* Resumen del conjunto seleccionado */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { label: "Los creó el aliado", n: origenPorAM.total.aliado, pct: origenPorAM.pctAliado, color: C_ALIADO, nota: "uso real de la plataforma" },
+                { label: "Los creó el Account Manager", n: origenPorAM.total.propio, pct: origenPorAM.pctPropio, color: C_AM, nota: "altas que la plataforma hace por ellos" },
+                { label: "Otros (Dirección u otro AM)", n: origenPorAM.total.otros, pct: origenPorAM.pctOtros, color: C_OTROS, nota: "incluye proyectos reasignados" },
+              ].map((c) => (
+                <div key={c.label} className="rounded-2xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/30 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500 leading-tight">{c.label}</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-bold tabular-nums tracking-tight leading-none" style={{ color: c.color }}>{c.pct.toFixed(0)}%</span>
+                    <span className="text-sm font-bold tabular-nums text-slate-700 dark:text-slate-200">{fmtNum(c.n)}</span>
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">de {fmtNum(origenPorAM.total.base)}</span>
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-medium text-slate-400 dark:text-slate-500">{c.nota}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Barra apilada del conjunto */}
+            <div className="flex h-3 rounded-full overflow-hidden bg-slate-150 dark:bg-slate-800">
+              {[
+                { k: "a", pct: origenPorAM.pctAliado, color: C_ALIADO, label: `Aliado: ${origenPorAM.total.aliado}` },
+                { k: "m", pct: origenPorAM.pctPropio, color: C_AM, label: `Account Manager: ${origenPorAM.total.propio}` },
+                { k: "o", pct: origenPorAM.pctOtros, color: C_OTROS, label: `Otros: ${origenPorAM.total.otros}` },
+              ].map((seg) => (
+                <div key={seg.k} style={{ width: `${seg.pct}%`, background: seg.color }} title={seg.label} />
+              ))}
+            </div>
+            {origenPorAM.total.sinDato > 0 && (
+              <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                {fmtNum(origenPorAM.total.sinDato)} proyecto(s) sin autoría registrada quedan fuera del porcentaje: no se reparten para no inflar ninguno de los lados.
+              </p>
+            )}
+
+            {/* Detalle por AM */}
+            <div className="overflow-x-auto -mx-5 px-5">
+              <table className="w-full text-xs min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
+                    {["Account Manager", "Distribución", "Los creó el aliado", "Los creó el AM", "Otros", "Total"].map((h, i) => (
+                      <th
+                        key={h}
+                        className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 ${i > 1 ? "text-right" : ""}`}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {origenPorAM.filas.map((f) => (
+                    <tr key={f.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 truncate block max-w-[200px]" title={f.nombre}>
+                          {f.nombre}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 w-[220px]">
+                        {f.base === 0 ? (
+                          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">Sin autoría registrada</span>
+                        ) : (
+                          <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-150 dark:bg-slate-800 min-w-[160px]">
+                            <div style={{ width: `${f.pctAliado}%`, background: C_ALIADO }} title={`Aliado: ${f.aliado}`} />
+                            <div style={{ width: `${f.pctPropio}%`, background: C_AM }} title={`Él mismo: ${f.propio}`} />
+                            <div style={{ width: `${f.pctOtros}%`, background: C_OTROS }} title={`Otros: ${f.otros}`} />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <span className="font-bold" style={{ color: f.aliado > 0 ? C_ALIADO : undefined }}>{f.aliado}</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-medium"> · {f.base > 0 ? `${f.pctAliado.toFixed(0)}%` : "—"}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <span className="font-bold" style={{ color: f.propio > 0 ? C_AM : undefined }}>{f.propio}</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-medium"> · {f.base > 0 ? `${f.pctPropio.toFixed(0)}%` : "—"}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">
+                        <span className="font-bold">{f.otros}</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-medium"> · {f.base > 0 ? `${f.pctOtros.toFixed(0)}%` : "—"}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-bold text-slate-700 dark:text-slate-200">
+                        {f.total}
+                        {f.sinDato > 0 && (
+                          <span className="text-slate-400 dark:text-slate-500 font-medium" title="Sin autoría registrada"> · {f.sinDato} s/r</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── 3 · Estados por AM ────────────────────────────────────────────── */}
