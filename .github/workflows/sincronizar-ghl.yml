@@ -1,0 +1,75 @@
+name: Sincronizar notas de GoHighLevel
+
+on:
+  schedule:
+    # 09:17 UTC = 03:17 en Ciudad de México (UTC-6 todo el año).
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sincronizar-ghl
+  cancel-in-progress: false
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Recorrer la cartera por tramos
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Faltan los secretos APP_URL o CRON_SECRET en el repositorio."
+            exit 1
+          fi
+
+          cursor=""
+          total_notas=0
+          total_proy=0
+          total_vistos=0
+          for i in $(seq 1 100); do
+            if [ -z "$cursor" ]; then cuerpo='{}'; else cuerpo="{\"cursor\":\"$cursor\"}"; fi
+
+            respuesta=$(curl -sS --fail-with-body --max-time 180 \
+              -X POST "$APP_URL/api/ghl/sincronizar-todo/" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H "Content-Type: application/json" \
+              -d "$cuerpo") || { echo "::error::La llamada falló: $respuesta"; exit 1; }
+
+            notas=$(echo "$respuesta"   | jq -r '.notas // 0')
+            proy=$(echo "$respuesta"    | jq -r '.proyectos // 0')
+            vistos=$(echo "$respuesta"  | jq -r '.procesados // 0')
+            frenado=$(echo "$respuesta" | jq -r '.frenado // false')
+            aviso=$(echo "$respuesta"   | jq -r '.aviso // empty')
+            cursor=$(echo "$respuesta"  | jq -r '.siguiente // empty')
+
+            total_notas=$((total_notas + notas))
+            total_proy=$((total_proy + proy))
+            total_vistos=$((total_vistos + vistos))
+            echo "tramo $i · $vistos proyectos · +$notas notas (acumulado: $total_vistos vistos, $total_notas notas)"
+
+            if [ -n "$aviso" ]; then echo "::warning::$aviso"; fi
+
+            if [ "$frenado" = "true" ]; then
+              echo "GoHighLevel está limitando; esperando 30 s"
+              sleep 30
+            fi
+
+            if [ -z "$cursor" ]; then
+              echo "Cartera recorrida entera."
+              break
+            fi
+          done
+
+          {
+            echo "### Sincronizado con GoHighLevel"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Proyectos revisados | $total_vistos |"
+            echo "| Proyectos con notas nuevas | $total_proy |"
+            echo "| Notas traídas a la bitácora | $total_notas |"
+          } >> "$GITHUB_STEP_SUMMARY"
