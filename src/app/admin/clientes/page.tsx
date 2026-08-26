@@ -33,7 +33,7 @@ import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/componen
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { CreadorPorCell, getCreadorRoleLabel } from "@/components/ui/creadorProyecto";
 import { SeguimientoCell, NotasDrawer } from "@/components/ui/notasSeguimiento";
-import { GhlSello, GhlDrawer, GhlCotejarBoton, useGhlCotejo } from "@/components/ui/ghlCotejo";
+import { GhlSello, GhlCotejarBoton, useGhlCotejo } from "@/components/ui/ghlCotejo";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
@@ -56,6 +56,8 @@ function ClientesAdminContent() {
     assignmentProfiles,
     notasResumen,
     recargarResumenNotas,
+    cotejosGhl,
+    recargarCotejosGhl,
     updateProspectStatus,
     reassignProspect,
     reassignAccountManager,
@@ -276,10 +278,10 @@ function ClientesAdminContent() {
   // Proyecto cuyo cajón de notas está abierto. El seguimiento se hace DESDE la
   // tabla: entrar al expediente para anotar una llamada era el paso que sobraba.
   const [notasTarget, setNotasTarget] = useState<Prospect | null>(null);
-  // Cotejo contra GoHighLevel. Arranca vacío y NO se dispara solo: se pide desde
-  // el botón de la barra, porque cada cliente cuesta hasta 4 búsquedas allá.
-  const { cotejos: ghlCotejos, cargando: ghlCargando, error: ghlError, traidas: ghlTraidas, cotejar: ghlCotejar } = useGhlCotejo();
-  const [ghlTarget, setGhlTarget] = useState<Prospect | null>(null);
+  // Los sellos de GoHighLevel se leen del contexto: los escribió el servidor y
+  // sobreviven a recargar la página. El botón solo sirve para el caso urgente —
+  // de mantener la cartera al día se encarga el barrido nocturno.
+  const { cargando: ghlCargando, error: ghlError, traidas: ghlTraidas, cotejar: ghlCotejar } = useGhlCotejo();
   const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
 
   const toggleTimeline = async (id: string) => {
@@ -755,7 +757,11 @@ function ClientesAdminContent() {
                   cargando={ghlCargando}
                   error={ghlError}
                   traidas={ghlTraidas}
-                  onCotejar={() => ghlCotejar(sortA.sorted.map((p) => p.id), recargarResumenNotas)}
+                  onCotejar={() =>
+                    ghlCotejar(sortA.sorted.map((p) => p.id), async () => {
+                      await Promise.all([recargarResumenNotas(), recargarCotejosGhl()]);
+                    })
+                  }
                 />
               )}
               <SortControl
@@ -931,11 +937,13 @@ function ClientesAdminContent() {
                                   <span className="text-slate-300 dark:text-slate-700">·</span>
                                   <span>Tel {p.phone}</span>
                                 </div>
-                                {/* Sello de coincidencia con GoHighLevel. Hasta que
-                                    no se pulsa «Cotejar con GHL» no pinta nada. */}
+                                {/* Sello de coincidencia con GoHighLevel. Sale
+                                    solo, sin pulsar nada, porque lo guardó el
+                                    barrido; abre el cajón de notas, que es donde
+                                    se ve el cotejo campo por campo. */}
                                 <GhlSello
-                                  cotejo={ghlCotejos[p.id]}
-                                  onClick={ghlCotejos[p.id] ? () => setGhlTarget(p) : undefined}
+                                  resumen={cotejosGhl[p.id]}
+                                  onClick={() => setNotasTarget(p)}
                                   className="mt-1"
                                 />
                                 <span className="block text-[9px] font-medium uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
@@ -1153,18 +1161,11 @@ function ClientesAdminContent() {
       <NotasDrawer
         prospectId={notasTarget?.id ?? null}
         prospectName={notasTarget?.full_name}
+        cotejoGhl={notasTarget ? cotejosGhl[notasTarget.id] : undefined}
+        email={notasTarget?.email}
+        phone={notasTarget?.phone}
         open={!!notasTarget}
         onClose={() => setNotasTarget(null)}
-      />
-
-      {/* Cajón de GoHighLevel: se abre desde el sello de color junto al nombre. */}
-      <GhlDrawer
-        cotejo={ghlTarget ? ghlCotejos[ghlTarget.id] ?? null : null}
-        prospectName={ghlTarget?.full_name}
-        prospectEmail={ghlTarget?.email}
-        prospectPhone={ghlTarget?.phone}
-        open={!!ghlTarget}
-        onClose={() => setGhlTarget(null)}
       />
 
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />

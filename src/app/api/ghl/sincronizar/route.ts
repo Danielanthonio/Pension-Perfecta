@@ -3,7 +3,7 @@ import { createClient as createServiceClient, type SupabaseClient } from "@supab
 import { createClient as createUserClient } from "@/utils/supabase/server";
 import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
 import { alcanzaParaCopiar } from "@/utils/ghlMatch";
-import { traerNotasDeGhl } from "@/utils/ghl/importar";
+import { guardarCotejo, traerNotasDeGhl } from "@/utils/ghl/importar";
 
 // Traer a la bitácora del proyecto lo que el equipo dejó en GoHighLevel.
 //
@@ -163,6 +163,9 @@ export async function POST(request: Request) {
   const importadas: Record<string, number> = {};
   let faltaMigracion = false;
   for (const [id, cotejo] of resultados) {
+    // El sello se anota SIEMPRE, aunque no haya notas que traer: es lo que deja
+    // el resultado visible en el listado después de recargar la página.
+    await guardarCotejo(admin, id, cotejo);
     if (!cotejo || !alcanzaParaCopiar(cotejo.cotejo) || cotejo.notas.length === 0) continue;
     const r = await traerNotasDeGhl(admin, id, cotejo.notas);
     importadas[id] = r.traidas;

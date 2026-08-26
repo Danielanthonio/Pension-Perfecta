@@ -3,7 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/utils/supabase/server";
 import { cotejarCliente, ghlConfigurado, GhlLimiteError } from "@/utils/ghl/client";
 import { alcanzaParaCopiar } from "@/utils/ghlMatch";
-import { traerNotasDeGhl } from "@/utils/ghl/importar";
+import { guardarCotejo, traerNotasDeGhl } from "@/utils/ghl/importar";
 
 // Barrido de TODA la cartera contra GoHighLevel. Es el que corre de madrugada.
 //
@@ -123,6 +123,10 @@ export async function POST(request: Request) {
   for (const c of clientes) {
     try {
       const cotejo = await cotejarCliente({ nombre: c.full_name, correo: c.email, telefono: c.phone });
+      // Cada noche se reescribe el sello de TODA la cartera, con o sin notas
+      // nuevas: así el listado amanece con el estado real de cada expediente y
+      // `cotejado_at` dice cuándo se comprobó por última vez.
+      await guardarCotejo(admin, c.id, cotejo);
       if (cotejo && alcanzaParaCopiar(cotejo.cotejo) && cotejo.notas.length > 0) {
         const r = await traerNotasDeGhl(admin, c.id, cotejo.notas);
         if (r.traidas > 0) {

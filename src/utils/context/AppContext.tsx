@@ -313,6 +313,25 @@ export interface Simulation {
   creditoNomina?: number;
 }
 
+/**
+ * Cómo cotejó un proyecto contra los contactos de GoHighLevel.
+ *
+ * Lo escribe el servidor (barrido nocturno y botón «Traer notas de GHL») en
+ * `prospect_ghl_cotejo`; el navegador solo lo lee. Un proyecto que nunca se ha
+ * cotejado sencillamente no está en el mapa — que es distinto de estar con
+ * `sello: null`, que significa «se buscó y no está en GoHighLevel».
+ * Ver migración 20260826000002_cotejo_ghl_persistente.sql.
+ */
+export interface CotejoGhlResumen {
+  sello: "verificado" | "probable" | "nombre" | "revisar" | null;
+  nivel: number;
+  contactoNombre: string | null;
+  /** Lo que GoHighLevel tiene, para poder enseñar cuál de los dos corregir. */
+  contactoCorreo: string | null;
+  contactoTelefono: string | null;
+  cotejadoAt: string;
+}
+
 export interface Prospect {
   id: string;
   aliado_id: string;
@@ -564,6 +583,10 @@ interface AppContextType {
   // seguimiento»). Llega agregado de la RPC `notas_resumen()`; la clave es el id
   // del proyecto. Un proyecto sin notas sencillamente no está en el mapa.
   notasResumen: Record<string, NotasResumen>;
+  // El sello de GoHighLevel POR PROYECTO, ya calculado por el servidor. Se pinta
+  // en el listado sin que nadie pulse nada: antes se calculaba al vuelo y moría
+  // al recargar la página.
+  cotejosGhl: Record<string, CotejoGhlResumen>;
   // La bitácora completa de UN proyecto, de la más nueva a la más vieja. Se pide
   // al abrir la ficha y no se cachea en el contexto: son datos de una sola
   // pantalla y crecen sin techo.
@@ -577,6 +600,9 @@ interface AppContextType {
   // las notas entran por el servidor (`service_role`), así que el navegador no
   // se entera de que la columna «Último seguimiento» acaba de cambiar.
   recargarResumenNotas: () => Promise<void>;
+  // Vuelve a pedir los sellos. Lo necesita el botón «Traer notas de GHL»: el
+  // cotejo lo escribe el servidor, así que el navegador no se entera solo.
+  recargarCotejosGhl: () => Promise<void>;
 }
 
 // Cierre de sesión automático por inactividad. En el plan limitado de Hostinger,
@@ -877,6 +903,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   // Resumen de notas POR PROYECTO (columna «Último seguimiento» de los listados).
   // Llega agregado de la base; un proyecto sin notas no está en el mapa.
   const [notasResumen, setNotasResumen] = useState<Record<string, NotasResumen>>({});
+  const [cotejosGhl, setCotejosGhl] = useState<Record<string, CotejoGhlResumen>>({});
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>({
     meeting_link_m40: DEFAULT_MEETING_LINK,
@@ -2165,10 +2192,47 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  /**
+   * Carga los sellos de cotejo con GoHighLevel. Silencioso igual que el resumen
+   * de notas: alimenta un adorno del listado y jamás puede tumbar la carga de
+   * clientes. Si la migración 20260826000002 no está aplicada, la tabla no
+   * existe, se avisa por consola y sencillamente no se pinta ningún sello.
+   */
+  const cargarCotejosGhl = async (): Promise<void> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      setCotejosGhl({});
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("prospect_ghl_cotejo")
+        .select("prospect_id, sello, nivel, contacto_nombre, contacto_correo, contacto_telefono, cotejado_at");
+      if (error) {
+        console.warn("No se pudo cargar el cotejo con GoHighLevel:", error.message);
+        return;
+      }
+      const mapa: Record<string, CotejoGhlResumen> = {};
+      (data || []).forEach((r: any) => {
+        mapa[r.prospect_id] = {
+          sello: r.sello ?? null,
+          nivel: Number(r.nivel) || 0,
+          contactoNombre: r.contacto_nombre ?? null,
+          contactoCorreo: r.contacto_correo ?? null,
+          contactoTelefono: r.contacto_telefono ?? null,
+          cotejadoAt: r.cotejado_at,
+        };
+      });
+      setCotejosGhl(mapa);
+    } catch (e) {
+      console.warn("No se pudo cargar el cotejo con GoHighLevel:", e);
+    }
+  };
+
   // Se recarga al cambiar de sesión o al pasar de demo a base real. Va aparte de
   // la carga de prospectos para que un fallo aquí no arrastre al listado entero.
   useEffect(() => {
     void cargarResumenNotas();
+    void cargarCotejosGhl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, isDemoMode, isProvisionalSession, user?.id]);
 
@@ -5801,11 +5865,13 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         triggerPushNotification,
         getFileContent,
         notasResumen,
+        cotejosGhl,
         fetchProspectNotas,
         addProspectNota,
         updateProspectNota,
         deleteProspectNota,
         recargarResumenNotas: cargarResumenNotas,
+        recargarCotejosGhl: cargarCotejosGhl,
       }}
     >
       {children}

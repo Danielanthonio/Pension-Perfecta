@@ -1,81 +1,43 @@
 "use client";
 
-// El sello de coincidencia con GoHighLevel, y el cajón que enseña lo que hay
-// allá del cliente.
+// El sello de coincidencia con GoHighLevel.
 //
 // GHL es donde se agenda al cliente y donde el equipo deja sus notas, pero los
 // dos sistemas no comparten identificador. Lo único cruzable son los tres datos
-// que un humano teclea en ambos lados —correo, teléfono y nombre—, así que en
-// vez de afirmar «es el mismo cliente» se enseña CON QUÉ CONFIANZA lo es:
+// que teclea un humano —correo, teléfono y nombre—, así que en vez de afirmar
+// «es el mismo cliente» se enseña CON QUÉ CONFIANZA lo es. La regla vive en
+// `@/utils/ghlMatch`, que es código puro y sin red; aquí solo se pinta.
 //
-//   🟢 3 de 3 → verificado
-//   🔵 2 de 3 → probable, un dato no cuadra
-//   🟡 1 de 3 → por revisar, hay que mirarlo a ojo
-//
-// La regla de qué cuenta como coincidencia vive en `@/utils/ghlMatch` (que es
-// código puro y sin red); aquí solo se pinta.
+// El sello NO se calcula aquí. Lo escribe el servidor en `prospect_ghl_cotejo`
+// —el barrido nocturno y el botón— y esto lo lee del contexto. Antes se
+// calculaba al vuelo y moría al recargar la página, que lo dejaba inservible
+// para lo que más valía: entrar por la mañana y ver de un vistazo qué
+// expedientes tienen mal el correo o el teléfono.
 
-import React, { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { X, ExternalLink, RefreshCw, StickyNote, CalendarClock, Link2, ShieldQuestion } from "lucide-react";
-import { selloDe, type ResultadoCotejo } from "@/utils/ghlMatch";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Lo que devuelve /api/ghl/sincronizar
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface GhlContacto {
-  id: string;
-  nombre: string;
-  correo: string | null;
-  telefono: string | null;
-  origen: string | null;
-  creado: string | null;
-}
-export interface GhlNota {
-  id: string;
-  texto: string;
-  fecha: string | null;
-}
-export interface GhlCita {
-  id: string;
-  titulo: string | null;
-  inicio: string | null;
-  estado: string | null;
-  liga: string | null;
-  notas: string | null;
-}
-export interface GhlCotejo {
-  cotejo: ResultadoCotejo;
-  contacto: GhlContacto;
-  notas: GhlNota[];
-  citas: GhlCita[];
-}
-
-/** `undefined` = todavía no se ha buscado. `null` = se buscó y no está en GHL. */
-export type MapaCotejos = Record<string, GhlCotejo | null>;
+import React, { useCallback, useState } from "react";
+import { RefreshCw, ShieldQuestion } from "lucide-react";
+import { SELLOS, type ClaveSello } from "@/utils/ghlMatch";
+import type { CotejoGhlResumen } from "@/utils/context/AppContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// El enganche que pide el cotejo
+// El enganche que pide traer las notas
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Tope del lote que acepta la ruta. Aquí se respeta para no pedir un 400.
- * DEBE seguir al de `src/app/api/ghl/sincronizar/route.ts`, que es quien manda: allá
- * está la razón (el límite de 100 peticiones por 10 s de toda la sub-cuenta).
+ * Tope del lote que acepta la ruta. DEBE seguir al de
+ * `src/app/api/ghl/sincronizar/route.ts`, que es quien manda: allá está la razón
+ * (el límite de 100 peticiones por 10 s de toda la sub-cuenta de GHL).
  */
 export const TOPE_LOTE = 12;
 
 /**
- * Pide a GHL el cotejo de un puñado de clientes.
+ * Trae las notas de un puñado de clientes, a petición.
  *
- * NO se dispara solo al montar la tabla, y es a propósito: cada cliente cuesta
- * hasta 4 búsquedas en GHL, y la cartera completa serían ~1 900 peticiones por
- * cada vez que alguien abre el listado. Se cotejan los que se piden, cuando se
- * piden.
+ * Existe para el caso urgente —acabas de dar de alta a alguien y quieres su
+ * seguimiento ya—, no para mantener la cartera al día: de eso se encarga el
+ * barrido nocturno (`.github/workflows/sincronizar-ghl.yml`).
  */
 export function useGhlCotejo() {
-  const [cotejos, setCotejos] = useState<MapaCotejos>({});
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Cuántas notas se trajeron en la última pulsación. null = todavía ninguna. */
@@ -90,8 +52,7 @@ export function useGhlCotejo() {
     try {
       // La barra final NO es cosmética: `next.config.js` fija `trailingSlash:
       // true`, así que sin ella la ruta contesta un 308 y el POST se repite
-      // entero —cuerpo incluido— en un segundo viaje. Es la misma convención
-      // que ya usa `/api/admin/delete-user/`.
+      // entero —cuerpo incluido— en un segundo viaje.
       const r = await fetch("/api/ghl/sincronizar/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,19 +63,13 @@ export function useGhlCotejo() {
         setError(j?.error || "No se pudo consultar GoHighLevel.");
         return;
       }
-      // Se ACUMULA en vez de reemplazar: cotejar el siguiente lote no debe
-      // borrar los sellos que ya están pintados en pantalla.
-      setCotejos((previo) => ({ ...previo, ...(j.cotejos || {}) }));
-      // Un aviso del servidor (p. ej. la migración sin aplicar) NO invalida los
-      // sellos, que se calculan sin tocar la base. Se enseña como error visible
-      // pero los cotejos se pintan igual.
       if (j.aviso) setError(j.aviso);
       const total = Object.values(j.importadas || {}).reduce((a: number, b) => a + (Number(b) || 0), 0);
       setTraidas(total);
-      // Las notas entraron por el servidor, así que el resumen que alimenta la
-      // columna «Último seguimiento» está viejo: hay que volver a pedirlo o la
-      // fila seguiría diciendo «Sin notas» con las notas ya dentro.
-      if (total > 0) await alTerminar?.();
+      // Los sellos y las notas los escribió el SERVIDOR, así que el navegador no
+      // se ha enterado de nada: hay que volver a pedirlos o la pantalla seguiría
+      // enseñando el estado de antes de pulsar.
+      await alTerminar?.();
     } catch {
       setError("No se pudo consultar GoHighLevel. Revisa la conexión.");
     } finally {
@@ -122,35 +77,47 @@ export function useGhlCotejo() {
     }
   }, []);
 
-  return { cotejos, cargando, error, traidas, cotejar };
+  return { cargando, error, traidas, cotejar };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // El sello
 // ─────────────────────────────────────────────────────────────────────────────
 
+function cuandoSeCotejo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const horas = Math.floor((Date.now() - d.getTime()) / 3_600_000);
+  if (horas < 1) return "comprobado hace un momento";
+  if (horas < 24) return `comprobado hace ${horas} h`;
+  const dias = Math.floor(horas / 24);
+  return `comprobado hace ${dias} ${dias === 1 ? "día" : "días"}`;
+}
+
 /**
  * El chip de color junto al nombre del cliente.
  *
- * Si `onClick` viene, es un botón que abre el cajón. Sin cotejo todavía no
- * pinta NADA: un sello gris de «sin buscar» en 476 filas es ruido, no dato.
+ * Tres estados, y la diferencia entre los dos primeros importa:
+ *   · `undefined`      → nunca se ha cotejado. No pinta NADA: un sello gris en
+ *                        478 filas es ruido, no dato.
+ *   · `sello: null`    → se buscó y no está en GoHighLevel. Eso sí se dice.
+ *   · un sello         → verde / azul / teal / ámbar.
  */
 export function GhlSello({
-  cotejo,
+  resumen,
   onClick,
   className = "",
 }: {
-  cotejo?: GhlCotejo | null;
+  resumen?: CotejoGhlResumen;
   onClick?: () => void;
   className?: string;
 }) {
-  // `undefined` → no se ha cotejado. `null` → se cotejó y no está allá.
-  if (cotejo === undefined) return null;
+  if (!resumen) return null;
 
-  if (cotejo === null) {
+  if (!resumen.sello) {
     return (
       <span
-        title="Se buscó en GoHighLevel y no hay ningún contacto que coincida ni en un solo dato."
+        title={`No hay ningún contacto en GoHighLevel que coincida con este expediente (${cuandoSeCotejo(resumen.cotejadoAt)}).`}
         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 whitespace-nowrap ${className}`}
       >
         <ShieldQuestion className="h-2.5 w-2.5" />
@@ -159,21 +126,24 @@ export function GhlSello({
     );
   }
 
-  const sello = selloDe(cotejo.cotejo);
+  const sello = SELLOS[resumen.sello as ClaveSello];
   if (!sello) return null;
 
   const contenido = (
     <>
       <span className={`h-1.5 w-1.5 rounded-full ${sello.punto}`} />
       {sello.label}
-      {/* El «n/3» solo tiene sentido cuando el sello ES el recuento. En
-          «Nombre exacto» el dato que manda no es cuántos cuadran, sino CUÁL. */}
-      {sello.clave !== "nombre" && <span className="tabular-nums opacity-60">{cotejo.cotejo.nivel}/3</span>}
+      {/* El «n/3» solo tiene sentido cuando el sello ES el recuento. En «Nombre
+          exacto» el dato que manda no es cuántos cuadran, sino CUÁL. */}
+      {sello.clave !== "nombre" && <span className="tabular-nums opacity-60">{resumen.nivel}/3</span>}
     </>
   );
 
   const clases = `inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border whitespace-nowrap ${sello.badge} ${className}`;
-  const ayuda = `${sello.ayuda}\nCoincide: ${cotejo.cotejo.camposCoincididos.join(", ")}\nEn GHL: ${cotejo.contacto.nombre}`;
+  const ayuda =
+    `${sello.ayuda}\n` +
+    (resumen.contactoNombre ? `En GoHighLevel: ${resumen.contactoNombre}\n` : "") +
+    cuandoSeCotejo(resumen.cotejadoAt);
 
   if (!onClick) {
     return (
@@ -190,7 +160,7 @@ export function GhlSello({
         e.stopPropagation();
         onClick();
       }}
-      title={`${ayuda}\n\nClic para ver sus notas y citas de GoHighLevel.`}
+      title={`${ayuda}\n\nClic para ver el cotejo y las notas.`}
       className={`${clases} hover:brightness-95 dark:hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-slate-400/30 transition-all cursor-pointer`}
     >
       {contenido}
@@ -199,271 +169,110 @@ export function GhlSello({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// El cajón
+// El cotejo, campo por campo — dentro del cajón de notas
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** «2026-08-25T20:46:11.831Z» / «2026-08-26 18:00:00» → «25 ago 2026, 14:46». */
-function fechaLegible(valor: string | null): string {
-  if (!valor) return "—";
-  // GHL devuelve las citas SIN zona («2026-08-26 18:00:00», ya en la del
-  // calendario) y las notas en UTC con Z. Si a la primera forma se le deja el
-  // espacio, Safari la rechaza; con la T la interpreta como hora local, que es
-  // justo lo que es.
-  const d = new Date(valor.includes("T") ? valor : valor.replace(" ", "T"));
-  if (Number.isNaN(d.getTime())) return valor;
-  return d.toLocaleString("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const TONO_CITA: Record<string, string> = {
-  confirmed: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  showed: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  noshow: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
-  cancelled: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-750",
-  invalid: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-850 dark:text-slate-400 dark:border-slate-750",
+/** Normalizaciones mínimas, solo para decidir si pintar un campo en desacuerdo. */
+const igualCorreo = (a?: string | null, b?: string | null) =>
+  !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+const diezDigitos = (v?: string | null) => {
+  const d = (v || "").replace(/\D+/g, "");
+  return d.length >= 10 ? d.slice(-10) : null;
+};
+const igualTelefono = (a?: string | null, b?: string | null) => {
+  const x = diezDigitos(a), y = diezDigitos(b);
+  return !!x && x === y;
 };
 
-function Fila({ etiqueta, nuestro, alla, coincide }: { etiqueta: string; nuestro: string; alla: string; coincide: boolean }) {
+function Discrepancia({ etiqueta, aqui, alla }: { etiqueta: string; aqui: string; alla: string }) {
   return (
-    <div className="grid grid-cols-[62px_1fr] gap-2 items-start py-1.5 border-b border-slate-100 dark:border-slate-800/70 last:border-0">
-      <span className="text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 pt-0.5">{etiqueta}</span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-1.5 w-1.5 rounded-full shrink-0 ${coincide ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
-            title={coincide ? "Coincide" : "No coincide"}
-          />
-          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{nuestro || "—"}</span>
-        </div>
-        {/* Solo se enseña el valor de GHL cuando DIFIERE: repetirlo idéntico no
-            informa de nada y alarga el panel. Cuando difiere es justamente el
-            dato que hay que corregir en uno de los dos sistemas. */}
-        {!coincide && (
-          <div className="flex items-center gap-1.5 mt-0.5 pl-3">
-            <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 truncate">
-              GHL: {alla || "vacío"}
-            </span>
-          </div>
-        )}
+    <li className="flex items-start gap-2 py-1">
+      <span className="text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 w-[52px] shrink-0 pt-0.5">
+        {etiqueta}
+      </span>
+      <span className="min-w-0 flex-1 text-[11px] leading-snug">
+        <span className="block font-bold text-slate-700 dark:text-slate-200 truncate">{aqui || "vacío"}</span>
+        <span className="block font-semibold text-amber-600 dark:text-amber-400 truncate">GHL: {alla || "vacío"}</span>
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Bloque de cotejo que se pinta en la cabecera del cajón de notas.
+ *
+ * Enseña SOLO lo que no cuadra. Repetir un correo idéntico a ambos lados no
+ * informa de nada y alarga el panel; lo que difiere es justamente el dato que
+ * hay que corregir en uno de los dos sistemas, y verlo con el valor de allá al
+ * lado convierte «algo no cuadra» en «cambia esta letra».
+ */
+export function CotejoGhlPanel({
+  resumen,
+  email,
+  phone,
+}: {
+  resumen?: CotejoGhlResumen;
+  email?: string | null;
+  phone?: string | null;
+}) {
+  if (!resumen) return null;
+
+  if (!resumen.sello) {
+    return (
+      <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+        <GhlSello resumen={resumen} />
+        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+          Este cliente no aparece en GoHighLevel.
+        </span>
       </div>
+    );
+  }
+
+  const correoCuadra = igualCorreo(email, resumen.contactoCorreo);
+  const telCuadra = igualTelefono(phone, resumen.contactoTelefono);
+  const discrepancias: React.ReactNode[] = [];
+  if (!correoCuadra) {
+    discrepancias.push(
+      <Discrepancia key="c" etiqueta="Correo" aqui={email || ""} alla={resumen.contactoCorreo || ""} />
+    );
+  }
+  if (!telCuadra) {
+    discrepancias.push(
+      <Discrepancia key="t" etiqueta="Teléfono" aqui={phone || ""} alla={resumen.contactoTelefono || ""} />
+    );
+  }
+
+  return (
+    <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex items-center gap-2 flex-wrap">
+        <GhlSello resumen={resumen} />
+        {resumen.contactoNombre && (
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+            = {resumen.contactoNombre}
+          </span>
+        )}
+        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 ml-auto">
+          {cuandoSeCotejo(resumen.cotejadoAt)}
+        </span>
+      </div>
+      {discrepancias.length > 0 && (
+        <>
+          <ul className="mt-1.5 mb-0.5">{discrepancias}</ul>
+          <p className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 leading-snug">
+            Corrige el dato en el sistema donde esté mal y el sello subirá solo en el siguiente sincronizado.
+          </p>
+        </>
+      )}
     </div>
   );
 }
 
-/**
- * Panel lateral con lo que GHL sabe del cliente: el contacto con el que se
- * cotejó, sus citas y las notas que el equipo fue dejando en ese portal.
- *
- * Las notas son de SOLO LECTURA. Escribir en GHL desde aquí sería una vía de
- * ida sin vuelta —la bitácora del proyecto vive en `prospect_notas`, con su
- * autor y su hora selladas por trigger— y mezclar las dos dejaría dos verdades
- * sobre el mismo cliente sin forma de saber cuál manda.
- */
-export function GhlDrawer({
-  cotejo,
-  prospectName,
-  prospectEmail,
-  prospectPhone,
-  open,
-  onClose,
-}: {
-  cotejo: GhlCotejo | null;
-  prospectName?: string | null;
-  /** Los datos de NUESTRO expediente. Son la mitad izquierda del cotejo: sin
-      ellos el panel enseñaría los de GHL a ambos lados y siempre cuadraría. */
-  prospectEmail?: string | null;
-  prospectPhone?: string | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  // Portal sobre `document.body` por la misma razón que el cajón de notas: los
-  // listados cuelgan de contenedores con `transform`, y un ancestro
-  // transformado se vuelve el bloque contenedor de todo `position: fixed`, con
-  // lo que el panel se recortaría a la caja de la tabla.
-  const [montado, setMontado] = useState(false);
-  useEffect(() => setMontado(true), []);
-
-  useEffect(() => {
-    if (!open) return;
-    const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", alPulsar);
-    return () => window.removeEventListener("keydown", alPulsar);
-  }, [open, onClose]);
-
-  if (!open || !cotejo || !montado) return null;
-
-  const sello = selloDe(cotejo.cotejo);
-  const { contacto, notas, citas } = cotejo;
-  const fiable = !!sello?.copia;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[70]">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className="absolute inset-y-0 right-0 w-full sm:w-[440px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-drawer-in">
-        {/* Encabezado */}
-        <div className="px-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex items-start gap-2 flex-shrink-0">
-          <Link2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 mt-0.5 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <span className="block text-[10px] font-black uppercase tracking-wide text-slate-700 dark:text-slate-200">
-              GoHighLevel
-            </span>
-            {prospectName && (
-              <span className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {prospectName}
-              </span>
-            )}
-          </div>
-          {sello && <GhlSello cotejo={cotejo} className="mt-0.5" />}
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 -mt-1 -mr-1 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-            title="Cerrar (Esc)"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 space-y-4">
-          {/* Con qué contacto se cotejó y en qué cuadra */}
-          <section>
-            <h3 className="text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">
-              Cotejo · {cotejo.cotejo.nivel} de 3
-              {cotejo.cotejo.nombreExacto && cotejo.cotejo.nivel < 2 && " · nombre completo idéntico"}
-            </h3>
-            <div className="rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 px-3 py-1.5">
-              <Fila etiqueta="Nombre" nuestro={prospectName || "—"} alla={contacto.nombre} coincide={cotejo.cotejo.nombre} />
-              <Fila etiqueta="Correo" nuestro={prospectEmail || "—"} alla={contacto.correo || ""} coincide={cotejo.cotejo.correo} />
-              <Fila etiqueta="Teléfono" nuestro={prospectPhone || "—"} alla={contacto.telefono || ""} coincide={cotejo.cotejo.telefono} />
-            </div>
-            {contacto.origen && (
-              <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-1.5 truncate" title={contacto.origen}>
-                Origen del lead: {contacto.origen}
-              </p>
-            )}
-          </section>
-
-          {/* Con 1 de 3 no se bajan notas ni citas: el contacto es una conjetura
-              y enseñar la conversación de otra persona en la ficha de este
-              cliente es peor que no enseñar nada. */}
-          {!fiable ? (
-            <div className="rounded-xl border border-dashed border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-3">
-              <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
-                Solo cuadra un dato suelto.
-              </p>
-              <p className="text-[10px] font-medium text-amber-600/90 dark:text-amber-400/80 leading-relaxed mt-1">
-                No se traen las notas ni las citas: puede ser un homónimo parcial o un teléfono reciclado, y
-                serían las de otra persona. Revísalo a ojo y corrige el dato que falte en el sistema donde
-                esté mal — si el nombre completo cuadrara entero, sus notas entrarían solas.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Citas */}
-              <section>
-                <h3 className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">
-                  <CalendarClock className="h-3 w-3" />
-                  Agenda en GHL {citas.length > 0 && <span className="tabular-nums">({citas.length})</span>}
-                </h3>
-                {citas.length === 0 ? (
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">Sin citas registradas allá.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {citas.map((c) => (
-                      <li key={c.id} className="rounded-xl border border-slate-150 dark:border-slate-800 px-3 py-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">
-                            {c.titulo || "Cita"}
-                          </span>
-                          {c.estado && (
-                            <span
-                              className={`shrink-0 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wide border ${
-                                TONO_CITA[c.estado] || TONO_CITA.cancelled
-                              }`}
-                            >
-                              {c.estado}
-                            </span>
-                          )}
-                        </div>
-                        <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5 tabular-nums">
-                          {fechaLegible(c.inicio)}
-                        </span>
-                        {c.liga && (
-                          <a
-                            href={c.liga}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline mt-1"
-                          >
-                            <ExternalLink className="h-2.5 w-2.5" />
-                            Liga de la reunión
-                          </a>
-                        )}
-                        {c.notas && (
-                          <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 whitespace-pre-wrap mt-1 leading-relaxed">
-                            {c.notas.trim()}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              {/* Notas */}
-              <section>
-                <h3 className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">
-                  <StickyNote className="h-3 w-3" />
-                  Notas del portal {notas.length > 0 && <span className="tabular-nums">({notas.length})</span>}
-                </h3>
-                {notas.length === 0 ? (
-                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">Sin notas en GoHighLevel.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {notas.map((n) => (
-                      <li key={n.id} className="rounded-xl border border-slate-150 dark:border-slate-800 px-3 py-2">
-                        {/* Solo la fecha: el autor NO se puede resolver. La nota
-                            trae un `userId`, pero el token de la integración no
-                            tiene el scope View Users (401). Añadirlo en GHL →
-                            Settings → Private Integrations pondría el nombre. */}
-                        <span className="block text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 tabular-nums">
-                          {fechaLegible(n.fecha)}
-                        </span>
-                        <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 whitespace-pre-wrap mt-1 leading-relaxed break-words">
-                          {n.texto || "(nota vacía)"}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
-
-          <p className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 leading-relaxed pt-1">
-            Solo lectura. La bitácora del proyecto se escribe en «Último seguimiento»; esto es lo que hay del
-            otro lado, en GoHighLevel.
-          </p>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// El botón que dispara el cotejo
+// El botón del listado
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Botón «Traer notas de GHL» del listado.
+ * Botón «Traer notas de GHL».
  *
  * Dice de cuántos clientes va a preguntar, porque el lote está topado y en una
  * cartera larga mirará solo los primeros: mejor que se lea en el botón a que el
@@ -493,8 +302,8 @@ export function GhlCotejarBoton({
         disabled={cargando || cuantos === 0}
         title={
           total > TOPE_LOTE
-            ? `Buscará en GoHighLevel los primeros ${TOPE_LOTE} clientes del listado (de ${total}) y traerá sus notas a la bitácora. Filtra para revisar el resto.`
-            : `Buscará ${cuantos} ${cuantos === 1 ? "cliente" : "clientes"} en GoHighLevel y traerá sus notas a la bitácora.`
+            ? `Buscará en GoHighLevel los primeros ${TOPE_LOTE} clientes del listado (de ${total}) y traerá sus notas. Toda la cartera se sincroniza sola cada madrugada.`
+            : `Buscará ${cuantos} ${cuantos === 1 ? "cliente" : "clientes"} en GoHighLevel y traerá sus notas.`
         }
         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-750 bg-white dark:bg-slate-850 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-800 dark:hover:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
@@ -509,9 +318,7 @@ export function GhlCotejarBoton({
         // botón parecería no haber hecho nada.
         traidas !== null && (
           <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-tight">
-            {traidas === 0
-              ? "Sin notas nuevas que traer."
-              : `${traidas} ${traidas === 1 ? "nota traída" : "notas traídas"} a la bitácora.`}
+            {traidas === 0 ? "Sin notas nuevas que traer." : `${traidas} ${traidas === 1 ? "nota traída" : "notas traídas"}.`}
           </span>
         )
       )}

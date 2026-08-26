@@ -15,7 +15,8 @@ import {
   Plus,
   Link2,
 } from "lucide-react";
-import { useApp, type ProspectNota, type NotasResumen } from "@/utils/context/AppContext";
+import { useApp, type ProspectNota, type NotasResumen, type CotejoGhlResumen } from "@/utils/context/AppContext";
+import { CotejoGhlPanel } from "@/components/ui/ghlCotejo";
 import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
 import {
   diasDesde,
@@ -466,11 +467,19 @@ export default function NotasSeguimiento({
 export function NotasDrawer({
   prospectId,
   prospectName,
+  cotejoGhl,
+  email,
+  phone,
   open,
   onClose,
 }: {
   prospectId: string | null;
   prospectName?: string | null;
+  /** El cotejo con GoHighLevel, si se ha hecho alguna vez. Se pinta arriba del
+      todo: es donde el sello del listado lleva, y donde se ve QUÉ dato corregir. */
+  cotejoGhl?: CotejoGhlResumen;
+  email?: string | null;
+  phone?: string | null;
   open: boolean;
   onClose: () => void;
 }) {
@@ -521,6 +530,7 @@ export function NotasDrawer({
             <X className="h-4 w-4" />
           </button>
         </div>
+        <CotejoGhlPanel resumen={cotejoGhl} email={email} phone={phone} />
         <NotasCuerpo prospectId={prospectId} activo={open} autoFoco />
       </div>
     </div>,

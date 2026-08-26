@@ -7,7 +7,8 @@
 // según por dónde entró.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { NotaGhl } from "@/utils/ghl/client";
+import type { CotejoGhl, NotaGhl } from "@/utils/ghl/client";
+import { selloDe } from "@/utils/ghlMatch";
 
 /** El tipo que infiere `createClient` sin genéricos: el proyecto no genera tipos de la base. */
 export type ClienteServicio = SupabaseClient<any, "public", "public", any, any>;
@@ -89,4 +90,53 @@ export async function traerNotasDeGhl(
     return { traidas: 0, faltaMigracion: error.code === "42703" };
   }
   return { traidas: nuevas.length, faltaMigracion: false };
+}
+
+
+/**
+ * Deja constancia de CÓMO cotejó este proyecto contra GoHighLevel.
+ *
+ * Antes el sello se calculaba al pulsar el botón y moría en la memoria del
+ * navegador: al recargar, desaparecía. Eso lo dejaba inservible para lo que más
+ * valía — entrar por la mañana y ver de un vistazo qué expedientes tienen el
+ * correo o el teléfono mal capturados.
+ *
+ * Se guarda SIEMPRE que se coteja, incluidos los dos casos que parecen no
+ * merecerlo:
+ *
+ *   · sello 'revisar' → es justamente la lista de trabajo: un dato suelto que
+ *     cuadra suele significar un teléfono de otra persona en el expediente.
+ *   · `cotejo` nulo   → «se buscó y no está en GHL», que NO es lo mismo que «no
+ *     se ha buscado». Sin la fila no se pueden distinguir, y esa diferencia es
+ *     la que dice si el barrido llegó hasta aquí.
+ *
+ * `cotejado_at` se reescribe en cada pasada aunque el resultado no cambie: un
+ * sello de hace tres semanas sobre un cliente cuyo correo se corrigió ayer ya no
+ * dice la verdad, y esta marca es lo único que permite notarlo.
+ */
+export async function guardarCotejo(
+  admin: ClienteServicio,
+  prospectId: string,
+  cotejo: CotejoGhl | null
+): Promise<void> {
+  const sello = cotejo ? selloDe(cotejo.cotejo) : null;
+  const { error } = await admin.from("prospect_ghl_cotejo").upsert(
+    {
+      prospect_id: prospectId,
+      sello: sello?.clave ?? null,
+      nivel: cotejo?.cotejo.nivel ?? 0,
+      contacto_id: cotejo?.contacto.id ?? null,
+      contacto_nombre: cotejo?.contacto.nombre ?? null,
+      contacto_correo: cotejo?.contacto.correo ?? null,
+      contacto_telefono: cotejo?.contacto.telefono ?? null,
+      cotejado_at: new Date().toISOString(),
+    },
+    { onConflict: "prospect_id" }
+  );
+  // Que no se pueda anotar el sello no puede tumbar la importación: las notas,
+  // que es lo que de verdad importa, ya están dentro. Se avisa por consola y se
+  // sigue. Si falta la migración 20260826000002, esto es lo que se verá.
+  if (error) {
+    console.error(`[ghl] no se pudo guardar el cotejo de ${prospectId}:`, error.message);
+  }
 }
