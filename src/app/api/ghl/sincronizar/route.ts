@@ -3,6 +3,7 @@ import { createClient as createServiceClient, type SupabaseClient } from "@supab
 import { createClient as createUserClient } from "@/utils/supabase/server";
 import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
 import { alcanzaParaCopiar } from "@/utils/ghlMatch";
+import { traerNotasDeGhl } from "@/utils/ghl/importar";
 
 // Traer a la bitácora del proyecto lo que el equipo dejó en GoHighLevel.
 //
@@ -163,7 +164,7 @@ export async function POST(request: Request) {
   let faltaMigracion = false;
   for (const [id, cotejo] of resultados) {
     if (!cotejo || !alcanzaParaCopiar(cotejo.cotejo) || cotejo.notas.length === 0) continue;
-    const r = await traerNotas(admin, id, cotejo.notas);
+    const r = await traerNotasDeGhl(admin, id, cotejo.notas);
     importadas[id] = r.traidas;
     if (r.faltaMigracion) faltaMigracion = true;
   }
@@ -182,83 +183,4 @@ export async function POST(request: Request) {
       ? "Los sellos están calculados, pero las notas no se pudieron guardar: falta aplicar la migración 20260826000000_notas_desde_ghl.sql en la base."
       : null,
   });
-}
-
-/**
- * Copia a `prospect_notas` las notas de GHL que aún no estén.
- *
- * Devuelve cuántas se añadieron ESTA vez (0 si ya estaban todas, que es el caso
- * normal a partir de la segunda pulsación).
- *
- * Se filtra contra lo ya importado ANTES de insertar en vez de dejar que choque
- * el índice único: PostgREST corta el lote entero al primer conflicto, así que
- * una sola nota repetida impediría entrar a las demás.
- *
- * DECISIÓN DE PRODUCTO (Daniel, 2026-08-26): lo ya traído NO se vuelve a tocar.
- * Si alguien corrige una nota en GHL, la copia de aquí se queda como estaba; si
- * la borra allá, la de aquí sobrevive. La bitácora es el antecedente del
- * CLIENTE y no se reescribe a posteriori — el mismo criterio que ya rige para
- * las notas que teclea el equipo, que solo su autor puede corregir. La
- * alternativa (que GHL pise el historial en cada sincronizado) se descartó a
- * propósito: dejaría la prueba de gestión a merced de quien limpie el CRM.
- *
- * Si algún día se quisiera lo contrario, el sitio es este: comparar `texto`
- * contra la nota conocida y hacer UPDATE. Ojo con `protege_nota_editada`, que
- * congela todo salvo el texto cuando hay sesión (por `service_role` no aplica).
- */
-async function traerNotas(
-  // El tipo que infiere `createServiceClient` sin genéricos: el proyecto no
-  // genera tipos de la base, así que las filas viajan sin forma y se validan
-  // contra los CHECK de la tabla, no contra TypeScript.
-  admin: SupabaseClient<any, "public", "public", any, any>,
-  prospectId: string,
-  notas: CotejoGhl["notas"]
-): Promise<{ traidas: number; faltaMigracion: boolean }> {
-  const { data: yaEstan, error: errLectura } = await admin
-    .from("prospect_notas")
-    .select("ghl_nota_id")
-    .eq("prospect_id", prospectId)
-    .eq("origen", "ghl");
-
-  // 42703 = la columna no existe: la migración 20260826000000 todavía no se ha
-  // aplicado. Se distingue de cualquier otro fallo porque tiene arreglo conocido
-  // y hay que decirlo con esas palabras, no dejar que parezca «no había notas».
-  if (errLectura) {
-    return { traidas: 0, faltaMigracion: errLectura.code === "42703" };
-  }
-
-  const conocidas = new Set((yaEstan || []).map((n) => n.ghl_nota_id));
-
-  const nuevas = notas
-    .filter((n) => n.id && !conocidas.has(n.id))
-    .map((n) => ({
-      prospect_id: prospectId,
-      // La nota es de GHL, no de una persona de aquí. `autor_id` queda en NULL
-      // a propósito: inventar un autor nuestro sería falsear la bitácora. El
-      // autor REAL tampoco se puede poner — GHL da un `userId` pero el token no
-      // tiene el scope View Users (401), así que hoy no hay forma de resolverlo
-      // a un nombre. Se añade el scope en GHL y esto empieza a firmarlas.
-      autor_id: null,
-      autor_nombre: "GoHighLevel",
-      autor_rol: "ghl",
-      // El CHECK de la tabla exige entre 1 y 4000 caracteres. Una nota de GHL
-      // puede venir vacía (adjuntos sueltos) o pasarse de largo; ni una ni otra
-      // pueden tumbar la importación de las demás.
-      texto: n.texto.trim().slice(0, 4000),
-      created_at: n.fecha,
-      origen: "ghl",
-      ghl_nota_id: n.id,
-    }))
-    .filter((n) => n.texto.length > 0 && !!n.created_at);
-
-  if (nuevas.length === 0) return { traidas: 0, faltaMigracion: false };
-
-  const { error } = await admin.from("prospect_notas").insert(nuevas);
-  if (error) {
-    // Que falle traer las notas de UN cliente no puede tumbar el lote: los
-    // sellos de los demás ya están calculados y son útiles por sí solos.
-    console.error(`[ghl] no se pudieron traer las notas de ${prospectId}:`, error.message);
-    return { traidas: 0, faltaMigracion: error.code === "42703" };
-  }
-  return { traidas: nuevas.length, faltaMigracion: false };
 }
