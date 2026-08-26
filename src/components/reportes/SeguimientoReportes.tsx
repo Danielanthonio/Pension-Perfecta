@@ -42,10 +42,12 @@ import {
   LineChart as LineChartIcon,
   MessageSquareText,
   PlugZap,
+  StickyNote,
   Users,
 } from "lucide-react";
 import { useApp, isLostStatus, type Prospect } from "@/utils/context/AppContext";
 import { StatCard } from "@/components/ui/StatCard";
+import { NotasDrawer } from "@/components/ui/notasSeguimiento";
 import { FIN_OTORGADO_STAGE } from "@/app/admin/_pipelineBuckets";
 import { STEP_DEFS, getActiveStageIndex } from "@/components/ui/projectStepper";
 import { SELLOS, type ClaveSello } from "@/utils/ghlMatch";
@@ -168,12 +170,36 @@ export function SeguimientoReportes({
   filters: ReportesFilters;
   setFilters: (patch: Partial<ReportesFilters>) => void;
 }) {
-  const { prospects, profiles, cotejosGhl, isProspectDeleted, isProspectPurged } = useApp();
-  const { porProyecto, porDia, cargando, error, demo } = useSeguimiento(filters.desde, filters.hasta);
+  const { prospects, profiles, cotejosGhl, notasResumen, isProspectDeleted, isProspectPurged } = useApp();
+  const { porProyecto, porDia, cargando, error, demo, recargar } = useSeguimiento(filters.desde, filters.hasta);
 
   // En modo demo no hay barrido nocturno que selle nada, así que `cotejosGhl`
   // llega vacío y el apartado de GoHighLevel no se podría revisar en local.
   const cotejos = useMemo(() => (demo ? cotejosDemo(prospects) : cotejosGhl), [demo, prospects, cotejosGhl]);
+
+  // El cajón de notas de los listados, montado desde la lista de trabajo: leer lo
+  // que hay —lo propio y lo de GoHighLevel, cada uno con su sello— y escribir el
+  // seguimiento sin abandonar el informe. Es el mismo componente que usa Gestión
+  // de Clientes, así que lo que se escriba aquí está en el expediente y al revés.
+  const [notasTarget, setNotasTarget] = useState<Prospect | null>(null);
+  // Cuántas notas tenía el proyecto al abrir el cajón. Si al cerrarlo hay más, el
+  // informe se ha quedado viejo —ese proyecto ya no va en «sin tocar»— y se
+  // vuelve a pedir. Comparar en vez de recargar siempre evita dos peticiones por
+  // cada expediente que alguien solo abre para leer.
+  const [notasAlAbrir, setNotasAlAbrir] = useState<number | null>(null);
+
+  const abrirNotas = (p: Prospect) => {
+    setNotasAlAbrir(notasResumen[p.id]?.total ?? 0);
+    setNotasTarget(p);
+  };
+
+  const cerrarNotas = () => {
+    const antes = notasAlAbrir;
+    const ahora = notasTarget ? notasResumen[notasTarget.id]?.total ?? 0 : antes;
+    setNotasTarget(null);
+    setNotasAlAbrir(null);
+    if (antes !== null && ahora !== antes) void recargar();
+  };
 
   const [soloActivos, setSoloActivos] = useState(true);
   const [orden, setOrden] = useState<OrdenRanking>("riesgo");
@@ -562,7 +588,9 @@ export function SeguimientoReportes({
       {demo && (
         <p className="rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300 print:hidden">
           Estás en modo demo: las notas de este informe son inventadas y sirven para ver cómo queda.
-          Con sesión real, aquí solo sale la bitácora de verdad.
+          Con sesión real, aquí solo sale la bitácora de verdad. Ojo con una cosa: el cajón de notas de
+          «Cartera sin tocar» lee la bitácora de demo (la que hayas tecleado tú), no las cifras
+          inventadas de las tablas, así que ahí verás «Sin notas» aunque el informe cuente seis.
         </p>
       )}
 
@@ -1044,31 +1072,48 @@ export function SeguimientoReportes({
                         {STEP_DEFS[getActiveStageIndex(f.p.status)]?.label || "—"}
                       </td>
                       <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tabular-nums ${
+                        <button
+                          type="button"
+                          onClick={() => abrirNotas(f.p)}
+                          title={
+                            (nunca
+                              ? "Nunca se le ha escrito una nota en la plataforma. Los días son los que lleva capturado."
+                              : `Última nota propia: ${fechaCortaLocal(f.seg?.ultimaPlataformaAt)}${
+                                  f.seg?.ultimoAutorPlataforma ? ` · ${f.seg.ultimoAutorPlataforma}` : ""
+                                }`) + " · Clic para leer la bitácora y anotar el seguimiento."
+                          }
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold tabular-nums ring-1 ring-inset ring-transparent hover:ring-current transition-all active:scale-95 ${
                             nunca
                               ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                               : "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400"
                           }`}
-                          title={
-                            nunca
-                              ? "Nunca se le ha escrito una nota en la plataforma. Los días son los que lleva capturado."
-                              : "Días desde la última nota escrita en la plataforma."
-                          }
                         >
                           {nunca ? `Nunca · ${espera ?? "—"} d` : etiquetaDias(espera)}
-                        </span>
+                          <StickyNote className="h-3 w-3 opacity-60" strokeWidth={2.4} />
+                        </button>
                       </td>
                       <td className="px-3 py-2.5 text-center whitespace-nowrap">
                         {f.seg && f.seg.notasGhl > 0 ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400"
-                            title={`Última nota de GoHighLevel: ${fechaCortaLocal(f.seg.ultimaGhlAt)}`}
+                          <button
+                            type="button"
+                            onClick={() => abrirNotas(f.p)}
+                            title={`${f.seg.notasGhl} nota(s) traída(s) de GoHighLevel · última el ${fechaCortaLocal(
+                              f.seg.ultimaGhlAt
+                            )} · Clic para leerlas aquí mismo.`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400 ring-1 ring-inset ring-transparent hover:ring-current transition-all active:scale-95"
                           >
                             {f.seg.notasGhl} · {f.diasGhl !== null ? etiquetaDias(f.diasGhl) : "—"}
-                          </span>
+                            <StickyNote className="h-3 w-3 opacity-60" strokeWidth={2.4} />
+                          </button>
                         ) : (
-                          <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
+                          <button
+                            type="button"
+                            onClick={() => abrirNotas(f.p)}
+                            title="No llegó ninguna nota de GoHighLevel. Clic para ver la bitácora y el cotejo del contacto."
+                            className="text-[10px] text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-400 transition-colors px-2 py-0.5"
+                          >
+                            —
+                          </button>
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-right">
@@ -1087,6 +1132,20 @@ export function SeguimientoReportes({
           </div>
         )}
       </div>
+
+      {/* El cajón de notas: leer la bitácora entera —lo propio y lo de
+          GoHighLevel, cada uno con su sello— y anotar el seguimiento sin salir
+          del informe. Al cerrarlo, si se escribió algo, el reporte se recarga
+          para que ese proyecto deje de figurar como «sin tocar». */}
+      <NotasDrawer
+        prospectId={notasTarget?.id ?? null}
+        prospectName={notasTarget?.full_name}
+        cotejoGhl={notasTarget ? cotejos[notasTarget.id] : undefined}
+        email={notasTarget?.email}
+        phone={notasTarget?.phone}
+        open={!!notasTarget}
+        onClose={cerrarNotas}
+      />
     </div>
   );
 }
