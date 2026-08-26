@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { saveFile, getFile } from "@/utils/db";
 import { getExpedienteDocSlots, getTipoFinanciamientoLabel } from "@/components/ui/tipoFinanciamiento";
-import { diaMx } from "@/utils/notas";
+import { diaLocal } from "@/utils/notas";
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
@@ -2097,7 +2097,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     Object.entries(mapa).forEach(([prospectId, notas]) => {
       if (!notas || notas.length === 0) return;
       const ordenadas = [...notas].sort((a, b) => b.created_at.localeCompare(a.created_at));
-      const dias = new Set(ordenadas.map((n) => diaMx(n.created_at)).filter(Boolean) as string[]);
+      const dias = new Set(ordenadas.map((n) => diaLocal(n.created_at)).filter(Boolean) as string[]);
       out[prospectId] = {
         total: ordenadas.length,
         diasConNota: dias.size,
@@ -2187,8 +2187,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const sumarAlResumen = (nota: ProspectNota) => {
       setNotasResumen((prev) => {
         const antes = prev[prospectId];
-        const diaNuevo = diaMx(nota.created_at);
-        const diaAnterior = antes?.ultimaAt ? diaMx(antes.ultimaAt) : null;
+        const diaNuevo = diaLocal(nota.created_at);
+        const diaAnterior = antes?.ultimaAt ? diaLocal(antes.ultimaAt) : null;
         return {
           ...prev,
           [prospectId]: {

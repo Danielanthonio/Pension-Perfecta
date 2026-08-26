@@ -40,7 +40,7 @@ import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/componen
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
 import { PipelineTabs } from "@/components/ui/pipelineTabs";
-import { SeguimientoCell } from "@/components/ui/notasSeguimiento";
+import { SeguimientoCell, NotasDrawer } from "@/components/ui/notasSeguimiento";
 
 function ClientesContent() {
   const {
@@ -93,6 +93,9 @@ function ClientesContent() {
   // Fila desplegada con la línea de tiempo en las tablas (evaluación y listo para
   // presentar). En las tarjetas de proyectos activos el stepper ya va siempre visible.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Proyecto cuyo cajón de notas está abierto. Da seguimiento sin salir de la
+  // tabla ni abrir el expediente.
+  const [notasTarget, setNotasTarget] = useState<Prospect | null>(null);
 
   // Se carga bajo demanda al desplegar, igual que en Gestión de Clientes.
   const toggleTimeline = async (id: string) => {
@@ -536,7 +539,7 @@ function ClientesContent() {
                           {/* Cuánto lleva el proyecto sin una nota. Las notas se
                               escriben dentro del expediente. */}
                           <td className="px-4 py-3.5">
-                            <SeguimientoCell resumen={notasResumen[p.id]} />
+                            <SeguimientoCell resumen={notasResumen[p.id]} onClick={() => setNotasTarget(p)} />
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -644,7 +647,7 @@ function ClientesContent() {
                           {/* Aquí el seguimiento es lo que más pesa: son los
                               dictámenes que hay que ir a presentar al cliente. */}
                           <td className="px-4 py-3.5">
-                            <SeguimientoCell resumen={notasResumen[p.id]} />
+                            <SeguimientoCell resumen={notasResumen[p.id]} onClick={() => setNotasTarget(p)} />
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
@@ -1096,6 +1099,14 @@ function ClientesContent() {
       </div>
 
       {/* Selector de modalidad para agendar (abre el link configurado por Dirección) */}
+      {/* Cajón de notas: se abre desde la columna «Último seguimiento». */}
+      <NotasDrawer
+        prospectId={notasTarget?.id ?? null}
+        prospectName={notasTarget?.full_name}
+        open={!!notasTarget}
+        onClose={() => setNotasTarget(null)}
+      />
+
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
 
       {/* Agenda de Asesoría — misma pantalla que usan el director y el AM */}

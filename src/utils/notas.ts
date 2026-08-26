@@ -1,10 +1,9 @@
 // Notas de seguimiento de un proyecto: reglas de FECHA y de ROL en un solo sitio.
 //
-// Las dos puntas que las usan —el panel de la ficha
-// (`components/ui/notasSeguimiento`) y la columna «Último seguimiento» de los
-// dos listados de clientes— tienen que estar de acuerdo en qué es "un día" y en
-// cuándo un proyecto se considera abandonado. Si cada una lo calculara por su
-// cuenta, la ficha diría «hace 2 días» y la tabla «hace 3».
+// Las puntas que las usan —el panel de la ficha, el cajón lateral de los
+// listados y la columna «Último seguimiento»— tienen que estar de acuerdo en qué
+// es "un día" y en cuándo un proyecto se considera abandonado. Si cada una lo
+// calculara por su cuenta, la ficha diría «hace 2 días» y la tabla «hace 3».
 //
 // La tabla vive en `public.prospect_notas` (migración 20260825000000).
 
@@ -13,8 +12,7 @@
  * INSERT en la base: aquí solo sirve para no enseñar el formulario a quien la
  * base le va a rechazar la escritura.
  *
- * Closer y finanzas quedan fuera a propósito: no trabajan expedientes (la ficha
- * del proyecto ni siquiera se les abre).
+ * Closer y finanzas quedan fuera a propósito: no trabajan expedientes.
  *
  * ⚠️ El front mapea 'admin' → 'director' al leer el perfil (ver `mapProfileFromDB`
  * en AppContext), así que aquí el rol de Dirección llega SIEMPRE como 'director'.
@@ -26,88 +24,87 @@ export function puedeEscribirNotas(role: string | null | undefined): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Fechas
+// Fechas — en la hora de QUIEN MIRA
 // ---------------------------------------------------------------------------
-// La base guarda UTC. Si se leyera tal cual, una nota escrita a las 19:00 del
-// lunes en México se agruparía bajo el martes y el conteo de «días de
-// seguimiento» saldría inflado. Se corre el instante seis horas y se leen los
-// campos UTC — el mismo truco que ya usa `utils/actividad.ts`. México no aplica
-// horario de verano desde 2022, así que −06:00 es fijo.
+// La base guarda el instante en UTC (`timestamptz`), que es lo correcto: un
+// instante es un instante. Lo que cambia es cómo se ROTULA, y eso se hace en el
+// huso del navegador que lo abre — es lo que pidió Daniel: «la hora y el día del
+// lugar donde se ve».
 //
-// Tampoco se usa `toLocaleDateString` a secas: la zona la pondría el navegador
-// de quien mira, y un director conectado desde otro país vería días distintos de
-// los de su equipo.
+// Por eso aquí se leen los campos LOCALES del `Date` (`getHours`, `getDate`, …)
+// y no los UTC. Un aliado en Tijuana y su account manager en Monterrey verán la
+// misma nota con la hora de su reloj, cada uno el suyo.
+//
+// (El resto de la plataforma —el reporte de actividad del AM— sí fija −06:00 de
+// México a propósito, porque ahí se COMPARAN personas entre sí y las horas
+// tienen que estar en la misma regla. Son dos problemas distintos.)
 
-const MX_OFFSET_MS = 6 * 60 * 60 * 1000;
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const MESES_LARGOS = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
-/** Instante ISO → el `Date` corrido a México, para leerle los campos UTC. */
-function enMexico(iso: string | null | undefined): Date | null {
+function aFecha(iso: string | null | undefined): Date | null {
   if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return null;
-  return new Date(t - MX_OFFSET_MS);
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
 }
 
-/** Instante ISO → «2026-08-25» (día de México). Es la clave con la que se agrupa. */
-export function diaMx(iso: string | null | undefined): string | null {
-  const d = enMexico(iso);
+function dosDigitos(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Instante → «2026-08-25» en el huso de quien mira. Clave para contar días. */
+export function diaLocal(iso: string | null | undefined): string | null {
+  const d = aFecha(iso);
   if (!d) return null;
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
 }
 
-/** El día de México de AHORA. */
-export function hoyMx(): string {
-  return diaMx(new Date().toISOString()) as string;
+/** El día de hoy, en el huso de quien mira. */
+export function hoyLocal(): string {
+  return diaLocal(new Date().toISOString()) as string;
 }
 
-/** Instante ISO → «15:33» (hora de México). */
-export function horaMx(iso: string | null | undefined): string {
-  const d = enMexico(iso);
+/** Instante → «18:36». */
+export function horaLocal(iso: string | null | undefined): string {
+  const d = aFecha(iso);
   if (!d) return "—";
-  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  return `${dosDigitos(d.getHours())}:${dosDigitos(d.getMinutes())}`;
 }
 
-/** Instante ISO → «25 ago 2026». Para la columna del listado, que va apretada. */
-export function fechaCortaMx(iso: string | null | undefined): string {
-  const d = enMexico(iso);
+/** Instante → «25 ago 2026». Para la columna del listado, que va apretada. */
+export function fechaCortaLocal(iso: string | null | undefined): string {
+  const d = aFecha(iso);
   if (!d) return "—";
-  return `${d.getUTCDate()} ${MESES_CORTOS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${d.getDate()} ${MESES_CORTOS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 /**
- * Instante ISO → «lunes, 25 de agosto de 2026». Es la cabecera de cada grupo de
- * notas del mismo día, que es lo que hace que la bitácora se lea como una
- * agenda de seguimiento y no como una lista de párrafos.
+ * Instante → «25 ago 2026 · 18:36».
+ *
+ * Cada nota lleva SU fecha y SU hora completas, sin agrupar por día: dos notas
+ * del mismo martes son dos notas, y cada una dice a qué hora se escribió. Esa es
+ * la unidad del seguimiento.
  */
-export function fechaLargaMx(iso: string | null | undefined): string {
-  const d = enMexico(iso);
+export function fechaHoraLocal(iso: string | null | undefined): string {
+  const d = aFecha(iso);
   if (!d) return "—";
-  return `${DIAS_SEMANA[d.getUTCDay()]}, ${d.getUTCDate()} de ${MESES_LARGOS[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
+  return `${fechaCortaLocal(iso)} · ${horaLocal(iso)}`;
 }
 
 /**
- * Días COMPLETOS transcurridos entre el día de México de la nota y el de hoy.
- * 0 = hoy, 1 = ayer. Cuenta días de calendario, no periodos de 24 horas: una
- * nota de anoche a las 23:00 es «ayer», aunque hayan pasado nueve horas.
+ * Días COMPLETOS de calendario entre la nota y hoy, en el huso de quien mira.
+ * 0 = hoy, 1 = ayer. No son periodos de 24 horas: una nota de anoche a las 23:00
+ * es «ayer», aunque hayan pasado nueve horas.
  */
-export function diasDesdeMx(iso: string | null | undefined): number | null {
-  const dia = diaMx(iso);
+export function diasDesde(iso: string | null | undefined): number | null {
+  const dia = diaLocal(iso);
   if (!dia) return null;
   const a = Date.parse(`${dia}T00:00:00Z`);
-  const b = Date.parse(`${hoyMx()}T00:00:00Z`);
+  const b = Date.parse(`${hoyLocal()}T00:00:00Z`);
   if (isNaN(a) || isNaN(b)) return null;
   return Math.round((b - a) / 86400000);
 }
 
-/** 0 → «hoy», 1 → «ayer», 9 → «hace 9 días». */
+/** 0 → «Hoy», 1 → «Ayer», 9 → «Hace 9 días». */
 export function etiquetaDias(dias: number | null): string {
   if (dias === null) return "Sin seguimiento";
   if (dias <= 0) return "Hoy";
@@ -118,10 +115,9 @@ export function etiquetaDias(dias: number | null): string {
 /**
  * Temperatura del seguimiento, para pintar la columna del listado.
  *
- * Los cortes (3 y 7 días) son los del pipeline comercial que ya usa la casa: un
- * proyecto tocado esta semana está vivo; uno que pasa de la semana sin una sola
- * nota es el que hay que ir a buscar. Se cambian aquí y cambian en las dos
- * pantallas a la vez.
+ * Los cortes (3 y 7 días) son los del pipeline comercial de la casa: un proyecto
+ * tocado esta semana está vivo; uno que pasa de la semana sin una sola nota es el
+ * que hay que ir a buscar. Se cambian aquí y cambian en todas las pantallas.
  */
 export type TonoSeguimiento = "sin" | "fresco" | "tibio" | "frio";
 

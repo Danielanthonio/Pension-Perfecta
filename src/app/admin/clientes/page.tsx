@@ -32,7 +32,7 @@ import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { CreadorPorCell, getCreadorRoleLabel } from "@/components/ui/creadorProyecto";
-import { SeguimientoCell } from "@/components/ui/notasSeguimiento";
+import { SeguimientoCell, NotasDrawer } from "@/components/ui/notasSeguimiento";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
@@ -271,6 +271,9 @@ function ClientesAdminContent() {
   // Línea de tiempo del aliado por fila (misma que ve el aliado en Mis Clientes).
   // Se carga bajo demanda al expandir para no traer todo el historial de golpe.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Proyecto cuyo cajón de notas está abierto. El seguimiento se hace DESDE la
+  // tabla: entrar al expediente para anotar una llamada era el paso que sobraba.
+  const [notasTarget, setNotasTarget] = useState<Prospect | null>(null);
   const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
 
   const toggleTimeline = async (id: string) => {
@@ -1027,7 +1030,7 @@ function ClientesAdminContent() {
                           {/* Último seguimiento: cuánto lleva el proyecto sin una
                               nota. El detalle vive en la bitácora del expediente. */}
                           <td className="px-4 py-2.5">
-                            <SeguimientoCell resumen={notasResumen[p.id]} />
+                            <SeguimientoCell resumen={notasResumen[p.id]} onClick={() => setNotasTarget(p)} />
                           </td>
                           {/* Acciones */}
                           <td className="px-5 py-2.5">
@@ -1120,6 +1123,14 @@ function ClientesAdminContent() {
       </div>
 
       {/* Selector 40/10 para abrir la agenda cuando el proyecto no tiene modalidad */}
+      {/* Cajón de notas: se abre desde la columna «Último seguimiento». */}
+      <NotasDrawer
+        prospectId={notasTarget?.id ?? null}
+        prospectName={notasTarget?.full_name}
+        open={!!notasTarget}
+        onClose={() => setNotasTarget(null)}
+      />
+
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />
 
       {/* Agenda de Asesoría — misma pantalla que usa el aliado */}
