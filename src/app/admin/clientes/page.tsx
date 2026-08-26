@@ -33,6 +33,7 @@ import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/componen
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { CreadorPorCell, getCreadorRoleLabel } from "@/components/ui/creadorProyecto";
 import { SeguimientoCell, NotasDrawer } from "@/components/ui/notasSeguimiento";
+import { GhlSello, GhlDrawer, GhlCotejarBoton, useGhlCotejo } from "@/components/ui/ghlCotejo";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
@@ -54,6 +55,7 @@ function ClientesAdminContent() {
     profiles,
     assignmentProfiles,
     notasResumen,
+    recargarResumenNotas,
     updateProspectStatus,
     reassignProspect,
     reassignAccountManager,
@@ -274,6 +276,10 @@ function ClientesAdminContent() {
   // Proyecto cuyo cajón de notas está abierto. El seguimiento se hace DESDE la
   // tabla: entrar al expediente para anotar una llamada era el paso que sobraba.
   const [notasTarget, setNotasTarget] = useState<Prospect | null>(null);
+  // Cotejo contra GoHighLevel. Arranca vacío y NO se dispara solo: se pide desde
+  // el botón de la barra, porque cada cliente cuesta hasta 4 búsquedas allá.
+  const { cotejos: ghlCotejos, cargando: ghlCargando, error: ghlError, traidas: ghlTraidas, cotejar: ghlCotejar } = useGhlCotejo();
+  const [ghlTarget, setGhlTarget] = useState<Prospect | null>(null);
   const [statusDates, setStatusDates] = useState<Record<string, Record<string, number>>>({});
 
   const toggleTimeline = async (id: string) => {
@@ -740,11 +746,24 @@ function ClientesAdminContent() {
                 </div>
               )}
             </div>
-            <SortControl
-              options={activeTab === "papelera" ? sortOptionsTrash : sortOptionsActive}
-              sort={activeTab === "papelera" ? sortT : sortA}
-              accent={accent as any}
-            />
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Cotejo con GoHighLevel. En la papelera no aplica: son expedientes
+                  eliminados y no hay nada que cruzar con la agenda de allá. */}
+              {activeTab !== "papelera" && (
+                <GhlCotejarBoton
+                  total={sortA.sorted.length}
+                  cargando={ghlCargando}
+                  error={ghlError}
+                  traidas={ghlTraidas}
+                  onCotejar={() => ghlCotejar(sortA.sorted.map((p) => p.id), recargarResumenNotas)}
+                />
+              )}
+              <SortControl
+                options={activeTab === "papelera" ? sortOptionsTrash : sortOptionsActive}
+                sort={activeTab === "papelera" ? sortT : sortA}
+                accent={accent as any}
+              />
+            </div>
           </div>
 
           {activeTab === "papelera" ? (
@@ -912,6 +931,13 @@ function ClientesAdminContent() {
                                   <span className="text-slate-300 dark:text-slate-700">·</span>
                                   <span>Tel {p.phone}</span>
                                 </div>
+                                {/* Sello de coincidencia con GoHighLevel. Hasta que
+                                    no se pulsa «Cotejar con GHL» no pinta nada. */}
+                                <GhlSello
+                                  cotejo={ghlCotejos[p.id]}
+                                  onClick={ghlCotejos[p.id] ? () => setGhlTarget(p) : undefined}
+                                  className="mt-1"
+                                />
                                 <span className="block text-[9px] font-medium uppercase tracking-wide text-slate-350 dark:text-slate-600 mt-0.5 truncate max-w-[220px]">{p.curp}</span>
                               </div>
                             </div>
@@ -1129,6 +1155,16 @@ function ClientesAdminContent() {
         prospectName={notasTarget?.full_name}
         open={!!notasTarget}
         onClose={() => setNotasTarget(null)}
+      />
+
+      {/* Cajón de GoHighLevel: se abre desde el sello de color junto al nombre. */}
+      <GhlDrawer
+        cotejo={ghlTarget ? ghlCotejos[ghlTarget.id] ?? null : null}
+        prospectName={ghlTarget?.full_name}
+        prospectEmail={ghlTarget?.email}
+        prospectPhone={ghlTarget?.phone}
+        open={!!ghlTarget}
+        onClose={() => setGhlTarget(null)}
       />
 
       <MeetingModalityModal isOpen={modalityOpen} onClose={() => setModalityOpen(false)} />

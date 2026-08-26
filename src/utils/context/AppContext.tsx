@@ -280,6 +280,13 @@ export interface ProspectNota {
   created_at: string;
   /** Marca de corrección. NULL = la nota está tal cual se escribió. */
   edited_at: string | null;
+  /**
+   * Dónde se escribió: 'plataforma' (aquí) o 'ghl' (traída de GoHighLevel).
+   * Las de GHL son de SOLO LECTURA — no son nuestras para corregirlas ni para
+   * borrarlas, y su fecha es la real de allá, no la de la importación.
+   * Ver migración 20260826000000_notas_desde_ghl.sql.
+   */
+  origen: "plataforma" | "ghl";
 }
 
 // Resumen por proyecto para el LISTADO de clientes: lo devuelve agregado la RPC
@@ -566,6 +573,10 @@ interface AppContextType {
   addProspectNota: (prospectId: string, texto: string) => Promise<ProspectNota>;
   updateProspectNota: (notaId: string, texto: string) => Promise<void>;
   deleteProspectNota: (notaId: string, prospectId: string) => Promise<void>;
+  // Vuelve a pedir el resumen agregado. Lo necesita la importación desde GHL:
+  // las notas entran por el servidor (`service_role`), así que el navegador no
+  // se entera de que la columna «Último seguimiento» acaba de cambiar.
+  recargarResumenNotas: () => Promise<void>;
 }
 
 // Cierre de sesión automático por inactividad. En el plan limitado de Hostinger,
@@ -2117,6 +2128,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     texto: row.texto || "",
     created_at: row.created_at,
     edited_at: row.edited_at ?? null,
+    // Sin la migración 20260826000000 la columna no existe todavía y la nota es,
+    // por definición, de las escritas aquí.
+    origen: row.origen === "ghl" ? "ghl" : "plataforma",
   });
 
   /**
@@ -2208,6 +2222,8 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         autor_id: user?.id || null,
         autor_nombre: user?.full_name || "Usuario",
         autor_rol: user?.role || "aliado",
+        // El modo demo no habla con GHL: todo lo de aquí se escribió aquí.
+        origen: "plataforma",
         texto: limpio,
         created_at: new Date().toISOString(),
         edited_at: null,
@@ -5789,6 +5805,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         addProspectNota,
         updateProspectNota,
         deleteProspectNota,
+        recargarResumenNotas: cargarResumenNotas,
       }}
     >
       {children}

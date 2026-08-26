@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Clock,
   Plus,
+  Link2,
 } from "lucide-react";
 import { useApp, type ProspectNota, type NotasResumen } from "@/utils/context/AppContext";
 import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
@@ -270,7 +271,11 @@ export function NotasCuerpo({
           notas.map((nota) => {
             const meta = getCreadorMeta(nota.autor_rol) ?? CREADOR_SIN_REGISTRO;
             const Icono = meta.Icon;
-            const esMia = !!user?.id && nota.autor_id === user.id;
+            // Traída de GoHighLevel. No es de nadie de aquí, así que no se
+            // corrige ni se borra desde la plataforma: el original vive allá y
+            // la próxima importación la volvería a traer igual.
+            const deGhl = nota.origen === "ghl";
+            const esMia = !deGhl && !!user?.id && nota.autor_id === user.id;
             const editando = editandoId === nota.id;
             const ocupada = ocupadaId === nota.id;
 
@@ -281,10 +286,12 @@ export function NotasCuerpo({
               >
                 <div className="flex items-start gap-2.5">
                   <div
-                    className={`h-7 w-7 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${meta.wrap}`}
-                    title={meta.label}
+                    className={`h-7 w-7 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${
+                      deGhl ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400" : meta.wrap
+                    }`}
+                    title={deGhl ? "Nota escrita en GoHighLevel" : meta.label}
                   >
-                    {inicialesAutor(nota.autor_nombre)}
+                    {deGhl ? <Link2 className="h-3 w-3" /> : inicialesAutor(nota.autor_nombre)}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -292,12 +299,25 @@ export function NotasCuerpo({
                       <span className="text-[11px] font-black text-slate-800 dark:text-white truncate max-w-[150px]">
                         {nota.autor_nombre}
                       </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wide border ${meta.badge}`}
-                      >
-                        <Icono className="h-2.5 w-2.5 shrink-0" />
-                        {meta.label}
-                      </span>
+                      {deGhl ? (
+                        // Quién la escribió NO se sabe: GHL da un `userId` pero
+                        // el token no tiene el scope View Users. Se dice de
+                        // dónde viene, que es lo que sí consta.
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wide border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/50"
+                          title="Nota escrita en el portal de GoHighLevel y traída a la bitácora. Conserva su fecha original."
+                        >
+                          <Link2 className="h-2.5 w-2.5 shrink-0" />
+                          GoHighLevel
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wide border ${meta.badge}`}
+                        >
+                          <Icono className="h-2.5 w-2.5 shrink-0" />
+                          {meta.label}
+                        </span>
+                      )}
                     </div>
 
                     {/* Fecha y hora COMPLETAS en cada nota: es lo que la
@@ -343,7 +363,7 @@ export function NotasCuerpo({
                     )}
 
                     {/* Corregir / borrar. Solo lo propio; dirección además borra cualquiera. */}
-                    {!editando && (esMia || esDireccion) && (
+                    {!editando && !deGhl && (esMia || esDireccion) && (
                       <div className="flex items-center gap-3 mt-2">
                         {esMia && (
                           <button
