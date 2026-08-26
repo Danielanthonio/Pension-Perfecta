@@ -47,10 +47,12 @@ import {
   Target,
   Briefcase,
   LayoutDashboard,
+  MessageSquareText,
 } from "lucide-react";
 import { AliadosReportes } from "@/components/reportes/AliadosReportes";
 import { AccountManagersReportes } from "@/components/reportes/AccountManagersReportes";
 import { ClosersReportes } from "@/components/reportes/ClosersReportes";
+import { SeguimientoReportes } from "@/components/reportes/SeguimientoReportes";
 import { ReportesFiltroBar } from "@/components/reportes/ReportesFiltroBar";
 import { Donut, DonutLegend, REPORTES_VIZ_STYLE } from "@/components/reportes/ReportesCharts";
 import { useReportesFilters, type ReportesFilters } from "@/components/reportes/reportesFilters";
@@ -703,7 +705,9 @@ function GeneralPanel({
 
 // ── Botonera de rol ──────────────────────────────────────────────────────────
 // Los colores son los del boceto: aliados verde, account manager azul, closer
-// ámbar. El general se queda en gris porque no es un rol, es el panorama.
+// ámbar. El general se queda en gris porque no es un rol, es el panorama, y
+// seguimiento va en violeta —el mismo tono que ya usa el panel de actividad—
+// porque tampoco es un rol: es la responsabilidad de atender la cartera.
 const TABS: { id: RolReporte; Icon: typeof Users; activo: string; inactivo: string }[] = [
   {
     id: "general",
@@ -724,6 +728,12 @@ const TABS: { id: RolReporte; Icon: typeof Users; activo: string; inactivo: stri
     inactivo: "bg-blue-50/60 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50 hover:border-blue-400",
   },
   {
+    id: "seguimiento",
+    Icon: MessageSquareText,
+    activo: "bg-violet-500 text-white border-violet-500 shadow-md shadow-violet-500/20",
+    inactivo: "bg-violet-50/60 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-900/50 hover:border-violet-400",
+  },
+  {
     id: "closers",
     Icon: Target,
     activo: "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20",
@@ -742,7 +752,7 @@ function ReportesContent() {
   // vez de enseñarle una vacía.
   const tabs = useMemo(() => (isAM ? TABS.filter((t) => t.id !== "closers") : TABS), [isAM]);
   const rol: RolReporte = tabs.some((t) => t.id === filters.rol) ? filters.rol : "general";
-  const conFiltroBar = rol === "aliados" || rol === "account_managers";
+  const conFiltroBar = rol === "aliados" || rol === "account_managers" || rol === "seguimiento";
 
   return (
     <div className="viz-root reportes-viz closers-viz space-y-5 max-w-[1700px] mx-auto animate-fade-in text-slate-800 dark:text-slate-100">
@@ -770,7 +780,9 @@ function ReportesContent() {
       </div>
 
       {/* Botonera de rol */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:hidden">
+      {/* La rejilla se ajusta al número de pestañas: al account manager se le
+          quita la de CLOSER y con `sm:grid-cols-5` fijo le quedaría un hueco. */}
+      <div className={`grid grid-cols-2 ${tabs.length >= 5 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 print:hidden`}>
         {tabs.map(({ id, Icon, activo, inactivo }) => {
           const on = rol === id;
           return (
@@ -794,6 +806,7 @@ function ReportesContent() {
       {rol === "general" && <GeneralPanel filters={filters} setFilters={setFilters} />}
       {rol === "aliados" && <AliadosReportes filters={filters} setFilters={setFilters} />}
       {rol === "account_managers" && <AccountManagersReportes filters={filters} setFilters={setFilters} />}
+      {rol === "seguimiento" && <SeguimientoReportes filters={filters} setFilters={setFilters} />}
       {rol === "closers" && <ClosersReportes qs={qs} />}
     </div>
   );

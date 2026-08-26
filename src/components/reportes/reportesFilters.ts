@@ -25,7 +25,7 @@ import {
   resolveRango,
 } from "./reportesTypes";
 
-const ROLES: RolReporte[] = ["general", "aliados", "account_managers", "closers"];
+const ROLES: RolReporte[] = ["general", "aliados", "account_managers", "seguimiento", "closers"];
 const GRANOS: Grano[] = ["dia", "semana", "mes", "anio"];
 const PRESETS: RangoPreset[] = [
   "hoy",

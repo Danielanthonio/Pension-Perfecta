@@ -50,13 +50,21 @@ export type { RangoPreset, TipoGrafico } from "@/components/closers/closerTypes"
 // Ejes del módulo
 // ---------------------------------------------------------------------------
 
-/** Las cuatro pestañas de la botonera. `general` es el panorama de siempre. */
-export type RolReporte = "general" | "aliados" | "account_managers" | "closers";
+/**
+ * Las pestañas de la botonera. `general` es el panorama de siempre.
+ *
+ * `seguimiento` no es un rol, es una responsabilidad: la del account manager
+ * sobre la bitácora de sus proyectos. Va en su propia pestaña y no dentro de
+ * ACCOUNT MANAGER porque mide otra cosa —el trabajo de atender, no el resultado
+ * del pipeline— y porque su apartado de GoHighLevel no es del AM.
+ */
+export type RolReporte = "general" | "aliados" | "account_managers" | "seguimiento" | "closers";
 
 export const ROL_LABEL: Record<RolReporte, string> = {
   general: "General",
   aliados: "Aliados",
   account_managers: "Account Manager",
+  seguimiento: "Seguimiento",
   closers: "Closer",
 };
 
