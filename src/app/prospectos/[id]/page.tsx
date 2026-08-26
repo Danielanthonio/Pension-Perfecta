@@ -44,6 +44,7 @@ import { LaborPeriodsTable } from "@/components/LaborPeriodsTable";
 import { getActiveStageIndex, STEP_STATUSES, STEP_DEFS, resolveStepDates } from "@/components/ui/projectStepper";
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto, getExpedienteDocSlots, getDocTypeLabel } from "@/components/ui/tipoFinanciamiento";
 import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
+import NotasSeguimiento from "@/components/ui/notasSeguimiento";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -1659,6 +1660,14 @@ export default function ProspectoDetalle() {
             {/* Fechas clave del proyecto (agenda, firma, riesgo, ganada, pagada) */}
             {renderKeyDates()}
 
+            {/* Bitácora de seguimiento del proyecto. Va ANTES del historial a
+                propósito: el historial lo escribe el sistema al cambiar de etapa
+                (qué pasó con el expediente), y esto lo escriben las personas
+                (qué pasó con el cliente). Lo segundo es lo que se trabaja a
+                diario. Es el MISMO panel que ve la dirección: la bitácora es
+                compartida. */}
+            <NotasSeguimiento prospectId={prospect.id} alto="lg:h-[560px] h-[480px]" />
+
             {/* Timeline Historial del Expediente */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex-1 flex flex-col">
               <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 flex-shrink-0">
@@ -2890,8 +2899,12 @@ export default function ProspectoDetalle() {
           </div>
         </div>
 
-        <div className="w-full lg:w-[33%] flex flex-col shrink-0">
+        <div className="w-full lg:w-[33%] flex flex-col shrink-0 gap-6">
           {renderCalculator()}
+          {/* Bitácora de seguimiento, debajo del simulador y en la misma columna:
+              es donde el account manager ya tiene la vista puesta al trabajar el
+              expediente. Comparte contenido con la que ve el aliado en su ficha. */}
+          <NotasSeguimiento prospectId={prospect.id} alto="lg:h-[620px] h-[520px]" />
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { saveFile, getFile } from "@/utils/db";
 import { getExpedienteDocSlots, getTipoFinanciamientoLabel } from "@/components/ui/tipoFinanciamiento";
+import { diaMx } from "@/utils/notas";
 import { createClient } from "@/utils/supabase/client";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
@@ -258,6 +259,37 @@ export interface DocumentItem {
   drive_file_url?: string;
   drive_folder_id?: string;
   uploaded_by?: string;
+}
+
+// Una nota de seguimiento del proyecto (tabla `prospect_notas`, migración
+// 20260825000000). La bitácora es COMPARTIDA: la escriben el aliado, su account
+// manager y la dirección, y la leen los tres. A diferencia de `notes_aliado` /
+// `notes_director` —que son un texto único que se pisa— aquí cada nota es una
+// fila con su fecha, y de esa fila sale el seguimiento del proyecto.
+//
+// `autor_nombre` y `autor_rol` son SNAPSHOT del momento de escribir: la nota se
+// pinta aunque quien la lee no tenga permiso de leer ese perfil, y sobrevive a
+// la baja del autor.
+export interface ProspectNota {
+  id: string;
+  prospect_id: string;
+  autor_id: string | null;
+  autor_nombre: string;
+  autor_rol: string;
+  texto: string;
+  created_at: string;
+  /** Marca de corrección. NULL = la nota está tal cual se escribió. */
+  edited_at: string | null;
+}
+
+// Resumen por proyecto para el LISTADO de clientes: lo devuelve agregado la RPC
+// `notas_resumen()` (una fila por proyecto) en vez de bajarse la bitácora entera
+// al navegador. Alimenta la columna «Último seguimiento».
+export interface NotasResumen {
+  total: number;
+  diasConNota: number;
+  ultimaAt: string | null;
+  ultimoAutor: string | null;
 }
 
 export interface Simulation {
@@ -520,6 +552,20 @@ interface AppContextType {
   clearToast: () => void;
   triggerPushNotification: (message: string, type: "whatsapp" | "email", recipient: string) => void;
   getFileContent: (doc: DocumentItem) => Promise<string | null>;
+  // ── Notas de seguimiento del proyecto (migración 20260825000000) ───────────
+  // Resumen POR PROYECTO para el listado de clientes (columna «Último
+  // seguimiento»). Llega agregado de la RPC `notas_resumen()`; la clave es el id
+  // del proyecto. Un proyecto sin notas sencillamente no está en el mapa.
+  notasResumen: Record<string, NotasResumen>;
+  // La bitácora completa de UN proyecto, de la más nueva a la más vieja. Se pide
+  // al abrir la ficha y no se cachea en el contexto: son datos de una sola
+  // pantalla y crecen sin techo.
+  fetchProspectNotas: (prospectId: string) => Promise<ProspectNota[]>;
+  // Escribir / corregir / borrar. La fecha y el autor los pone la base, no el
+  // navegador: lo que se manda de más se ignora (trigger `sella_autor_nota`).
+  addProspectNota: (prospectId: string, texto: string) => Promise<ProspectNota>;
+  updateProspectNota: (notaId: string, texto: string) => Promise<void>;
+  deleteProspectNota: (notaId: string, prospectId: string) => Promise<void>;
 }
 
 // Cierre de sesión automático por inactividad. En el plan limitado de Hostinger,
@@ -817,6 +863,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [empresasMultialiado, setEmpresasMultialiado] = useState<EmpresaMultialiado[]>([]);
+  // Resumen de notas POR PROYECTO (columna «Último seguimiento» de los listados).
+  // Llega agregado de la base; un proyecto sin notas no está en el mapa.
+  const [notasResumen, setNotasResumen] = useState<Record<string, NotasResumen>>({});
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [appSettings, setAppSettings] = useState<AppSettings>({
     meeting_link_m40: DEFAULT_MEETING_LINK,
@@ -2008,6 +2057,237 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         console.error("Error deleting document from DB:", err);
       }
     }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NOTAS DE SEGUIMIENTO DEL PROYECTO (tabla `prospect_notas`, migr. 20260825000000)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Bitácora compartida: la escriben el aliado, su account manager y la
+  // dirección, y la leen los tres. La FECHA y el AUTOR los sella la base con un
+  // trigger, así que lo que se mande desde aquí en esos campos es indiferente
+  // (se manda igualmente para que el modo demo y un eventual service_role
+  // tengan algo con qué pintar).
+  //
+  // Nada de esto se cachea en el contexto: la bitácora de un proyecto se pide al
+  // abrir su ficha. Lo único que vive en memoria es el RESUMEN por proyecto, que
+  // es una fila por proyecto y lo necesitan los dos listados de clientes.
+
+  const NOTAS_DEMO_KEY = "pensionflow_notas";
+
+  const notasDemoLeer = (): Record<string, ProspectNota[]> => {
+    try {
+      const raw = localStorage.getItem(NOTAS_DEMO_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const notasDemoGuardar = (mapa: Record<string, ProspectNota[]>): void => {
+    try {
+      saveToStorage(NOTAS_DEMO_KEY, mapa);
+    } catch (e) {
+      console.warn("No se pudieron guardar las notas del modo demo:", e);
+    }
+  };
+
+  /** Resumen equivalente al de la RPC, calculado en el navegador. Solo modo demo. */
+  const notasDemoResumen = (mapa: Record<string, ProspectNota[]>): Record<string, NotasResumen> => {
+    const out: Record<string, NotasResumen> = {};
+    Object.entries(mapa).forEach(([prospectId, notas]) => {
+      if (!notas || notas.length === 0) return;
+      const ordenadas = [...notas].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const dias = new Set(ordenadas.map((n) => diaMx(n.created_at)).filter(Boolean) as string[]);
+      out[prospectId] = {
+        total: ordenadas.length,
+        diasConNota: dias.size,
+        ultimaAt: ordenadas[0].created_at,
+        ultimoAutor: ordenadas[0].autor_nombre,
+      };
+    });
+    return out;
+  };
+
+  const mapNotaFromDB = (row: any): ProspectNota => ({
+    id: row.id,
+    prospect_id: row.prospect_id,
+    autor_id: row.autor_id ?? null,
+    autor_nombre: row.autor_nombre || "Usuario",
+    autor_rol: row.autor_rol || "aliado",
+    texto: row.texto || "",
+    created_at: row.created_at,
+    edited_at: row.edited_at ?? null,
+  });
+
+  /**
+   * Carga el resumen por proyecto. Silencioso a propósito: alimenta una columna
+   * secundaria del listado y JAMÁS puede tumbar la carga de clientes. Si la
+   * migración todavía no está aplicada en la base, la RPC no existe, se avisa por
+   * consola y la columna se queda en «Sin seguimiento».
+   */
+  const cargarResumenNotas = async (): Promise<void> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      setNotasResumen(notasDemoResumen(notasDemoLeer()));
+      return;
+    }
+    try {
+      const { data, error } = await supabase.rpc("notas_resumen");
+      if (error) {
+        console.warn("No se pudo cargar el resumen de notas de seguimiento:", error.message);
+        return;
+      }
+      const mapa: Record<string, NotasResumen> = {};
+      (data || []).forEach((r: any) => {
+        mapa[r.proyecto_id] = {
+          total: Number(r.total_notas) || 0,
+          diasConNota: Number(r.dias_con_nota) || 0,
+          ultimaAt: r.ultima_nota_at || null,
+          ultimoAutor: r.ultimo_autor || null,
+        };
+      });
+      setNotasResumen(mapa);
+    } catch (e) {
+      console.warn("No se pudo cargar el resumen de notas de seguimiento:", e);
+    }
+  };
+
+  // Se recarga al cambiar de sesión o al pasar de demo a base real. Va aparte de
+  // la carga de prospectos para que un fallo aquí no arrastre al listado entero.
+  useEffect(() => {
+    void cargarResumenNotas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, isDemoMode, isProvisionalSession, user?.id]);
+
+  const fetchProspectNotas = async (prospectId: string): Promise<ProspectNota[]> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const mapa = notasDemoLeer();
+      return [...(mapa[prospectId] || [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    const { data, error } = await supabase
+      .from("prospect_notas")
+      .select("*")
+      .eq("prospect_id", prospectId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Error cargando las notas de seguimiento:", error);
+      throw new Error(error.message || "No se pudieron cargar las notas.");
+    }
+    return (data || []).map(mapNotaFromDB);
+  };
+
+  const addProspectNota = async (prospectId: string, texto: string): Promise<ProspectNota> => {
+    const limpio = (texto || "").trim();
+    if (!limpio) throw new Error("La nota está vacía.");
+    if (limpio.length > 4000) throw new Error("La nota es demasiado larga (máximo 4000 caracteres).");
+
+    // Adelanta el resumen del listado sin volver a preguntar a la base. El día
+    // se compara con el de la última nota: si es el mismo, el proyecto no suma un
+    // día de seguimiento nuevo. Es exacto porque la nota que se acaba de escribir
+    // es, por definición, la más reciente.
+    const sumarAlResumen = (nota: ProspectNota) => {
+      setNotasResumen((prev) => {
+        const antes = prev[prospectId];
+        const diaNuevo = diaMx(nota.created_at);
+        const diaAnterior = antes?.ultimaAt ? diaMx(antes.ultimaAt) : null;
+        return {
+          ...prev,
+          [prospectId]: {
+            total: (antes?.total || 0) + 1,
+            diasConNota: (antes?.diasConNota || 0) + (diaNuevo && diaNuevo === diaAnterior ? 0 : 1),
+            ultimaAt: nota.created_at,
+            ultimoAutor: nota.autor_nombre,
+          },
+        };
+      });
+    };
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const nota: ProspectNota = {
+        id: `nota-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        prospect_id: prospectId,
+        autor_id: user?.id || null,
+        autor_nombre: user?.full_name || "Usuario",
+        autor_rol: user?.role || "aliado",
+        texto: limpio,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+      };
+      const mapa = notasDemoLeer();
+      mapa[prospectId] = [nota, ...(mapa[prospectId] || [])];
+      notasDemoGuardar(mapa);
+      sumarAlResumen(nota);
+      return nota;
+    }
+
+    const { data, error } = await supabase
+      .from("prospect_notas")
+      .insert({
+        prospect_id: prospectId,
+        texto: limpio,
+        // Los tres van por cortesía: el trigger los pisa con los de la sesión.
+        autor_id: user?.id ?? null,
+        autor_nombre: user?.full_name || "Usuario",
+        autor_rol: user?.role || "aliado",
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Error guardando la nota de seguimiento:", error);
+      throw new Error(error.message || "No se pudo guardar la nota.");
+    }
+
+    const nota = mapNotaFromDB(data);
+    sumarAlResumen(nota);
+    // Escribir una nota es seguimiento: cuenta como actividad del Account Manager.
+    registrarActividad("nota", "Nota de seguimiento", prospectId);
+    return nota;
+  };
+
+  const updateProspectNota = async (notaId: string, texto: string): Promise<void> => {
+    const limpio = (texto || "").trim();
+    if (!limpio) throw new Error("La nota está vacía.");
+    if (limpio.length > 4000) throw new Error("La nota es demasiado larga (máximo 4000 caracteres).");
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const mapa = notasDemoLeer();
+      Object.keys(mapa).forEach((pid) => {
+        mapa[pid] = (mapa[pid] || []).map((n) =>
+          n.id === notaId ? { ...n, texto: limpio, edited_at: new Date().toISOString() } : n
+        );
+      });
+      notasDemoGuardar(mapa);
+      return;
+    }
+
+    // Solo se manda el texto: el resto de columnas las protege el trigger
+    // `protege_nota_editada`, y la RLS ya impide tocar la nota de otro.
+    const { error } = await supabase.from("prospect_notas").update({ texto: limpio }).eq("id", notaId);
+    if (error) {
+      console.error("Error corrigiendo la nota de seguimiento:", error);
+      throw new Error(error.message || "No se pudo corregir la nota.");
+    }
+  };
+
+  const deleteProspectNota = async (notaId: string, prospectId: string): Promise<void> => {
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      const mapa = notasDemoLeer();
+      mapa[prospectId] = (mapa[prospectId] || []).filter((n) => n.id !== notaId);
+      if (mapa[prospectId].length === 0) delete mapa[prospectId];
+      notasDemoGuardar(mapa);
+      setNotasResumen(notasDemoResumen(mapa));
+      return;
+    }
+
+    const { error } = await supabase.from("prospect_notas").delete().eq("id", notaId);
+    if (error) {
+      console.error("Error borrando la nota de seguimiento:", error);
+      throw new Error(error.message || "No se pudo borrar la nota.");
+    }
+    // Al borrar no se puede recalcular el resumen de cabeza (habría que saber si
+    // la nota era la única de su día), así que se vuelve a pedir agregado. Es una
+    // llamada suelta y solo ocurre al borrar, que es raro.
+    void cargarResumenNotas();
   };
 
   const login = async (email: string, role: UserRole, password?: string): Promise<UserRole | null> => {
@@ -5504,6 +5784,11 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         clearToast,
         triggerPushNotification,
         getFileContent,
+        notasResumen,
+        fetchProspectNotas,
+        addProspectNota,
+        updateProspectNota,
+        deleteProspectNota,
       }}
     >
       {children}

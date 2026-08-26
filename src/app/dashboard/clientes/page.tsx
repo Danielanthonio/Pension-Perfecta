@@ -40,6 +40,7 @@ import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/componen
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { ClientTabId, classifyProspect, prospectMatchesTab, getTabMeta } from "@/components/ui/clientTabs";
 import { PipelineTabs } from "@/components/ui/pipelineTabs";
+import { SeguimientoCell } from "@/components/ui/notasSeguimiento";
 
 function ClientesContent() {
   const {
@@ -55,6 +56,7 @@ function ClientesContent() {
     getProspectDeletedAt,
     appSettings,
     isDemoMode,
+    notasResumen,
   } = useApp();
 
   const searchParams = useSearchParams();
@@ -514,6 +516,7 @@ function ClientesContent() {
                       <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
                       <th className="px-4 py-3.5">Registro</th>
+                      <th className="px-4 py-3.5">Último seguimiento</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -529,6 +532,11 @@ function ClientesContent() {
                           <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
                           <td className="px-4 py-3.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                             {new Date(p.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+                          </td>
+                          {/* Cuánto lleva el proyecto sin una nota. Las notas se
+                              escriben dentro del expediente. */}
+                          <td className="px-4 py-3.5">
+                            <SeguimientoCell resumen={notasResumen[p.id]} />
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -561,7 +569,7 @@ function ClientesContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={6} className="px-6 pt-1 pb-6">
+                            <td colSpan={7} className="px-6 pt-1 pb-6">
                               <TimelinePanel
                                 status={p.status}
                                 dates={statusDates[p.id]}
@@ -607,6 +615,7 @@ function ClientesContent() {
                       <th className="px-4 py-3.5">Account Manager</th>
                       <th className="px-4 py-3.5">Crédito Total</th>
                       <th className="px-4 py-3.5">Etapa · Subetapa</th>
+                      <th className="px-4 py-3.5">Último seguimiento</th>
                       <th className="px-5 py-3.5 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -632,6 +641,11 @@ function ClientesContent() {
                             )}
                           </td>
                           <td className="px-4 py-3.5">{renderEtapaCell(p)}</td>
+                          {/* Aquí el seguimiento es lo que más pesa: son los
+                              dictámenes que hay que ir a presentar al cliente. */}
+                          <td className="px-4 py-3.5">
+                            <SeguimientoCell resumen={notasResumen[p.id]} />
+                          </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="flex items-center gap-2 justify-end">
                               {/* La línea de tiempo existe desde que se crea el proyecto. */}
@@ -693,7 +707,7 @@ function ClientesContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={6} className="px-6 pt-1 pb-6">
+                            <td colSpan={7} className="px-6 pt-1 pb-6">
                               <TimelinePanel
                                 status={p.status}
                                 dates={statusDates[p.id]}

@@ -35,6 +35,7 @@ export interface TipoActividad {
 export const TIPOS_ACTIVIDAD: TipoActividad[] = [
   { id: TIPO_VISTA_MODULO, label: "Entra a un módulo", short: "Módulos", ayuda: "Abrió una sección de la plataforma (Clientes, Agenda, Reportes…)." },
   { id: TIPO_ABRE_EXPEDIENTE, label: "Abre el expediente de un cliente", short: "Expedientes", ayuda: "Entró a la ficha de un cliente concreto. Es el seguimiento: mide si revisa su cartera." },
+  { id: "nota", label: "Escribe una nota de seguimiento", short: "Notas", ayuda: "Anotó el seguimiento de un proyecto en su bitácora (llamada, respuesta del cliente, acuerdo…)." },
   { id: "cambia_etapa", label: "Cambia la etapa de un proyecto", short: "Etapas", ayuda: "Movió un proyecto de etapa o subetapa, con o sin comentario." },
   { id: "agenda_asesoria", label: "Agenda una asesoría", short: "Agendas", ayuda: "Grabó la fecha de la reunión de asesoría." },
   { id: "simulacion", label: "Guarda una simulación", short: "Simulaciones", ayuda: "Guardó el cálculo de pensión y financiamiento del cliente." },

@@ -32,6 +32,7 @@ import { useSortable, SortControl, SortHeader } from "@/components/ui/sorting";
 import { ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection } from "@/components/ui/AliadoPicker";
 import { CreadorPorCell, getCreadorRoleLabel } from "@/components/ui/creadorProyecto";
+import { SeguimientoCell } from "@/components/ui/notasSeguimiento";
 import { TipoFinanciamientoBadge } from "@/components/ui/tipoFinanciamiento";
 import { TimelineToggleButton, TimelinePanel, hasProjectTimeline, formatCita } from "@/components/ui/projectStepper";
 import { AgendaAsesoriaModal } from "@/components/ui/agendaModal";
@@ -52,6 +53,7 @@ function ClientesAdminContent() {
     prospects,
     profiles,
     assignmentProfiles,
+    notasResumen,
     updateProspectStatus,
     reassignProspect,
     reassignAccountManager,
@@ -472,6 +474,10 @@ function ClientesAdminContent() {
       am: (p) => getAmName(p) || "",
       etapa: (p) => stageIndex(p.status),
       expediente: (p) => p.documents.length,
+      // Fecha de la última nota. Los proyectos sin una sola nota se van al fondo
+      // solos (useSortable hunde los vacíos), que es justo donde deben estar
+      // cuando se ordena por «lo último trabajado».
+      seguimiento: (p) => notasResumen[p.id]?.ultimaAt || "",
     },
     "fecha",
     "desc"
@@ -496,6 +502,7 @@ function ClientesAdminContent() {
     { id: "am", label: "Account Manager" },
     { id: "etapa", label: "Etapa" },
     { id: "expediente", label: "Documentos" },
+    { id: "seguimiento", label: "Último seguimiento" },
   ];
   const sortOptionsTrash = [
     { id: "eliminado", label: "Fecha eliminado" },
@@ -854,6 +861,7 @@ function ClientesAdminContent() {
                       <SortHeader col="expediente" label="Expediente" sort={sortA} align="center" />
                       <SortHeader col="etapa" label="Etapa · Subetapa" sort={sortA} />
                       <SortHeader col="fecha" label="Registrado" sort={sortA} align="center" />
+                      <SortHeader col="seguimiento" label="Último seguimiento" sort={sortA} />
                       <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">Acciones</th>
                     </tr>
                   </thead>
@@ -1016,6 +1024,11 @@ function ClientesAdminContent() {
                                 : "—"}
                             </span>
                           </td>
+                          {/* Último seguimiento: cuánto lleva el proyecto sin una
+                              nota. El detalle vive en la bitácora del expediente. */}
+                          <td className="px-4 py-2.5">
+                            <SeguimientoCell resumen={notasResumen[p.id]} />
+                          </td>
                           {/* Acciones */}
                           <td className="px-5 py-2.5">
                             <div className="flex items-center justify-end gap-2">
@@ -1084,7 +1097,7 @@ function ClientesAdminContent() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/50 dark:bg-slate-900/30">
-                            <td colSpan={9} className="px-6 pt-1 pb-6 border-b-0">
+                            <td colSpan={10} className="px-6 pt-1 pb-6 border-b-0">
                               <TimelinePanel
                                 status={p.status}
                                 dates={statusDates[p.id]}
