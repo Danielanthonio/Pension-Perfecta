@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/utils/supabase/server";
 import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
+import { alcanzaParaCopiar } from "@/utils/ghlMatch";
 
 // Traer a la bitácora del proyecto lo que el equipo dejó en GoHighLevel.
 //
@@ -9,8 +10,9 @@ import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "
 //
 //   1. COTEJA al cliente contra los contactos de GHL y devuelve con qué
 //      confianza es el mismo (3, 2 o 1 de 3 datos coincidiendo).
-//   2. Si la confianza alcanza (2 de 3 o más), COPIA sus notas de GHL a
-//      `prospect_notas`, que es la bitácora que se lee en «Último seguimiento».
+//   2. Si la confianza alcanza —dos de tres datos, o el nombre completo
+//      idéntico— COPIA sus notas de GHL a `prospect_notas`, que es la bitácora
+//      que se lee en «Último seguimiento».
 //
 // El paso 2 es el que pidió el negocio: hasta ahora el expediente decía «Sin
 // notas» aunque en GHL hubiera once, y quien lo abría creía que nadie había
@@ -23,9 +25,11 @@ import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "
 // `sella_autor_nota`, que respeta fecha y autor cuando el INSERT entra sin
 // sesión — o sea, con la `service_role` de aquí.
 //
-// Con 1 de 3 NO se copia nada: un homónimo o un teléfono reciclado metería la
-// conversación de otra persona en el expediente de este cliente, y una vez
-// dentro de la bitácora eso ya no se distingue a simple vista.
+// Con una coincidencia suelta NO se copia nada: un homónimo parcial o un
+// teléfono reciclado metería la conversación de otra persona en el expediente
+// de este cliente, y una vez dentro de la bitácora eso ya no se distingue a
+// simple vista. La regla vive en `alcanzaParaCopiar`, junto al cotejo, para que
+// el sello y la importación no puedan contar dos historias distintas.
 //
 // Por qué esto vive en el servidor y no en el navegador:
 //   1. El token de GHL da lectura sobre 830 000 contactos de la sub-cuenta, que
@@ -158,7 +162,7 @@ export async function POST(request: Request) {
   const importadas: Record<string, number> = {};
   let faltaMigracion = false;
   for (const [id, cotejo] of resultados) {
-    if (!cotejo || cotejo.cotejo.nivel < 2 || cotejo.notas.length === 0) continue;
+    if (!cotejo || !alcanzaParaCopiar(cotejo.cotejo) || cotejo.notas.length === 0) continue;
     const r = await traerNotas(admin, id, cotejo.notas);
     importadas[id] = r.traidas;
     if (r.faltaMigracion) faltaMigracion = true;

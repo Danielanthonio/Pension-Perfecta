@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ExternalLink, RefreshCw, StickyNote, CalendarClock, Link2, ShieldQuestion } from "lucide-react";
-import { selloDe, type NivelCoincidencia, type ResultadoCotejo } from "@/utils/ghlMatch";
+import { selloDe, type ResultadoCotejo } from "@/utils/ghlMatch";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lo que devuelve /api/ghl/sincronizar
@@ -129,12 +129,6 @@ export function useGhlCotejo() {
 // El sello
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PUNTO: Record<Exclude<NivelCoincidencia, 0>, string> = {
-  3: "bg-emerald-500",
-  2: "bg-blue-500",
-  1: "bg-amber-500",
-};
-
 /**
  * El chip de color junto al nombre del cliente.
  *
@@ -165,14 +159,16 @@ export function GhlSello({
     );
   }
 
-  const sello = selloDe(cotejo.cotejo.nivel);
+  const sello = selloDe(cotejo.cotejo);
   if (!sello) return null;
 
   const contenido = (
     <>
-      <span className={`h-1.5 w-1.5 rounded-full ${PUNTO[sello.nivel as Exclude<NivelCoincidencia, 0>]}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${sello.punto}`} />
       {sello.label}
-      <span className="tabular-nums opacity-60">{sello.nivel}/3</span>
+      {/* El «n/3» solo tiene sentido cuando el sello ES el recuento. En
+          «Nombre exacto» el dato que manda no es cuántos cuadran, sino CUÁL. */}
+      {sello.clave !== "nombre" && <span className="tabular-nums opacity-60">{cotejo.cotejo.nivel}/3</span>}
     </>
   );
 
@@ -303,9 +299,9 @@ export function GhlDrawer({
 
   if (!open || !cotejo || !montado) return null;
 
-  const sello = selloDe(cotejo.cotejo.nivel);
+  const sello = selloDe(cotejo.cotejo);
   const { contacto, notas, citas } = cotejo;
-  const fiable = cotejo.cotejo.nivel >= 2;
+  const fiable = !!sello?.copia;
 
   return createPortal(
     <div className="fixed inset-0 z-[70]">
@@ -340,6 +336,7 @@ export function GhlDrawer({
           <section>
             <h3 className="text-[9px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">
               Cotejo · {cotejo.cotejo.nivel} de 3
+              {cotejo.cotejo.nombreExacto && cotejo.cotejo.nivel < 2 && " · nombre completo idéntico"}
             </h3>
             <div className="rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 px-3 py-1.5">
               <Fila etiqueta="Nombre" nuestro={prospectName || "—"} alla={contacto.nombre} coincide={cotejo.cotejo.nombre} />
@@ -359,12 +356,12 @@ export function GhlDrawer({
           {!fiable ? (
             <div className="rounded-xl border border-dashed border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-3">
               <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed">
-                Solo cuadra un dato de tres.
+                Solo cuadra un dato suelto.
               </p>
               <p className="text-[10px] font-medium text-amber-600/90 dark:text-amber-400/80 leading-relaxed mt-1">
-                No se traen las notas ni las citas: con una sola coincidencia puede ser un homónimo o un
-                teléfono reciclado, y serían las de otra persona. Revísalo a ojo y corrige el dato que falte
-                en el sistema donde esté mal.
+                No se traen las notas ni las citas: puede ser un homónimo parcial o un teléfono reciclado, y
+                serían las de otra persona. Revísalo a ojo y corrige el dato que falte en el sistema donde
+                esté mal — si el nombre completo cuadrara entero, sus notas entrarían solas.
               </p>
             </div>
           ) : (

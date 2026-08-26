@@ -15,6 +15,7 @@
 // candidatos que vuelven.
 
 import {
+  alcanzaParaCopiar,
   cotejarContacto,
   mejorCoincidencia,
   normalizarTelefono,
@@ -349,8 +350,9 @@ export async function citasDeContacto(contactoId: string): Promise<CitaGhl[]> {
  * se devuelve un sello gris de «no encontrado»: el listado ya tiene bastante
  * ruido y una ausencia no es un dato.
  *
- * Las notas y las citas solo se piden si el cotejo llegó a 2 de 3. Con una sola
- * coincidencia el contacto es una CONJETURA —un homónimo, un teléfono
+ * Las notas y las citas solo se piden si el cotejo ALCANZA: dos de tres datos, o
+ * el nombre completo idéntico (ver `alcanzaParaCopiar`). Con una coincidencia
+ * suelta el contacto es una CONJETURA —un homónimo parcial, un teléfono
  * reciclado— y traerse las notas de otra persona a la ficha de este cliente es
  * peor que no traer nada.
  */
@@ -361,7 +363,7 @@ export async function cotejarCliente(local: DatosCotejo): Promise<CotejoGhl | nu
   const mejor = mejorCoincidencia(local, posibles);
   if (!mejor) return null;
 
-  const fiable = mejor.cotejo.nivel >= 2;
+  const fiable = alcanzaParaCopiar(mejor.cotejo);
   const [notas, citas] = fiable
     ? await Promise.all([notasDeContacto(mejor.contacto.id), citasDeContacto(mejor.contacto.id)])
     : [[], []];
