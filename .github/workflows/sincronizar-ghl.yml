@@ -33,11 +33,19 @@ jobs:
           for i in $(seq 1 100); do
             if [ -z "$cursor" ]; then cuerpo='{}'; else cuerpo="{\"cursor\":\"$cursor\"}"; fi
 
-            respuesta=$(curl -sS --fail-with-body --max-time 180 \
-              -X POST "$APP_URL/api/ghl/sincronizar-todo/" \
-              -H "Authorization: Bearer $CRON_SECRET" \
-              -H "Content-Type: application/json" \
-              -d "$cuerpo") || { echo "::error::La llamada falló: $respuesta"; exit 1; }
+                     respuesta=""
+            for intento in 1 2 3; do
+              if respuesta=$(curl -sS --fail-with-body --connect-timeout 30 --max-time 180 \
+                -X POST "$APP_URL/api/ghl/sincronizar-todo/" \
+                -H "Authorization: Bearer $CRON_SECRET" \
+                -H "Content-Type: application/json" \
+                -d "$cuerpo"); then break; fi
+              echo "::warning::Tramo $i, intento $intento: $(printf '%s' "${respuesta:-sin respuesta}" | tr -d '\n' | cut -c1-300)"
+              respuesta=""
+              if [ "$intento" = "3" ]; then echo "::error::El tramo $i falló tres veces."; exit 1; fi
+              sleep 20
+            done
+
 
             notas=$(echo "$respuesta"   | jq -r '.notas // 0')
             proy=$(echo "$respuesta"    | jq -r '.proyectos // 0')
