@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/utils/supabase/server";
-import { cotejarCliente, ghlConfigurado, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
+import { cotejarCliente, ghlConfigurado, GhlAccesoError, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
 import { alcanzaParaCopiar } from "@/utils/ghlMatch";
 import { guardarCotejo, traerNotasDeGhl } from "@/utils/ghl/importar";
 
@@ -155,6 +155,12 @@ export async function POST(request: Request) {
     // fiaría de ellos. Mejor no devolver ningún sello y decir qué pasó.
     if (e instanceof GhlLimiteError) {
       return NextResponse.json({ error: e.message }, { status: 429 });
+    }
+    // Igual con un rechazo de GHL, y aquí el mensaje se enseña tal cual: quien
+    // pulsa el botón es Dirección o el AM, y «404 en /contacts/» les dice a
+    // quién llamar. Un «no se pudo» genérico manda a nadie a ninguna parte.
+    if (e instanceof GhlAccesoError) {
+      return NextResponse.json({ error: e.message }, { status: 502 });
     }
     return NextResponse.json({ error: "No se pudo consultar GoHighLevel." }, { status: 502 });
   }

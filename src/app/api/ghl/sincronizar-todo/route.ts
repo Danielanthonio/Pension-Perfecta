@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/utils/supabase/server";
-import { cotejarCliente, ghlConfigurado, GhlLimiteError } from "@/utils/ghl/client";
+import { cotejarCliente, ghlConfigurado, GhlAccesoError, GhlLimiteError, type CotejoGhl } from "@/utils/ghl/client";
 import { alcanzaParaCopiar } from "@/utils/ghlMatch";
 import { guardarCotejo, traerNotasDeGhl } from "@/utils/ghl/importar";
 
@@ -119,6 +119,9 @@ export async function POST(request: Request) {
   let procesados = 0;
   let faltaMigracion = false;
   let ultimoId: string | null = cursor;
+  // Los sellos NO se escriben según van saliendo: se apuntan y se vuelcan al
+  // final del tramo, cuando ya se sabe si el tramo entero salió en blanco.
+  const sellos: [string, CotejoGhl | null][] = [];
 
   for (const c of clientes) {
     try {
@@ -126,7 +129,7 @@ export async function POST(request: Request) {
       // Cada noche se reescribe el sello de TODA la cartera, con o sin notas
       // nuevas: así el listado amanece con el estado real de cada expediente y
       // `cotejado_at` dice cuándo se comprobó por última vez.
-      await guardarCotejo(admin, c.id, cotejo);
+      sellos.push([c.id, cotejo]);
       if (cotejo && alcanzaParaCopiar(cotejo.cotejo) && cotejo.notas.length > 0) {
         const r = await traerNotasDeGhl(admin, c.id, cotejo.notas);
         if (r.traidas > 0) {
@@ -138,9 +141,22 @@ export async function POST(request: Request) {
       procesados++;
       ultimoId = c.id;
     } catch (e) {
+      if (e instanceof GhlAccesoError) {
+        // GHL nos está rechazando: token, sub-cuenta o URL mal puestos. Ni un
+        // sello se escribe —los de este tramo se quedan en `sellos`, sin
+        // volcar— y el barrido se para aquí. Lo contrario es lo que arrasó la
+        // cartera: seguir preguntando 500 veces lo mismo y anotar 500 «no está».
+        return NextResponse.json(
+          { error: e.message, estadoGhl: e.estado, procesados: 0, notas: 0, proyectos: 0, siguiente: cursor },
+          { status: 502 }
+        );
+      }
       if (e instanceof GhlLimiteError) {
         // GHL nos está frenando. Se devuelve lo hecho y el cursor donde se quedó:
         // quien llama espera y retoma justo ahí, sin repetir ni saltarse nada.
+        // Lo cotejado ANTES del frenazo es bueno y se guarda; lo que no se llegó
+        // a preguntar no deja rastro, que es justo lo que se quiere.
+        await volcarSellos(admin, sellos);
         return NextResponse.json({
           procesados,
           notas,
@@ -159,6 +175,34 @@ export async function POST(request: Request) {
     }
   }
 
+  // --- La guardia del tramo en blanco ---
+  //
+  // Unos 9 de cada 10 expedientes están en GoHighLevel. Que 20 seguidos no
+  // coincidan con NADIE no es un dato sobre la cartera: es que no estamos
+  // preguntando bien —credenciales, sub-cuenta, o una API que cambió—. Sellar
+  // esos 20 como «sin GHL» es escribir una mentira creíble en el expediente, y
+  // repetida 26 veces borra la cartera entera. Eso ya ocurrió del 26 al 28 de
+  // agosto de 2026: tres barridos «correctos» dejaron los 508 sellos en blanco.
+  //
+  // Así que un tramo entero sin coincidencias no se guarda: se para y se avisa.
+  if (sellos.length === TRAMO && sellos.every(([, cotejo]) => cotejo === null)) {
+    return NextResponse.json(
+      {
+        error:
+          `Ninguno de los ${TRAMO} clientes de este tramo coincidió con GoHighLevel. ` +
+          "Eso no pasa con una cartera normal, así que no se ha sellado ninguno: " +
+          "revisa GHL_API_TOKEN, GHL_LOCATION_ID y GHL_API_BASE en el hosting.",
+        procesados: 0,
+        notas,
+        proyectos,
+        siguiente: cursor,
+      },
+      { status: 502 }
+    );
+  }
+
+  await volcarSellos(admin, sellos);
+
   // Menos clientes que el tramo = se acabó la cartera.
   const fin = clientes.length < TRAMO;
 
@@ -172,4 +216,21 @@ export async function POST(request: Request) {
       ? "Falta aplicar la migración 20260826000000_notas_desde_ghl.sql: las notas no se pudieron guardar."
       : null,
   });
+}
+
+/**
+ * Escribe de golpe los sellos apuntados durante el tramo.
+ *
+ * Un lote en el que NADIE coincidió no se escribe: sin un solo acierto no hay
+ * prueba de que se estuviera hablando con GoHighLevel, y «no está en GHL» es
+ * una afirmación, no la ausencia de una. Lo único que se pierde por no
+ * escribirlo es refrescar `cotejado_at` una pasada; lo que se evita es sellar
+ * en falso. La misma regla, con la voz alta, vive en la guardia del tramo.
+ */
+async function volcarSellos(
+  admin: Parameters<typeof guardarCotejo>[0],
+  sellos: [string, CotejoGhl | null][]
+): Promise<void> {
+  if (sellos.length === 0 || sellos.every(([, cotejo]) => cotejo === null)) return;
+  for (const [id, cotejo] of sellos) await guardarCotejo(admin, id, cotejo);
 }

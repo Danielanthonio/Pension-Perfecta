@@ -106,6 +106,38 @@ export class GhlLimiteError extends Error {
   }
 }
 
+/**
+ * GHL rechaza la petición: no es que el cliente no esté, es que no estamos
+ * preguntando bien.
+ *
+ * Un 4xx de esta API NUNCA significa «no encontrado»: una búsqueda sin
+ * resultados contesta 200 con la lista vacía. Un 4xx es siempre nuestro:
+ *
+ *   401 · token inválido, caducado, o cabecera `Version` en blanco.
+ *   403 · el token no tiene acceso a esa sub-cuenta (`GHL_LOCATION_ID` ajeno).
+ *   404 · la ruta no existe — típicamente `GHL_API_BASE` con barra final,
+ *         que deja la URL en `//contacts/`.
+ *
+ * Devolver esto como `null` fue lo que permitió que el barrido del 26 al 28 de
+ * agosto de 2026 sellara los 508 expedientes como «sin GHL» sin una queja: tres
+ * ejecuciones «correctas» que en realidad no cotejaron a nadie. Cuesta lo mismo
+ * gritar, y un barrido detenido se repite; una cartera mal sellada hay que
+ * reconstruirla.
+ */
+export class GhlAccesoError extends Error {
+  readonly estado: number;
+  constructor(estado: number, detalle: string, ruta: string) {
+    super(
+      `GoHighLevel rechazó la consulta con ${estado} en ${ruta}` +
+        (detalle ? `: ${detalle}` : "") +
+        ". Revisa GHL_API_TOKEN, GHL_LOCATION_ID y GHL_API_BASE " +
+        "(sin barra final) en las variables del hosting."
+    );
+    this.name = "GhlAccesoError";
+    this.estado = estado;
+  }
+}
+
 // -- Control de ritmo --
 //
 // Medido en las cabeceras de la propia API: `x-ratelimit-max: 100` cada
@@ -136,19 +168,37 @@ async function esperarTurno(): Promise<void> {
   }
 }
 
+/** El `message` que trae GHL en sus errores; corto y sin datos del cliente. */
+async function detalleDelError(r: Response): Promise<string> {
+  try {
+    const cuerpo = await r.text();
+    if (!cuerpo) return "";
+    try {
+      const j = JSON.parse(cuerpo) as { message?: unknown };
+      if (typeof j?.message === "string") return j.message.slice(0, 200);
+    } catch {
+      // No era JSON: vale el texto crudo, recortado.
+    }
+    return cuerpo.slice(0, 200);
+  } catch {
+    return "";
+  }
+}
+
 /**
  * GET a la API de GHL.
  *
  * Distingue tres desenlaces, y la distinción es lo importante:
  *
- *   · Respuesta buena          → los datos.
- *   · GHL no tiene nada / 4xx  → `null`, que el cotejo lee como «no está allá».
+ *   · Respuesta buena          → los datos (una búsqueda vacía es 200 con `[]`).
  *   · GHL nos está frenando    → `GhlLimiteError`, que SÍ revienta.
+ *   · GHL nos rechaza (4xx)    → `GhlAccesoError`, que TAMBIÉN revienta.
  *
- * El tercer caso tiene que reventar. Si un 429 se devolviera como `null`, el
- * cliente aparecería en pantalla como «Sin GHL» —una afirmación falsa y
- * creíble— cuando lo cierto es que no se llegó a preguntar. Vale mil veces más
- * un aviso de «vuelve a intentarlo» que un sello equivocado.
+ * Los dos últimos casos tienen que reventar, y por la misma razón: si se
+ * devolvieran como `null`, el cliente aparecería en pantalla como «Sin GHL»
+ * —una afirmación falsa y creíble— cuando lo cierto es que no se llegó a
+ * preguntar. Vale mil veces más un aviso de «vuelve a intentarlo» que un sello
+ * equivocado. Ya pasó: ver `GhlAccesoError`.
  *
  * Un fallo de red o un 5xx se reintentan un par de veces antes de rendirse a
  * `null`: que GHL parpadee no puede tumbar el listado de clientes, que es la
@@ -175,10 +225,15 @@ async function pedir<T>(ruta: string): Promise<T | null> {
         continue;
       }
 
-      if (!r.ok) return null;
+      if (!r.ok) {
+        // No se reintenta: un 4xx no se arregla repitiéndolo, y repetirlo 3
+        // veces por cada una de las ~2 000 consultas del barrido solo tarda más
+        // en dar la misma noticia.
+        throw new GhlAccesoError(r.status, await detalleDelError(r), ruta.split("?")[0]);
+      }
       return (await r.json()) as T;
     } catch (e) {
-      if (e instanceof GhlLimiteError) throw e;
+      if (e instanceof GhlLimiteError || e instanceof GhlAccesoError) throw e;
       if (intento === INTENTOS - 1) return null;
       await new Promise((res) => setTimeout(res, 400 * (intento + 1)));
     }
