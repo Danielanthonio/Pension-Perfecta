@@ -55,17 +55,22 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
   };
 
   const showAccountManagers = user?.role === "director";
-  // Con el pivote AM-por-PROYECTO el AM ya no tiene "cartera de aliados", así que la
-  // tarjeta ALIADOS deja de medir algo suyo y se le retira: su embudo arranca en
-  // PROYECTOS. El director SÍ conserva el conteo global de aliados (visión de sistema).
-  const showAliadosCard = user?.role === "director";
+  // El AM volvió a tener CARTERA de aliados (20260831000001: el AM se asigna al
+  // aliado, no al proyecto), así que su embudo vuelve a arrancar en ALIADOS. Se
+  // cuenta por `account_manager_id` y no por "todo aliado que veo": `profiles` le
+  // entrega además los que él dio de alta y los dueños de ventas viejas que ya no
+  // están en su cartera, y esos no son suyos.
+  const showAliadosCard = user?.role === "director" || user?.role === "account_manager";
   let accountManagersCount = 0;
   let alliesCount = 0;
   if (user?.role === "director") {
     accountManagersCount = profiles.filter((p) => p.role === "account_manager" && p.is_active).length;
-    // Director: TODOS los aliados activos del sistema (visión global, ya sin la noción
-    // de "cartera de aliados" de un AM).
+    // Director: TODOS los aliados activos del sistema (visión global).
     alliesCount = profiles.filter((p) => p.role === "aliado" && p.is_active).length;
+  } else if (user?.role === "account_manager") {
+    alliesCount = profiles.filter(
+      (p) => p.role === "aliado" && p.is_active && p.account_manager_id === user.id
+    ).length;
   }
 
   // Find allies assigned to this leader

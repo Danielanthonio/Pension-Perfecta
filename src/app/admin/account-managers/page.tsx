@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import Link from "next/link";
 import { useApp, Prospect } from "@/utils/context/AppContext";
 import {
   fueAprobado,
@@ -20,41 +21,22 @@ import {
   Briefcase,
   UserCheck,
   UserX,
-  Shuffle,
+  UserCog,
 } from "lucide-react";
 
 export default function GestionAccountManagers() {
-  const { profiles, prospects, user, updateProfileAdmin } = useApp();
+  const { profiles, prospects, user } = useApp();
 
   const isDirector = user?.role === "director";
 
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
 
-  // Interruptor de "ruleta" de asignación automática por AM. La ruleta reparte
-  // PROYECTOS: solo los AM encendidos reciben proyectos nuevos al azar cuando un
-  // aliado captura lo suyo; los apagados (p. ej. cuentas de prueba) quedan fuera
-  // del sorteo. La asignación real la ejecuta el trigger assign_am_to_prospect
-  // sobre prospects (el trigger sobre profiles se eliminó).
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-  // Cuenta solo los AM que realmente entran al sorteo: encendidos Y activos (mismo
-  // criterio que `pickRandomAutoAssignAM` y el trigger de la BD). Un AM inactivo,
-  // aunque tenga el interruptor encendido, no recibe proyectos.
-  const rouletteCount = accountManagers.filter(
-    (am) => am.auto_assign_enabled === true && am.is_active !== false
-  ).length;
-
-  const handleToggleRoulette = async (amId: string, current: boolean) => {
-    setTogglingId(amId);
-    try {
-      await updateProfileAdmin(amId, { auto_assign_enabled: !current });
-    } catch (e) {
-      console.error(e);
-      alert("No se pudo actualizar la ruleta de asignación automática.");
-    } finally {
-      setTogglingId(null);
-    }
-  };
+  // La ruleta de asignación automática murió con 20260831000001: el AM se asigna
+  // al ALIADO, a mano, desde el módulo "Asignación AM". Lo que queda por vigilar
+  // aquí es el hueco: un aliado sin AM manda a la mesa de dirección todo lo que
+  // capture.
+  const sinAmCount = allies.filter((a) => !a.account_manager_id).length;
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("es-MX", {
@@ -103,7 +85,9 @@ export default function GestionAccountManagers() {
         name: am.full_name,
         email: am.email,
         type: "account_manager" as const,
-        autoAssign: am.auto_assign_enabled === true,
+        // Su cartera de aliados. Vuelve a ser un dato del AM desde que la
+        // asignación es aliado→AM (20260831000001).
+        aliados: allies.filter((a) => a.account_manager_id === am.id).length,
         metrics: getMetricsForProspects(amProspects),
       };
     }),
@@ -112,7 +96,8 @@ export default function GestionAccountManagers() {
       name: "Gestión Directa (Director)",
       email: "Operaciones Centrales",
       type: "director" as const,
-      autoAssign: false,
+      // Los aliados que todavía no tienen AM: su producción cae aquí.
+      aliados: allies.filter((a) => !a.account_manager_id).length,
       metrics: getMetricsForProspects(directProspects),
     },
   ];
@@ -158,17 +143,21 @@ export default function GestionAccountManagers() {
         <SortControl options={sortOptions} sort={sortAM} accent="emerald" />
       </div>
 
-      {/* Explicación de la ruleta de asignación automática (para el director) */}
+      {/* Cómo se reparte el trabajo entre los AM (para el director) */}
       {isDirector && (
         <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/15 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-          <Shuffle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
+          <UserCog className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
           <span>
-            La asignación de proyectos a Account Manager es <strong className="text-slate-800 dark:text-slate-100">automática y al azar</strong> entre los AM que estén en la ruleta cuando un aliado captura su propio proyecto.
-            Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba.
-            {rouletteCount === 0 ? (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los proyectos nuevos quedan sin AM (mesa del director).</span>
-            ) : (
-              <span className="font-semibold text-indigo-700 dark:text-indigo-400"> {rouletteCount} {rouletteCount === 1 ? "AM participa" : "AM participan"} en la ruleta.</span>
+            Cada Account Manager tiene una <strong className="text-slate-800 dark:text-slate-100">cartera de aliados</strong>, y los proyectos que esos aliados capturen son suyos.
+            La cartera se reparte a mano desde{" "}
+            <Link href="/admin/asignacion-am" className="underline font-semibold text-indigo-700 dark:text-indigo-400">
+              Asignación AM
+            </Link>
+            .
+            {sinAmCount > 0 && (
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                {" "}Hay {sinAmCount} aliado(s) sin Account Manager: lo que capturen queda en la mesa de dirección.
+              </span>
             )}
           </span>
         </div>
@@ -218,47 +207,25 @@ export default function GestionAccountManagers() {
                   </div>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-100 dark:border-slate-850">
-                  <div className="text-center">
-                    <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">Proyectos</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{m.totalCount}</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-100 dark:border-slate-850">
+                    <div className="text-center">
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">Proyectos</span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{m.totalCount}</span>
+                    </div>
+                  </div>
+                  {/* Su CARTERA de aliados: volvió a ser un dato suyo cuando el AM
+                      pasó a asignarse al aliado y no al proyecto. En la columna de
+                      gestión directa son los aliados que aún no tienen AM. */}
+                  <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-100 dark:border-slate-850">
+                    <div className="text-center">
+                      <span className="block text-[8px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wide">
+                        {col.type === "account_manager" ? "Aliados" : "Sin AM"}
+                      </span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 block tabular-nums">{col.aliados}</span>
+                    </div>
                   </div>
                 </div>
-
-                {/* Ruleta de asignación automática (solo AMs; editable por el director) */}
-                {col.type === "account_manager" && (
-                  <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border transition-colors ${
-                    col.autoAssign
-                      ? "border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/15"
-                      : "border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30"
-                  }`}>
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                      <Shuffle className={`h-3 w-3 ${col.autoAssign ? "text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} strokeWidth={2.4} />
-                      Ruleta de asignación
-                    </span>
-                    {isDirector ? (
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={col.autoAssign}
-                        onClick={() => handleToggleRoulette(col.id, col.autoAssign)}
-                        disabled={togglingId === col.id}
-                        title={col.autoAssign ? "Recibe proyectos nuevos al azar. Click para sacarlo del sorteo." : "Fuera del sorteo. Click para que reciba proyectos nuevos al azar."}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
-                          col.autoAssign ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
-                        } ${togglingId === col.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-                      >
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                          col.autoAssign ? "translate-x-4" : "translate-x-1"
-                        }`} />
-                      </button>
-                    ) : (
-                      <span className={`text-[9px] font-black uppercase tracking-wide ${col.autoAssign ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}>
-                        {col.autoAssign ? "En sorteo" : "Fuera"}
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Vertical Funnel Comparison */}

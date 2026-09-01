@@ -45,8 +45,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Asignación no encontrada" }, { status: 404 });
     }
 
-    // (Sin gate de cartera: cualquier AM puede eliminar asignaciones — la
-    // "cartera" del AM ya no existe, el AM se asigna por PROYECTO.)
+    // (Sin gate de cartera: cualquier AM puede eliminar asignaciones. Desde el
+    // 2026-08-31 el AM volvió a tener cartera de aliados (20260831000001), pero este gate
+    // sigue siendo deliberadamente amplio: la estructura de líderes y empresas
+    // es del sistema, no de una cartera, y acotarla dejaría huecos sin dueño.)
 
     // Perform delete
     const { error: deleteError } = await supabase

@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Target,
   Link2,
+  UserCog,
   Wallet,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
@@ -51,6 +52,10 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   // Aliados sin closer atribuido. Se pinta como contador en el menú porque la
   // regla es "todo aliado tiene closer": si el hueco no se ve, no se cierra.
   const sinCloserCount = assignmentProfiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
+  // Aliados sin Account Manager. Mismo criterio que el contador de arriba: desde
+  // 20260831000001 los proyectos son del AM del ALIADO, así que un aliado sin AM
+  // manda todo lo que capture a la mesa de dirección.
+  const sinAmCount = assignmentProfiles.filter((p) => p.role === "aliado" && !p.account_manager_id).length;
   const currentParamsString = searchParams.toString();
   const qs = currentParamsString ? `?${currentParamsString}` : "";
   const cleanPath = pathname.replace(/\/$/, "");
@@ -152,6 +157,19 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
       label: "Asignación Closer",
       badge: sinCloserCount,
     },
+    // Asignación AM: solo Dirección. Mover un aliado de AM arrastra su cartera de
+    // proyectos, así que no se delega (el gate real está en la RPC).
+    ...(!isAM
+      ? [
+          {
+            href: `/admin/asignacion-am${qs}`,
+            active: cleanPath === "/admin/asignacion-am",
+            Icon: UserCog,
+            label: "Asignación AM",
+            badge: sinAmCount,
+          },
+        ]
+      : []),
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
     ...(!isAM
@@ -625,6 +643,12 @@ export default function AdminLayout({
       return {
         title: "Asignación Closer",
         subtitle: "Atribuye cada aliado al closer que lo incorporó. Ninguno debe quedarse sin uno.",
+      };
+    }
+    if (cleanPath === "/admin/asignacion-am") {
+      return {
+        title: "Asignación AM",
+        subtitle: "Asigna a cada aliado su Account Manager. Sus proyectos van detrás de él.",
       };
     }
     if (cleanPath.startsWith("/admin/closers")) {

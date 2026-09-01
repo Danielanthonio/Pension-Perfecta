@@ -20,7 +20,6 @@ import {
   SlidersHorizontal,
   RotateCcw,
   CheckCircle,
-  UserCog,
   Building2,
   Calendar,
   CheckSquare,
@@ -60,7 +59,6 @@ function ClientesAdminContent() {
     recargarCotejosGhl,
     updateProspectStatus,
     reassignProspect,
-    reassignAccountManager,
     deleteProspect,
     restoreProspect,
     permanentlyDeleteProspect,
@@ -171,10 +169,7 @@ function ClientesAdminContent() {
   const [reassignAllyId, setReassignAllyId] = useState<string>("");
   const [reassigning, setReassigning] = useState(false);
 
-  // Reasignar Account Manager: modal de confirmación (Sí/No) + toast de éxito arriba.
-  const [amReassignTarget, setAmReassignTarget] = useState<{ prospect: Prospect; newAmId: string } | null>(null);
-  const [amReassigning, setAmReassigning] = useState(false);
-  // Toast de éxito compartido (reasignación de AM, agenda de asesoría...).
+  // Toast de éxito compartido (agenda de asesoría...).
   const [toast, setToast] = useState<{ title: string; message: string } | null>(null);
 
   const showToast = (title: string, message: string) => {
@@ -432,15 +427,9 @@ function ClientesAdminContent() {
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [origenCountSource, getProspectEmpresaId, empresasMultialiado]);
 
-  // Account Managers disponibles para asignar (lista CRUDA `assignmentProfiles`, que
-  // incluye a los AMs) y helper para resolver el nombre del AM de un proyecto.
-  const accountManagers = React.useMemo(
-    () =>
-      assignmentProfiles
-        .filter((pr) => pr.role === "account_manager" && pr.is_active !== false)
-        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
-    [assignmentProfiles]
-  );
+  // Nombre del AM que gestiona el proyecto. Se LEE, no se elige: el AM va con el
+  // ALIADO y se cambia en Asignación AM (20260831000001). Sale de la lista CRUDA
+  // `assignmentProfiles`, que incluye a los AMs.
   const getAmName = React.useCallback(
     (p: Prospect): string | null => {
       if (!p.account_manager_id) return null;
@@ -448,29 +437,6 @@ function ClientesAdminContent() {
     },
     [assignmentProfiles]
   );
-
-  // Nombre legible de un AM por id (para el modal / toast). "" o null = Sin asignar.
-  const amNameById = (amId: string | null) =>
-    amId ? accountManagers.find((a) => a.id === amId)?.full_name || "Account Manager" : "Sin asignar";
-
-  // Confirma la reasignación del AM desde el modal. Al terminar: notifica al nuevo AM
-  // (dentro de reassignAccountManager) y muestra un toast de éxito arriba para el director.
-  const confirmAmReassign = async () => {
-    if (!amReassignTarget) return;
-    const { prospect, newAmId } = amReassignTarget;
-    const target = newAmId || null;
-    setAmReassigning(true);
-    try {
-      await reassignAccountManager(prospect.id, target);
-      setAmReassignTarget(null);
-      showToast("Reasignación exitosa ✅", `Proyecto de ${prospect.full_name} reasignado con éxito a ${amNameById(target)}.`);
-    } catch (e) {
-      console.error("Error reasignando AM:", e);
-      alert("No se pudo reasignar el Account Manager.");
-    } finally {
-      setAmReassigning(false);
-    }
-  };
 
   // Sorting — active list and trash each get their own sort state/controls.
   const sortA = useSortable<Prospect>(
@@ -965,26 +931,24 @@ function ClientesAdminContent() {
                           <td className="px-4 py-2.5">
                             <CreadorPorCell name={p.created_by_name} role={p.created_by_role} />
                           </td>
-                          {/* Account Manager — editable (reasignar el dueño de la gestión) */}
+                          {/* Account Manager — de SOLO LECTURA. El AM va con el ALIADO,
+                              no con el proyecto: se cambia en "Asignación AM" y de ahí
+                              se arrastran todos sus proyectos (20260831000001). */}
                           <td className="px-4 py-2.5">
-                            <select
-                              value={p.account_manager_id || ""}
-                              onChange={(e) => setAmReassignTarget({ prospect: p, newAmId: e.target.value })}
-                              onClick={(e) => e.stopPropagation()}
-                              title="Reasignar Account Manager"
-                              className={`min-w-[140px] max-w-[190px] px-2 py-1.5 border rounded-lg text-[11px] font-semibold outline-none transition-all cursor-pointer truncate ${
+                            <span
+                              title={
+                                p.account_manager_id
+                                  ? `El AM va con el aliado ${p.aliado_name || ""}. Se cambia en Asignación AM.`
+                                  : "Su aliado todavía no tiene Account Manager. Se le asigna en Asignación AM."
+                              }
+                              className={`inline-block min-w-[140px] max-w-[190px] px-2 py-1.5 border rounded-lg text-[11px] font-semibold truncate ${
                                 p.account_manager_id
                                   ? "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300"
                                   : "bg-slate-50 dark:bg-slate-850/40 border-dashed border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500"
-                              } ${isAM ? "focus:border-blue-500" : "focus:border-emerald-500"}`}
+                              }`}
                             >
-                              <option value="">Sin asignar</option>
-                              {accountManagers.map((am) => (
-                                <option key={am.id} value={am.id}>
-                                  {am.full_name}
-                                </option>
-                              ))}
-                            </select>
+                              {getAmName(p) || "Sin asignar"}
+                            </span>
                           </td>
                           {/* Expediente */}
                           <td className="px-4 py-2.5">
@@ -1317,63 +1281,6 @@ function ClientesAdminContent() {
               >
                 <ArrowLeftRight className="h-3.5 w-3.5" />
                 {reassigning ? "Reasignando..." : "Confirmar reasignación"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de confirmación — reasignar Account Manager (Sí / No) */}
-      {amReassignTarget && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800 mx-4 animate-scale-up">
-            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
-              <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40">
-                <UserCog className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white">Reasignar Account Manager</h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                  ¿Confirmas que deseas reasignar este proyecto?
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-sm font-bold">
-                  {amReassignTarget.prospect.full_name.charAt(0)}
-                </div>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block truncate">
-                  {amReassignTarget.prospect.full_name}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-500 dark:text-slate-400 font-semibold truncate max-w-[42%]">
-                  {amNameById(amReassignTarget.prospect.account_manager_id || null)}
-                </span>
-                <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 font-bold truncate max-w-[42%]">
-                  {amNameById(amReassignTarget.newAmId || null)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={() => setAmReassignTarget(null)}
-                disabled={amReassigning}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
-              >
-                No
-              </button>
-              <button
-                onClick={confirmAmReassign}
-                disabled={amReassigning}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                <CheckCircle className="h-3.5 w-3.5" />
-                {amReassigning ? "Reasignando..." : "Sí, reasignar"}
               </button>
             </div>
           </div>

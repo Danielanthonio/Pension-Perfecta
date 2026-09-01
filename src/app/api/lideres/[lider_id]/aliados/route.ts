@@ -46,8 +46,8 @@ export async function GET(
     const isAM = callerRole === "account_manager";
     const isSelf = user.id === liderId;
 
-    // Permisos: el propio líder, Dirección o cualquier Account Manager (la
-    // "cartera" del AM ya no existe: el AM se asigna por PROYECTO).
+    // Permisos: el propio líder, Dirección o cualquier Account Manager. Amplio a
+    // propósito: la estructura de líderes es del sistema, no de una cartera.
     const hasPermission = isSelf || isDirector || isAM;
     if (!hasPermission) {
       return NextResponse.json({ error: "No tienes permisos para ver los aliados de este líder" }, { status: 403 });
@@ -98,8 +98,8 @@ export async function GET(
 
       total_prospectos += activeProspectsCount;
 
-      // (El AM ya no es un atributo del aliado: se asigna por PROYECTO, así que
-      // el payload ya no incluye account_manager_name.)
+      // (El payload no incluye account_manager_name: a un líder le importa su
+      // equipo, no de qué AM cuelga cada uno.)
       aliados_asignados.push({
         id: ally.id,
         name: ally.full_name,
