@@ -13,10 +13,11 @@
 import type { Prospect, UserProfile } from "@/utils/context/AppContext";
 import { isLostStatus } from "@/utils/context/AppContext";
 import {
-  APPROVED_STAGE,
-  CONDITIONED_STAGE,
-  EVALUATED_STAGE,
-  FIN_OTORGADO_STAGE,
+  fueAprobado,
+  fueCondicionado,
+  fueEvaluado,
+  fueOtorgado,
+  fueRechazado,
 } from "@/app/admin/_pipelineBuckets";
 import { getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
 import {
@@ -97,12 +98,14 @@ export const SEGMENTO_LABEL: Record<SegmentoAliado, string> = {
 // Un único sitio donde se decide qué cuenta como cada cosa, para que el gráfico
 // de líneas, el ranking y las tasas no puedan divergir entre sí.
 //
-// ⚠️ "Proyectos" aquí es el UNIVERSO del período: TODOS los capturados, incluidos
-// los cerrados perdidos. Es distinto de la tarjeta "Proyectos" del tab GENERAL,
-// que los excluye porque alimenta el embudo comercial. Se hace así a propósito:
-// estos reportes pintan "Cerrado Perdido" como una serie más, y si el total no
-// los contuviera, las líneas dejarían de sumar el total y las tasas se calcularían
-// sobre una base que no es la que se ve. Cada gráfico lo dice en su subtítulo.
+// ⚠️ "Proyectos" es el UNIVERSO del período: TODOS los capturados, incluidos los
+// cerrados perdidos — igual que la tarjeta "Proyectos" del tab GENERAL. Estos
+// reportes pintan "Cerrado Perdido" como una serie más, y si el total no los
+// contuviera, las tasas se calcularían sobre una base que no es la que se ve.
+//
+// ⚠️ Las series NO son excluyentes entre sí: se anidan. Un proyecto otorgado también
+// cuenta en Aprobados, y uno que pasó por condicionado antes de aprobarse cuenta en
+// ambas. Es la consecuencia de medir hitos alcanzados en vez del estado de hoy.
 
 export type MetricaId =
   | "proyectos"
@@ -124,19 +127,20 @@ export interface MetricaDef {
   match: (p: Prospect) => boolean;
 }
 
-const inSet = (set: readonly string[]) => (p: Prospect) => set.includes(p.status);
-
+// Las métricas del embudo se miden por HITO ALCANZADO, no por el estado de hoy: un
+// proyecto que llegó a aprobarse cuenta como aprobado aunque después se cerrara
+// perdido o se otorgara. Ver src/app/admin/_pipelineBuckets.ts.
 export const METRICAS: Record<MetricaId, MetricaDef> = {
   proyectos: { id: "proyectos", label: "Proyectos", short: "Proyectos", slot: 0, match: () => true },
-  evaluados: { id: "evaluados", label: "Evaluados", short: "Evaluados", slot: 1, match: inSet(EVALUATED_STAGE) },
-  aprobados: { id: "aprobados", label: "Aprobados", short: "Aprobados", slot: 2, match: inSet(APPROVED_STAGE) },
-  condicionados: { id: "condicionados", label: "Condicionados", short: "Condic.", slot: 3, match: inSet(CONDITIONED_STAGE) },
-  otorgados: { id: "otorgados", label: "Fin. Otorgado", short: "Otorgado", slot: 4, match: inSet(FIN_OTORGADO_STAGE) },
+  evaluados: { id: "evaluados", label: "Evaluados", short: "Evaluados", slot: 1, match: fueEvaluado },
+  aprobados: { id: "aprobados", label: "Aprobados", short: "Aprobados", slot: 2, match: fueAprobado },
+  condicionados: { id: "condicionados", label: "Condicionados", short: "Condic.", slot: 3, match: fueCondicionado },
+  otorgados: { id: "otorgados", label: "Fin. Otorgado", short: "Otorgado", slot: 4, match: fueOtorgado },
   perdidos: { id: "perdidos", label: "Cerrado Perdido", short: "Perdido", slot: 5, match: (p) => isLostStatus(p.status) },
-  // Subconjunto de Condicionados (`agenda_futura` está dentro de CONDITIONED_STAGE):
-  // se saca aparte porque la Dirección lo sigue como cola propia.
+  // Subconjunto de Condicionados: se saca aparte porque la Dirección lo sigue como
+  // cola propia. Aquí sí es estado ACTUAL — es una cola de trabajo, no un hito.
   agenda_futura: { id: "agenda_futura", label: "Agenda Futura", short: "Ag. Futura", slot: 6, match: (p) => p.status === "agenda_futura" },
-  rechazados: { id: "rechazados", label: "Rechazados", short: "Rechaz.", slot: 7, match: (p) => p.status === "rechazado" },
+  rechazados: { id: "rechazados", label: "Rechazados", short: "Rechaz.", slot: 7, match: fueRechazado },
 };
 
 /** Series del reporte de productividad de ALIADOS (boceto: 4 líneas). */
@@ -179,9 +183,9 @@ export interface Tasas {
 export function calcTasas(items: Prospect[]): Tasas {
   const total = items.length;
   if (total === 0) return { proyectos: 0, aprobacion: null, condicionamiento: null, cierre: null };
-  // Un proyecto ya otorgado pasó por la aprobación: si no se sumara, la tasa
-  // bajaría justo cuando el equipo cierra, que es exactamente al revés.
-  const aprobados = items.filter((p) => METRICAS.aprobados.match(p) || METRICAS.otorgados.match(p)).length;
+  // `fueAprobado` ya incluye a los otorgados (para otorgarse tuvo que aprobarse) y a
+  // los que después se perdieron: la tasa no baja por cerrar ni por perder al cliente.
+  const aprobados = items.filter(METRICAS.aprobados.match).length;
   const condicionados = items.filter(METRICAS.condicionados.match).length;
   const otorgados = items.filter(METRICAS.otorgados.match).length;
   return {
@@ -223,8 +227,8 @@ export const SUB_CONDICIONADOS: SubEtapa[] = [
 ];
 
 /**
- * Condicionados con `status` legacy: existen en datos viejos y `CONDITIONED_STAGE`
- * los cuenta, pero no tienen subetapa propia en el modelo actual. Si se omitieran,
+ * Condicionados con `status` legacy: existen en datos viejos y el bucket de
+ * condicionados los cuenta, pero no tienen subetapa propia en el modelo actual. Si se omitieran,
  * la suma de la columna no cuadraría con la tarjeta "Condicionados" y nadie sabría
  * por qué. Solo se muestran cuando hay alguno.
  */
@@ -498,10 +502,10 @@ export function agendaEnRango(p: Prospect, rango: RangoAgendas): boolean {
 /**
  * Financiamiento otorgado: lo que cierra de verdad.
  *
- * Son los dos estados que la app agrupa en esa etapa (`FIN_OTORGADO_STAGE`) —
- * «Cerrada Ganada» (`firma_programada`) y «Pagada Cerrada» (`pagado_comision`)—.
- * Mirar solo el primero haría desaparecer el cierre del informe el día que se
- * libera la comisión, y la tasa de un AM bajaría justo por cobrar.
+ * Es el hito «Fin. Otorgado», que agrupa «Cerrada Ganada» (`firma_programada`) y
+ * «Pagada Cerrada» (`pagado_comision`). Mirar solo el primero haría desaparecer el
+ * cierre del informe el día que se libera la comisión, y la tasa de un AM bajaría
+ * justo por cobrar.
  *
  * Es exactamente la tarjeta «Fin. Otorgado» de la cabecera: el reporte de cierre
  * no puede medir con una vara distinta a la que Dirección ya lee arriba.

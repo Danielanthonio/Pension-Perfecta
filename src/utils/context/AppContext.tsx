@@ -392,6 +392,15 @@ export interface Prospect {
   created_by?: string | null;
   created_by_role?: string | null;
   created_by_name?: string | null;
+  // Hitos ALCANZADOS: la primera vez que el proyecto llegó a cada escalón del
+  // embudo. Los sella el trigger en BD y no se borran nunca — perder al cliente
+  // (o ganarlo) no des-aprueba lo que ya se aprobó. El embudo y los indicadores
+  // de gestión se cuentan con estos sellos, no con `status`.
+  // Ver migración 20260831000000_hitos_alcanzados.sql y _pipelineBuckets.ts.
+  hito_condicionado_at?: string | null;
+  hito_rechazado_at?: string | null;
+  hito_aprobado_at?: string | null;
+  hito_otorgado_at?: string | null;
   simulation?: Simulation;
   sim_emitted_at?: string | null;
   documents: DocumentItem[];
@@ -1110,6 +1119,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       created_by: dbProspect.created_by ?? null,
       created_by_role: dbProspect.created_by_role ?? null,
       created_by_name: dbProspect.created_by_name ?? null,
+      hito_condicionado_at: dbProspect.hito_condicionado_at ?? null,
+      hito_rechazado_at: dbProspect.hito_rechazado_at ?? null,
+      hito_aprobado_at: dbProspect.hito_aprobado_at ?? null,
+      hito_otorgado_at: dbProspect.hito_otorgado_at ?? null,
       simulation: hasSimulation ? {
         semanas,
         pensionActual,

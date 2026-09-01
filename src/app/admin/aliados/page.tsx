@@ -2,6 +2,14 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect, UserProfile, isLostStatus } from "@/utils/context/AppContext";
+import {
+  fueAprobado,
+  fueCondicionado,
+  fueEvaluado,
+  fueOtorgado,
+  fueRechazado,
+  montoFinanciamiento,
+} from "@/app/admin/_pipelineBuckets";
 import { StatCard } from "@/components/ui/StatCard";
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import {
@@ -28,17 +36,12 @@ import {
   DollarSign,
 } from "lucide-react";
 
-// Definiciones del embudo — IDÉNTICAS a las del Dashboard (src/app/admin/page.tsx),
-// que es el único embudo que vale. No modificar sin actualizar allá también.
-// "Aprobado" = misma etapa que usa Gestión Clientes (getStageAndSubStage → stage "aprobado"):
-// dictamen de aprobación + pipeline de cierre posterior (Agenda Asesoría, Firma Carta Compromiso,
-// Análisis de Riesgo, Firma de Contrato, Cerrada Ganada). Ya fueron aprobados.
-const APPROVED_STAGE = ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"];
-const CONDITIONED_STAGE = ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"];
-const FINANCED_APPROVED = ["aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision"];
-// "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
-// El único estado previo al dictamen que se excluye es evaluacion_pendiente.
-const EVALUATED_STAGE = [...APPROVED_STAGE, ...CONDITIONED_STAGE, "rechazado", "pagado_comision"];
+// Las definiciones del embudo viven en src/app/admin/_pipelineBuckets.ts y son las
+// MISMAS que usan el Dashboard y Reportes. Antes esta pantalla tenía su propia copia
+// de los buckets y ya había divergido (contaba `firma_programada` como aprobado y
+// `firma_contrato` no como otorgado), así que la ficha del aliado nunca cuadraba del
+// todo con el embudo del director. Se cuenta por HITO ALCANZADO: perder al cliente o
+// cerrarlo ganado no borra la aprobación que ya se consiguió.
 
 export default function GestorAliados() {
   const { prospects, profiles, isProspectDeleted, isProspectPurged, empresasMultialiado } = useApp();
@@ -102,33 +105,32 @@ export default function GestorAliados() {
   const getAllyMetrics = (ally: UserProfile) => {
     const allyProspects = getAllyProspects(ally);
     const clientes = allyProspects.length;
-    // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
-    const evaluados = allyProspects.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
-    const aprobados = allyProspects.filter((p) => APPROVED_STAGE.includes(p.status)).length;
-    const condicionados = allyProspects.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
-    const rechazados = allyProspects.filter((p) => p.status === "rechazado").length;
-    const financed = allyProspects.filter((p) => p.status === "pagado_comision").length;
-    // "Cerrado perdido" es solo un estado del cliente, no un rechazo ni parte del funnel.
+    // Todo por hito alcanzado: los escalones se anidan y no suman entre sí.
+    const evaluados = allyProspects.filter(fueEvaluado).length;
+    const aprobados = allyProspects.filter(fueAprobado).length;
+    const condicionados = allyProspects.filter(fueCondicionado).length;
+    const rechazados = allyProspects.filter(fueRechazado).length;
+    const financed = allyProspects.filter(fueOtorgado).length;
+    // "Cerrado perdido" es un desenlace del cliente, no un rechazo: se cuenta aparte
+    // pero ya NO borra los escalones que el proyecto había subido.
     const lost = allyProspects.filter((p) => isLostStatus(p.status)).length;
 
     // Montos ($) — financiamiento aprobado vs. otorgado, igual que el dashboard.
-    const finAprobados = allyProspects
-      .filter((p) => FINANCED_APPROVED.includes(p.status) && p.simulation)
-      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
-    const finOtorgados = allyProspects
-      .filter((p) => p.status === "pagado_comision" && p.simulation)
-      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+    const finAprobados = allyProspects.filter(fueAprobado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
+    const finOtorgados = allyProspects.filter(fueOtorgado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
 
     // Tasas del embudo.
     const tasaEvaluacion = clientes > 0 ? (evaluados / clientes) * 100 : 0;
     const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
     const tasaCierre = aprobados > 0 ? (financed / aprobados) * 100 : 0;
 
-    // Lead quality (se conserva) — proporción positiva sobre la base sin cerrados perdidos.
-    const rateBase = clientes - lost;
+    // Lead quality (se conserva) — proporción de expedientes que llegaron a aprobarse.
+    // Ya no hace falta descontar los perdidos de la base: un perdido que se aprobó
+    // cuenta en el numerador, así que la base es toda la cartera del aliado.
+    const rateBase = clientes;
     let leadQuality: "Alta" | "Media" | "Baja" | "N/A" = "N/A";
     if (rateBase > 0) {
-      const positiveRate = (aprobados + financed) / rateBase;
+      const positiveRate = aprobados / rateBase;
       if (positiveRate >= 0.6) leadQuality = "Alta";
       else if (positiveRate >= 0.25) leadQuality = "Media";
       else leadQuality = "Baja";
@@ -194,25 +196,25 @@ export default function GestorAliados() {
   const filteredProspectsGlobal = filterProspectsByDate(activeProspects);
   const totalProspectsSent = filteredProspectsGlobal.length;
   
-  const globalConditioned = filteredProspectsGlobal.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
-  const globalApproved = filteredProspectsGlobal.filter((p) => APPROVED_STAGE.includes(p.status)).length;
+  const globalConditioned = filteredProspectsGlobal.filter(fueCondicionado).length;
+  const globalApproved = filteredProspectsGlobal.filter(fueAprobado).length;
 
-  const globalFinanced = filteredProspectsGlobal.filter((p) => p.status === "pagado_comision").length;
-  const globalRejected = filteredProspectsGlobal.filter((p) => p.status === "rechazado").length;
+  const globalFinanced = filteredProspectsGlobal.filter(fueOtorgado).length;
+  const globalRejected = filteredProspectsGlobal.filter(fueRechazado).length;
   const globalLost = filteredProspectsGlobal.filter((p) => isLostStatus(p.status)).length;
 
-  // "Evaluados" = proyectos con dictamen/respuesta (aprobado, condicionado, rechazado u otorgado).
-  const globalEvaluation = filteredProspectsGlobal.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
+  const globalEvaluation = filteredProspectsGlobal.filter(fueEvaluado).length;
 
   // Global Averages
   const avgProspectsPerAlly = allies.length > 0 ? (totalProspectsSent / allies.length).toFixed(1) : "0.0";
-  const avgApprovalsPerAlly = allies.length > 0 ? ((globalApproved + globalFinanced) / allies.length).toFixed(1) : "0.0";
+  const avgApprovalsPerAlly = allies.length > 0 ? (globalApproved / allies.length).toFixed(1) : "0.0";
   const avgFinancementsPerAlly = allies.length > 0 ? (globalFinanced / allies.length).toFixed(1) : "0.0";
 
-  // El cerrado perdido no cuenta en la base de las tasas de conversión/aprobación.
-  const globalRateBase = totalProspectsSent - globalLost;
+  // La base son TODOS los proyectos del rango, perdidos incluidos: como el numerador
+  // cuenta hitos alcanzados, marcar un cliente como perdido ya no infla la tasa.
+  const globalRateBase = totalProspectsSent;
   const globalConversionRate = globalRateBase > 0 ? Math.round((globalFinanced / globalRateBase) * 100) : 0;
-  const globalApprovalRate = globalRateBase > 0 ? Math.round(((globalApproved + globalFinanced) / globalRateBase) * 100) : 0;
+  const globalApprovalRate = globalRateBase > 0 ? Math.round((globalApproved / globalRateBase) * 100) : 0;
 
   // Rankings
   // 1. By Productivity (total leads sent)
@@ -270,7 +272,7 @@ export default function GestorAliados() {
       {/* Aggregate metrics grid (compact) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         <StatCard size="sm" label="Aliados Activos" value={totalActiveAllies} sub={`/ ${allies.length} · productivos`} tone="indigo" icon={Users} />
-        <StatCard size="sm" label="Clientes Enviados" value={totalProspectsSent} sub={`${globalFinanced} financiados`} tone="emerald" icon={TrendingUp} />
+        <StatCard size="sm" label="Clientes Enviados" value={totalProspectsSent} sub={`${globalFinanced} financiados · ${globalLost} perdidos`} tone="emerald" icon={TrendingUp} />
         <StatCard size="sm" label="Tasa Conversión" value={`${globalConversionRate}%`} sub={`Aprob. ${globalApprovalRate}%`} tone="amber" icon={Percent} />
         <StatCard size="sm" label="Prom. por Aliado" value={avgProspectsPerAlly} sub={`Aprob ${avgApprovalsPerAlly} · Fin ${avgFinancementsPerAlly}`} tone="cyan" icon={BarChart3} />
       </div>

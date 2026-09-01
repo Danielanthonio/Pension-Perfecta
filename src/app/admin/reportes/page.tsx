@@ -30,7 +30,7 @@ import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter }
 import { TipoFinanciamientoBadge, getFinanciamientoResuelto } from "@/components/ui/tipoFinanciamiento";
 import { getCreadorMeta, CREADOR_SIN_REGISTRO } from "@/components/ui/creadorProyecto";
 import { STEP_STATUSES, STEP_DEFS } from "@/components/ui/projectStepper";
-import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "../_pipelineBuckets";
+import { fueAprobado, fueCondicionado, fueEvaluado, fueOtorgado, fueRechazado } from "../_pipelineBuckets";
 import Link from "next/link";
 import {
   Users,
@@ -163,20 +163,26 @@ function GeneralPanel({
     [activeProspects, startDate, endDate]
   );
 
-  // Base del embudo (sin cerrado_perdido, incl. sus subetapas).
-  const pipeline = useMemo(() => filteredByDate.filter((p) => !isLostStatus(p.status)), [filteredByDate]);
+  // Base del embudo: TODOS los proyectos del rango, perdidos incluidos. El embudo se
+  // cuenta por HITO ALCANZADO (ver _pipelineBuckets.ts), así que un cerrado perdido
+  // conserva los escalones que ya había subido en vez de desaparecer del reporte.
+  const pipeline = filteredByDate;
 
   // ── Embudo comercial (tarjetas de arriba) ────────────────────────────────────
+  // Cada escalón es subconjunto del anterior (Proyectos ⊇ Evaluados ⊇ Aprobados ⊇
+  // Fin. Otorgado): las tarjetas NO suman entre sí, un otorgado también cuenta como
+  // aprobado. "Perdidos" es un desenlace y va aparte.
   const f = useMemo(() => {
     const proyectos = pipeline.length;
-    const evaluados = pipeline.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
-    const aprobados = pipeline.filter((p) => APPROVED_STAGE.includes(p.status)).length;
-    const condicionados = pipeline.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
-    const rechazados = pipeline.filter((p) => p.status === "rechazado").length;
-    const otorgados = pipeline.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).length;
-    const finAprobado = pipeline.filter((p) => FINANCED_APPROVED.includes(p.status)).reduce((s, p) => s + financiamientoOf(p), 0);
-    const finOtorgado = pipeline.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).reduce((s, p) => s + financiamientoOf(p), 0);
-    return { proyectos, evaluados, aprobados, condicionados, rechazados, otorgados, finAprobado, finOtorgado };
+    const evaluados = pipeline.filter(fueEvaluado).length;
+    const aprobados = pipeline.filter(fueAprobado).length;
+    const condicionados = pipeline.filter(fueCondicionado).length;
+    const rechazados = pipeline.filter(fueRechazado).length;
+    const otorgados = pipeline.filter(fueOtorgado).length;
+    const perdidos = pipeline.filter((p) => isLostStatus(p.status)).length;
+    const finAprobado = pipeline.filter(fueAprobado).reduce((s, p) => s + financiamientoOf(p), 0);
+    const finOtorgado = pipeline.filter(fueOtorgado).reduce((s, p) => s + financiamientoOf(p), 0);
+    return { proyectos, evaluados, aprobados, condicionados, rechazados, otorgados, perdidos, finAprobado, finOtorgado };
   }, [pipeline]);
 
   const pct = (n: number) => (f.proyectos > 0 ? `${((n / f.proyectos) * 100).toFixed(0)}% del total` : "—");
@@ -187,6 +193,7 @@ function GeneralPanel({
     { label: "Condicionados", value: String(f.condicionados), sub: pct(f.condicionados), tone: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
     { label: "Rechazados", value: String(f.rechazados), sub: pct(f.rechazados), tone: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" },
     { label: "Fin. Otorgado", value: String(f.otorgados), sub: pct(f.otorgados), tone: "text-teal-600 dark:text-teal-400", bar: "bg-teal-500" },
+    { label: "Perdidos", value: String(f.perdidos), sub: pct(f.perdidos), tone: "text-slate-500 dark:text-slate-400", bar: "bg-slate-400" },
     { label: "Financiamiento aprobado", value: fmtCurrency(f.finAprobado), sub: "acumulado", tone: "text-indigo-600 dark:text-indigo-400", bar: "bg-indigo-500", wide: true },
     { label: "Financiamiento otorgado", value: fmtCurrency(f.finOtorgado), sub: "otorgado", tone: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500", wide: true },
   ];
@@ -367,7 +374,7 @@ function GeneralPanel({
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const rows: (string | number)[][] = [["Sección", "Concepto", "Valor"]];
-    rows.push(["Embudo", "Proyectos", f.proyectos], ["Embudo", "Evaluados", f.evaluados], ["Embudo", "Aprobados", f.aprobados], ["Embudo", "Condicionados", f.condicionados], ["Embudo", "Rechazados", f.rechazados], ["Embudo", "Fin. Otorgado", f.otorgados], ["Embudo", "Financiamiento aprobado", Math.round(f.finAprobado)], ["Embudo", "Financiamiento otorgado", Math.round(f.finOtorgado)]);
+    rows.push(["Embudo", "Proyectos", f.proyectos], ["Embudo", "Evaluados", f.evaluados], ["Embudo", "Aprobados", f.aprobados], ["Embudo", "Condicionados", f.condicionados], ["Embudo", "Rechazados", f.rechazados], ["Embudo", "Fin. Otorgado", f.otorgados], ["Embudo", "Perdidos", f.perdidos], ["Embudo", "Financiamiento aprobado", Math.round(f.finAprobado)], ["Embudo", "Financiamiento otorgado", Math.round(f.finOtorgado)]);
     tipoSegments.forEach((s) => rows.push(["Tipo de financiamiento", s.label, s.value]));
     amSegments.forEach((s) => rows.push(["Contribución AM (proyectos)", s.label, s.value]));
     origen.segments.forEach((seg) => rows.push(["Origen del alta (creado por)", seg.label, seg.value]));
@@ -436,7 +443,7 @@ function GeneralPanel({
       </div>
 
       {/* 1 · Embudo comercial (tarjetas de arriba) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
         {funnelCards.map((c) => (
           <div key={c.label} className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-sm p-3.5 overflow-hidden flex flex-col justify-between min-h-[104px]">
             <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-400 dark:text-slate-500 leading-tight">{c.label}</span>
@@ -573,7 +580,7 @@ function GeneralPanel({
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">Aprobados por línea de tiempo</h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">En qué etapa de cierre están.</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">Dónde está HOY el pipeline vivo. No cuadra con la tarjeta Aprobados: esa cuenta hitos alcanzados.</p>
             </div>
           </div>
           <div className="space-y-2.5">

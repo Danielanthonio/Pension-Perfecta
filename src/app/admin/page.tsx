@@ -11,7 +11,7 @@ import { SortControl, SortHeader, SortDir, SortState } from "@/components/ui/sor
 import { ModalidadFilter, ModalidadFilterValue, prospectMatchesModalidadFilter } from "@/components/ui/ModalidadFilter";
 import { AliadoPicker, prospectMatchesSelection, GESTION_DIRECTA_ID } from "@/components/ui/AliadoPicker";
 // Buckets de estado (fuente única de verdad compartida con el módulo Reportes).
-import { APPROVED_STAGE, CONDITIONED_STAGE, FINANCED_APPROVED, EVALUATED_STAGE, FIN_OTORGADO_STAGE } from "./_pipelineBuckets";
+import { fueAprobado, fueCondicionado, fueEvaluado, fueOtorgado, fueRechazado, montoFinanciamiento } from "./_pipelineBuckets";
 import {
   Users,
   Filter,
@@ -98,6 +98,7 @@ function PipelineManagerContent() {
     aprobados: number;
     condicionados: number;
     rechazados: number;
+    perdidos: number;
     finAprobados: number;
     finOtorgados: number;
     tasaEvaluacion: number;
@@ -120,29 +121,28 @@ function PipelineManagerContent() {
     const rows: EfficiencyTableRow[] = [];
 
     const getStats = (prospectsList: Prospect[]): RowStats => {
-      // "Cerrado perdido" es SOLO un estado del cliente: no forma parte del embudo/pipeline,
-      // así que se excluye de TODOS los conteos (igual que el Embudo Comercial), incluida la
-      // base "Proyectos". De lo contrario la tabla no cuadra con el embudo.
-      const active = prospectsList.filter((p) => !isLostStatus(p.status));
-      const totalClientes = active.length;
-      const evaluados = active.filter((p) => EVALUATED_STAGE.includes(p.status)).length;
-      const aprobados = active.filter((p) => APPROVED_STAGE.includes(p.status)).length;
-      const condicionados = active.filter((p) => CONDITIONED_STAGE.includes(p.status)).length;
-      const rechazados = active.filter((p) => p.status === "rechazado").length;
+      // Se cuenta por HITO ALCANZADO, no por el estado de hoy (mismo criterio que el
+      // Embudo Comercial, ver _pipelineBuckets.ts). Antes se excluía a los cerrados
+      // perdidos de TODOS los conteos, así que marcar un cliente como perdido le
+      // borraba al AM la aprobación que ya había conseguido y le movía la T. Aprob.
+      // hacia atrás. Ahora el perdido conserva los escalones que subió, y un
+      // financiamiento otorgado sigue contando como aprobado.
+      const totalClientes = prospectsList.length;
+      const evaluados = prospectsList.filter(fueEvaluado).length;
+      const aprobados = prospectsList.filter(fueAprobado).length;
+      const condicionados = prospectsList.filter(fueCondicionado).length;
+      const rechazados = prospectsList.filter(fueRechazado).length;
+      const otorgados = prospectsList.filter(fueOtorgado).length;
+      const perdidos = prospectsList.filter((p) => isLostStatus(p.status)).length;
 
-      const finAprobados = active
-        .filter((p) => FINANCED_APPROVED.includes(p.status) && p.simulation)
-        .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
-
-      const finOtorgados = active
-        .filter((p) => FIN_OTORGADO_STAGE.includes(p.status) && p.simulation)
-        .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+      const finAprobados = prospectsList.filter(fueAprobado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
+      const finOtorgados = prospectsList.filter(fueOtorgado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
 
       const tasaEvaluacion = totalClientes > 0 ? (evaluados / totalClientes) * 100 : 0;
       const tasaAprobacion = evaluados > 0 ? (aprobados / evaluados) * 100 : 0;
-      const tasaCierre = aprobados > 0 ? (active.filter((p) => FIN_OTORGADO_STAGE.includes(p.status)).length / aprobados) * 100 : 0;
+      const tasaCierre = aprobados > 0 ? (otorgados / aprobados) * 100 : 0;
 
-      return { clientes: totalClientes, evaluados, aprobados, condicionados, rechazados, finAprobados, finOtorgados, tasaEvaluacion, tasaAprobacion, tasaCierre };
+      return { clientes: totalClientes, evaluados, aprobados, condicionados, rechazados, perdidos, finAprobados, finOtorgados, tasaEvaluacion, tasaAprobacion, tasaCierre };
     };
 
     // Value used to order rows, per the selected sort key.
@@ -154,6 +154,7 @@ function PipelineManagerContent() {
         case "aprobados": return stats.aprobados;
         case "condicionados": return stats.condicionados;
         case "rechazados": return stats.rechazados;
+        case "perdidos": return stats.perdidos;
         case "finAprobados": return stats.finAprobados;
         case "finOtorgados": return stats.finOtorgados;
         case "tasaEvaluacion": return stats.tasaEvaluacion;
@@ -332,6 +333,7 @@ function PipelineManagerContent() {
                   <SortHeader col="aprobados" label="Aprob." sort={sort} align="center" />
                   <SortHeader col="condicionados" label="Condic." sort={sort} align="center" />
                   <SortHeader col="rechazados" label="Rechaz." sort={sort} align="center" />
+                  <SortHeader col="perdidos" label="Perdidos" sort={sort} align="center" />
                   <SortHeader col="finAprobados" label="Fin. Aprob." sort={sort} align="right" />
                   <SortHeader col="finOtorgados" label="Fin. Otorg." sort={sort} align="right" />
                   <SortHeader col="tasaEvaluacion" label="T. Eval." sort={sort} align="center" />
@@ -360,6 +362,7 @@ function PipelineManagerContent() {
                     <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{row.aprobados}</td>
                     <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-amber-600 dark:text-amber-400">{row.condicionados}</td>
                     <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-rose-500 dark:text-rose-400">{row.rechazados}</td>
+                    <td className="px-4 py-2.5 text-center whitespace-nowrap tabular-nums text-slate-400 dark:text-slate-500">{row.perdidos}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(row.finAprobados)}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(row.finOtorgados)}</td>
                     <td className="px-4 py-2.5 text-center whitespace-nowrap">

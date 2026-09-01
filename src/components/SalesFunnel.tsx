@@ -3,6 +3,14 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Prospect, useApp, isLostStatus } from "@/utils/context/AppContext";
 import {
+  fueAprobado,
+  fueCondicionado,
+  fueEvaluado,
+  fueOtorgado,
+  fueRechazado,
+  montoFinanciamiento,
+} from "@/app/admin/_pipelineBuckets";
+import {
   ChevronDown,
   Users,
   FileText,
@@ -19,6 +27,7 @@ import {
   User,
   LayoutGrid,
   AlignLeft,
+  UserX,
 } from "lucide-react";
 
 interface SalesFunnelProps {
@@ -75,12 +84,11 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     return assignedAllies.map((a) => a.id);
   }, [assignedAllies]);
 
-  // "Cerrado perdido" es SOLO un estado de cliente: no forma parte del embudo/pipeline,
-  // así que se excluye de todos los conteos del funnel (base y etapas).
-  const activeProspects = useMemo(
-    () => prospects.filter((p) => !isLostStatus(p.status)),
-    [prospects]
-  );
+  // El embudo cuenta por HITO ALCANZADO, no por el estado de hoy: un proyecto que se
+  // cerró perdido sigue contando en los escalones que ya había subido (ver
+  // _pipelineBuckets.ts). Por eso la base ya NO excluye a los perdidos — excluirlos era
+  // justo lo que hacía caer la Tasa de Aprobación al marcar un cliente como perdido.
+  const activeProspects = prospects;
 
   // Filter prospects dynamically based on selected funnel view
   const displayProspects = useMemo(() => {
@@ -124,59 +132,38 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
     return activeProspects.filter((p) => p.aliado_id === allyId).length;
   }, [activeProspects]);
 
-  // 1. Filter counts according to the specific mappings using displayProspects
+  // 1. Conteos del embudo — por HITO ALCANZADO, no por el estado de hoy. Cada escalón
+  // es subconjunto del anterior (Proyectos ⊇ Evaluados ⊇ Aprobados ⊇ Fin. Otorgado), así
+  // que las tarjetas ya no suman entre sí: un otorgado también cuenta como aprobado,
+  // porque para otorgarse tuvo que aprobarse.
   const proyectosCount = displayProspects.length;
 
-  // "Aprobado" = dictamen de aprobación + pipeline de cierre HASTA Firma de Contrato
-  // (Agenda Asesoría, Firma Carta Compromiso, Análisis de Riesgo, Firma de Contrato). Al
-  // ejecutarse el financiamiento (Cerrada Ganada = firma_programada) el proyecto pasa a
-  // "Fin. Otorgado" y ya NO cuenta como Aprobado. (Debe seguir el mismo criterio que
-  // src/app/admin/_pipelineBuckets.ts para que embudo y Reportes cuadren.)
-  const aprobadosCount = displayProspects.filter((p) =>
-    ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato"].includes(p.status)
-  ).length;
+  // Aprobados = los que ALGUNA VEZ llegaron a la aprobación. Incluye a los que ya se
+  // otorgaron y a los que después se cerraron perdidos: la aprobación ya ocurrió y no
+  // se deshace. (Criterio único en src/app/admin/_pipelineBuckets.ts.)
+  const aprobadosCount = displayProspects.filter(fueAprobado).length;
 
-  const condicionadosCount = displayProspects.filter((p) =>
-    ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
-  ).length;
+  const condicionadosCount = displayProspects.filter(fueCondicionado).length;
 
-  const rechazadosCount = displayProspects.filter((p) =>
-    p.status === "rechazado"
-  ).length;
+  const rechazadosCount = displayProspects.filter(fueRechazado).length;
 
-  // "Fin. Otorgado" = financiamiento otorgado/ejecutado: Cerrada Ganada (firma_programada,
-  // se ejecutan las líneas de captura) + Pagado/Cerrado (pagado_comision, comisión liberada).
-  // Este conteo cuadra con la etapa "Fin. Otorgado" de la línea de tiempo.
-  const otorgadosCount = displayProspects.filter((p) =>
-    ["firma_programada", "pagado_comision"].includes(p.status)
-  ).length;
+  // Fin. Otorgado = llegó a financiamiento otorgado/ejecutado (Cerrada Ganada o
+  // Pagado/Cerrado). Cuadra con la etapa "Fin. Otorgado" de la línea de tiempo.
+  const otorgadosCount = displayProspects.filter(fueOtorgado).length;
 
-  // Un proyecto cuenta como "evaluado" SOLO cuando ya tiene un dictamen/respuesta
-  // (aprobado, condicionado, rechazado o fin. otorgado). El único estado previo al dictamen
-  // (evaluacion_pendiente) todavía NO cuenta como evaluado.
-  const enEvaluacionCount = aprobadosCount + condicionadosCount + rechazadosCount + otorgadosCount;
+  // Evaluados = ya tuvo dictamen alguna vez (aprobado, condicionado, rechazado u
+  // otorgado). Lo único que queda fuera es lo que nunca salió de evaluación.
+  const enEvaluacionCount = displayProspects.filter(fueEvaluado).length;
 
-  // Financiamientos Aprobados: sum of simulation.financiamiento for any approved/active/closed project
-  const approvedStatuses = [
-    "aprobado_listo",
-    "aportacion",
-    "asesoria_agendada",
-    "doc_proceso",
-    "analisis_riesgo",
-    "firma_contrato",
-    "firma_programada",
-    "pagado_comision",
-  ];
-  const finAprobados = displayProspects
-    .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
-    .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+  // Cerrados perdidos: es un desenlace, no un escalón. Se muestra aparte para que se
+  // vea cuánta cartera se cayó sin que eso borre los hitos que ya había alcanzado.
+  const perdidosCount = displayProspects.filter((p) => isLostStatus(p.status)).length;
 
-  // Financiamientos Otorgados: Σ del financiamiento otorgado/ejecutado — proyectos en
-  // Fin. Otorgado (Cerrada Ganada = firma_programada, ya se ejecutaron las líneas de captura,
-  // + Pagado/Cerrado = pagado_comision).
-  const finOtorgados = displayProspects
-    .filter((p) => ["firma_programada", "pagado_comision"].includes(p.status) && p.simulation)
-    .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+  // Financiamientos Aprobados: Σ del financiamiento de todo lo que llegó a aprobarse.
+  const finAprobados = displayProspects.filter(fueAprobado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
+
+  // Financiamientos Otorgados: Σ del financiamiento ya otorgado/ejecutado.
+  const finOtorgados = displayProspects.filter(fueOtorgado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
 
   // 2. Conversion rates calculations
   const tasaEvaluacion = proyectosCount > 0 ? (enEvaluacionCount / proyectosCount) * 100 : 0;
@@ -266,6 +253,14 @@ export default function SalesFunnel({ prospects, assignedAllies: assignedAlliesP
       iconWrap: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400",
       labelColor: "text-teal-600 dark:text-teal-400",
       accent: "bg-teal-500",
+    },
+    {
+      label: "PERDIDOS",
+      value: perdidosCount,
+      icon: UserX,
+      iconWrap: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+      labelColor: "text-slate-500 dark:text-slate-400",
+      accent: "bg-slate-400",
     },
   ];
 

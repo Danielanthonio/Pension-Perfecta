@@ -18,10 +18,12 @@
 import type { Prospect, UserProfile } from "@/utils/context/AppContext";
 import { isProspectDeleted, isProspectPurged } from "@/utils/context/AppContext";
 import {
-  APPROVED_STAGE,
-  CONDITIONED_STAGE,
-  EVALUATED_STAGE,
   FIN_OTORGADO_STAGE,
+  fueAprobado,
+  fueCondicionado,
+  fueEvaluado,
+  fueOtorgado,
+  fueRechazado,
 } from "@/app/admin/_pipelineBuckets";
 import type {
   CloserAliadoRow,
@@ -154,12 +156,14 @@ function aggregateAliado(aliado: UserProfile, proyectos: Prospect[], v: Ventana)
   };
 
   for (const p of proyectos) {
+    // Venta / en proceso miran el estado de HOY (son colas de trabajo). Los conteos
+    // del embudo miran el HITO ALCANZADO: perder al cliente no borra la aprobación.
     const esVenta = VENTAS.includes(p.status);
     const esRechazo = RECHAZADOS.includes(p.status);
     const esPerdido = PERDIDOS.includes(p.status);
 
     if (esVenta) agg.ventasTotal++;
-    if (APPROVED_STAGE.includes(p.status)) agg.aprobadosTotal++;
+    if (fueAprobado(p)) agg.aprobadosTotal++;
     // "En proceso" = sigue vivo en el embudo: ni venta, ni rechazo, ni perdido.
     if (!esVenta && !esRechazo && !esPerdido) agg.enProceso++;
 
@@ -175,12 +179,12 @@ function aggregateAliado(aliado: UserProfile, proyectos: Prospect[], v: Ventana)
     } else {
       continue;
     }
-    if (EVALUATED_STAGE.includes(p.status)) agg.evaluados++;
-    if (APPROVED_STAGE.includes(p.status)) agg.aprobados++;
-    if (CONDITIONED_STAGE.includes(p.status)) agg.condicionados++;
-    if (esRechazo) agg.rechazados++;
+    if (fueEvaluado(p)) agg.evaluados++;
+    if (fueAprobado(p)) agg.aprobados++;
+    if (fueCondicionado(p)) agg.condicionados++;
+    if (fueRechazado(p)) agg.rechazados++;
     if (esPerdido) agg.perdidos++;
-    if (esVenta) agg.ventasPeriodo++;
+    if (fueOtorgado(p)) agg.ventasPeriodo++;
   }
 
   return agg;

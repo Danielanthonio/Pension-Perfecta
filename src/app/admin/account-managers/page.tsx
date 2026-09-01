@@ -2,6 +2,14 @@
 
 import React, { useState } from "react";
 import { useApp, Prospect } from "@/utils/context/AppContext";
+import {
+  fueAprobado,
+  fueCondicionado,
+  fueEvaluado,
+  fueOtorgado,
+  fueRechazado,
+  montoFinanciamiento,
+} from "@/app/admin/_pipelineBuckets";
 import { StatCard } from "@/components/ui/StatCard";
 import { useSortable, SortControl } from "@/components/ui/sorting";
 import {
@@ -57,40 +65,21 @@ export default function GestionAccountManagers() {
     }).format(val);
   };
 
+  // Mismos criterios que el Dashboard y Reportes (src/app/admin/_pipelineBuckets.ts):
+  // se cuenta por HITO ALCANZADO. Esta pantalla tenía su propia copia de los buckets y
+  // había divergido de las demás (contaba como otorgado solo `pagado_comision`, así que
+  // un financiamiento ya ejecutado no aparecía hasta liberar la comisión).
   const getMetricsForProspects = (groupProspects: Prospect[]) => {
     const totalCount = groupProspects.length;
 
-    // "Aprobado" = misma etapa que Gestión Clientes (getStageAndSubStage → "aprobado"): dictamen
-    // de aprobación + pipeline de cierre posterior. Un proyecto ahí YA fue aprobado.
-    const aprobados = groupProspects.filter((p) =>
-      ["aprobado_listo", "asesoria_agendada", "doc_proceso", "analisis_riesgo", "firma_contrato", "firma_programada"].includes(p.status)
-    ).length;
+    const aprobados = groupProspects.filter(fueAprobado).length;
+    const condicionados = groupProspects.filter(fueCondicionado).length;
+    const rechazados = groupProspects.filter(fueRechazado).length;
+    const otorgados = groupProspects.filter(fueOtorgado).length;
+    const enEvaluacion = groupProspects.filter(fueEvaluado).length;
 
-    const condicionados = groupProspects.filter((p) =>
-      ["falta_reporte", "falta_afore", "pendiente_documentos", "falta_semanas", "falta_afore_cuenta", "posible_simulacion", "agenda_futura", "aportacion"].includes(p.status)
-    ).length;
-
-    // "Cerrado perdido" es solo un estado del cliente, no un rechazo.
-    const rechazados = groupProspects.filter((p) => p.status === "rechazado").length;
-
-    const otorgados = groupProspects.filter((p) => p.status === "pagado_comision").length;
-
-    // "Evaluados" = proyectos que ya tienen un dictamen/respuesta (aprobado, condicionado,
-    // rechazado u otorgado). El único estado previo al dictamen que se excluye es
-    // evaluacion_pendiente.
-    const enEvaluacion = aprobados + condicionados + rechazados + otorgados;
-
-    const approvedStatuses = [
-      "aprobado_listo", "aportacion", "asesoria_agendada", "doc_proceso",
-      "analisis_riesgo", "firma_contrato", "firma_programada", "pagado_comision",
-    ];
-    const finAprobados = groupProspects
-      .filter((p) => approvedStatuses.includes(p.status) && p.simulation)
-      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
-
-    const finOtorgados = groupProspects
-      .filter((p) => p.status === "pagado_comision" && p.simulation)
-      .reduce((sum, p) => sum + (p.simulation?.totalCredito || p.simulation?.financiamiento || 0), 0);
+    const finAprobados = groupProspects.filter(fueAprobado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
+    const finOtorgados = groupProspects.filter(fueOtorgado).reduce((sum, p) => sum + montoFinanciamiento(p), 0);
 
     const tasaEvaluacion = totalCount > 0 ? (enEvaluacion / totalCount) * 100 : 0;
     const tasaAprobacion = enEvaluacion > 0 ? (aprobados / enEvaluacion) * 100 : 0;
