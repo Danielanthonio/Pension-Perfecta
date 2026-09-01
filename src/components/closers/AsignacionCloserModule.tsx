@@ -240,7 +240,11 @@ export default function AsignacionCloserModule() {
   });
 
   return (
-    <div className="space-y-5 animate-fade-in text-slate-800 dark:text-slate-100">
+    // Sin `animate-fade-in`: esa clase deja un `transform` puesto y un ancestro con
+    // transform rompe la barra `sticky` de abajo (y cualquier `fixed` de dentro).
+    // Con 453 aliados en la tabla la barra de acción quedaba a miles de píxeles de
+    // scroll, imposible de encontrar. Mismo fallo que se corrigió en Asignación AM.
+    <div className={`space-y-5 text-slate-800 dark:text-slate-100 ${seleccion.size > 0 ? "pb-32" : ""}`}>
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
@@ -487,7 +491,13 @@ export default function AsignacionCloserModule() {
 
       {/* Barra de acción: solo aparece cuando hay algo seleccionado */}
       {seleccion.size > 0 && (
-        <div className="sticky bottom-4 z-20 bg-white dark:bg-slate-900 rounded-2xl border border-emerald-300 dark:border-emerald-800/60 shadow-lg shadow-emerald-500/10 p-4 space-y-3">
+        // `fixed`, y no `sticky`. Dentro del área admin `sticky` NO engancha nunca:
+        // el envoltorio del layout (`flex-1 … overflow-hidden`) es un contenedor de
+        // scroll que no scrollea. Con la barra después de una tabla de 453 filas
+        // eso la dejaba a miles de píxeles, imposible de encontrar. Requiere que
+        // ningún ancestro tenga `transform`: de ahí que se le quitara
+        // `animate-fade-in` al contenedor.
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-4xl bg-white dark:bg-slate-900 rounded-2xl border border-emerald-300 dark:border-emerald-800/60 shadow-2xl shadow-emerald-500/20 p-4 space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">

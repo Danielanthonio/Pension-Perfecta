@@ -74,6 +74,18 @@ export default function AsignacionAmModule() {
   const [errorMsg, setErrorMsg] = useState("");
   const [okMsg, setOkMsg] = useState("");
 
+  // Asignación de UNA fila: el camino normal para un aliado suelto. Pasa por un
+  // modal de confirmación porque mover a un aliado le mueve la cartera entera de
+  // proyectos al AM nuevo, y eso conviene verlo antes de soltarlo.
+  const [confirmando, setConfirmando] = useState<{ aliado: UserProfile; amId: string | null } | null>(null);
+  const [confirmandoGuardar, setConfirmandoGuardar] = useState(false);
+  const [toast, setToast] = useState<string>("");
+
+  const mostrarToast = (texto: string) => {
+    setToast(texto);
+    window.setTimeout(() => setToast(""), 5000);
+  };
+
   const accountManagers = useMemo(
     () =>
       profiles
@@ -173,6 +185,29 @@ export default function AsignacionAmModule() {
 
   const puedeGuardar = elegidos.length > 0 && amDestino !== "" && !guardando;
 
+  // Impacto de mover a UN aliado, para el modal de la fila.
+  const impactoDe = (a: UserProfile) => cargaPorAliado.get(a.id) || { enCurso: 0, ventas: 0 };
+
+  const confirmarFila = async () => {
+    if (!confirmando) return;
+    setConfirmandoGuardar(true);
+    setErrorMsg("");
+    try {
+      await assignAccountManager([confirmando.aliado.id], confirmando.amId, null);
+      const destino = confirmando.amId
+        ? nombrePorId.get(confirmando.amId) || "el Account Manager"
+        : "la mesa de dirección";
+      mostrarToast(`${confirmando.aliado.full_name} pasa a ${destino}.`);
+      setConfirmando(null);
+    } catch (e: any) {
+      console.error("Error asignando Account Manager:", e);
+      setErrorMsg(e?.message || "No se pudo asignar el Account Manager.");
+      setConfirmando(null);
+    } finally {
+      setConfirmandoGuardar(false);
+    }
+  };
+
   const asignar = async () => {
     if (!puedeGuardar) return;
     setGuardando(true);
@@ -204,7 +239,12 @@ export default function AsignacionAmModule() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in text-slate-800 dark:text-slate-100">
+    // OJO: aquí NO va `animate-fade-in`. Esa clase deja un `transform` puesto, y un
+    // ancestro con transform convierte a la barra `sticky` (y a los modales `fixed`)
+    // en hijos de ESE bloque, no del viewport: con 202 aliados en la tabla, la barra
+    // de acción se quedaba a 11 000 px de scroll y la pantalla parecía no tener
+    // ninguna forma de asignar. Verificado en prod el 2026-08-31.
+    <div className={`space-y-5 text-slate-800 dark:text-slate-100 ${seleccion.size > 0 ? "pb-32" : ""}`}>
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
@@ -305,6 +345,88 @@ export default function AsignacionAmModule() {
           />
         </div>
       </div>
+      {/* Barra de acción: solo aparece cuando hay algo seleccionado */}
+      {seleccion.size > 0 && (
+        // `fixed`, y no `sticky`. Dentro del área admin `sticky` NO funciona: el
+        // envoltorio del layout (`flex-1 … overflow-hidden`) es un contenedor de
+        // scroll que nunca scrollea, así que cualquier `sticky` se ancla a él y no
+        // llega a engancharse nunca. Con la barra después de una tabla de cientos
+        // de filas eso la dejaba a 11 000 px de scroll: existía, pero era
+        // imposible de encontrar. Fija al viewport aparece siempre en cuanto hay
+        // algo marcado. Requiere además que ningún ancestro tenga `transform`, por
+        // eso el contenedor ya no lleva `animate-fade-in`.
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-3rem)] max-w-4xl bg-white dark:bg-slate-900 rounded-2xl border border-emerald-300 dark:border-emerald-800/60 shadow-2xl shadow-emerald-500/20 p-4 space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Asignar a
+              </span>
+              <select
+                value={amDestino}
+                onChange={(e) => setAmDestino(e.target.value)}
+                className="px-3 py-2 rounded-lg text-xs bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500 min-w-[200px]"
+              >
+                <option value="">Selecciona un Account Manager…</option>
+                {accountManagers.map((am) => (
+                  <option key={am.id} value={am.id}>
+                    {am.full_name}
+                  </option>
+                ))}
+                <option value={SIN_AM}>Quitar el AM (mesa de dirección)</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Motivo (opcional)
+              </span>
+              <input
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                placeholder="Queda en la auditoría del aliado"
+                className="px-3 py-2 rounded-lg text-xs bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <button
+              onClick={asignar}
+              disabled={!puedeGuardar}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" strokeWidth={2.4} />}
+              Asignar {seleccion.size}
+            </button>
+
+            <button
+              onClick={() => setSeleccion(new Set())}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
+              Limpiar
+            </button>
+          </div>
+
+          {/* Qué va a pasar exactamente, antes de que toquen el botón. */}
+          {amDestino !== "" && (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+              Se moverán <strong>{impacto.enCurso}</strong> proyecto(s) en curso
+              {impacto.reasignados > 0 && (
+                <>
+                  {" "}
+                  · <strong>{impacto.reasignados}</strong> aliado(s) cambian de Account Manager
+                </>
+              )}
+              {impacto.ventas > 0 && (
+                <>
+                  {" "}
+                  · <strong>{impacto.ventas}</strong> venta(s) se quedan con su AM actual
+                </>
+              )}
+              .
+            </p>
+          )}
+        </div>
+      )}
+
 
       {(okMsg || errorMsg) && (
         <div
@@ -400,19 +522,30 @@ export default function AsignacionAmModule() {
                       <td className="px-3 py-2.5 tabular-nums text-slate-500 dark:text-slate-400">
                         {fmtFecha(a.created_at)}
                       </td>
-                      <td className="px-3 py-2.5">
-                        {am ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[150px]">
-                              {am}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
-                            <AlertTriangle className="h-3 w-3" /> Sin asignar
-                          </span>
-                        )}
+                      {/* Asignación DIRECTA, fila a fila: es lo primero que busca
+                          quien entra a repartir un aliado suelto. La selección en
+                          lote de abajo sigue existiendo para repartir de golpe. */}
+                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative inline-block">
+                          <select
+                            value={a.account_manager_id || ""}
+                            onChange={(e) => setConfirmando({ aliado: a, amId: e.target.value || null })}
+                            title={am ? `Lo gestiona ${am}. Cámbialo aquí.` : "Elige quién va a gestionar a este aliado"}
+                            className={`appearance-none w-[190px] pl-3 pr-7 py-1.5 rounded-lg border text-[11px] font-semibold outline-none transition-all cursor-pointer truncate focus:border-emerald-500 ${
+                              a.account_manager_id
+                                ? "bg-white dark:bg-slate-950/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                                : "bg-amber-50 dark:bg-amber-950/20 border-dashed border-amber-300 dark:border-amber-800/60 text-amber-700 dark:text-amber-400"
+                            }`}
+                          >
+                            <option value="">⚠ Sin asignar</option>
+                            {accountManagers.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.full_name}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="h-3.5 w-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-slate-700 dark:text-slate-200">
                         {carga?.enCurso || 0}
@@ -432,79 +565,6 @@ export default function AsignacionAmModule() {
         )}
       </div>
 
-      {/* Barra de acción: solo aparece cuando hay algo seleccionado */}
-      {seleccion.size > 0 && (
-        <div className="sticky bottom-4 z-20 bg-white dark:bg-slate-900 rounded-2xl border border-emerald-300 dark:border-emerald-800/60 shadow-lg shadow-emerald-500/10 p-4 space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Asignar a
-              </span>
-              <select
-                value={amDestino}
-                onChange={(e) => setAmDestino(e.target.value)}
-                className="px-3 py-2 rounded-lg text-xs bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500 min-w-[200px]"
-              >
-                <option value="">Selecciona un Account Manager…</option>
-                {accountManagers.map((am) => (
-                  <option key={am.id} value={am.id}>
-                    {am.full_name}
-                  </option>
-                ))}
-                <option value={SIN_AM}>Quitar el AM (mesa de dirección)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Motivo (opcional)
-              </span>
-              <input
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Queda en la auditoría del aliado"
-                className="px-3 py-2 rounded-lg text-xs bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <button
-              onClick={asignar}
-              disabled={!puedeGuardar}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-            >
-              {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" strokeWidth={2.4} />}
-              Asignar {seleccion.size}
-            </button>
-
-            <button
-              onClick={() => setSeleccion(new Set())}
-              className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            >
-              Limpiar
-            </button>
-          </div>
-
-          {/* Qué va a pasar exactamente, antes de que toquen el botón. */}
-          {amDestino !== "" && (
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Se moverán <strong>{impacto.enCurso}</strong> proyecto(s) en curso
-              {impacto.reasignados > 0 && (
-                <>
-                  {" "}
-                  · <strong>{impacto.reasignados}</strong> aliado(s) cambian de Account Manager
-                </>
-              )}
-              {impacto.ventas > 0 && (
-                <>
-                  {" "}
-                  · <strong>{impacto.ventas}</strong> venta(s) se quedan con su AM actual
-                </>
-              )}
-              .
-            </p>
-          )}
-        </div>
-      )}
 
       <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center">
         El Account Manager de un proyecto se lee en{" "}
@@ -513,6 +573,89 @@ export default function AsignacionAmModule() {
         </Link>
         , pero solo se cambia aquí.
       </p>
+
+      {/* Confirmación de la asignación de una fila. Dice qué se lleva el AM nuevo
+          y qué se queda donde está, antes de tocarlo. */}
+      {confirmando && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-4">
+              <div className="h-11 w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 flex items-center justify-center border border-emerald-150 dark:border-emerald-800/40 shrink-0">
+                <UserCog className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                  {confirmando.amId ? "Asignar Account Manager" : "Quitar el Account Manager"}
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">
+                  {confirmando.aliado.full_name}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold truncate max-w-[42%]">
+                  {confirmando.aliado.account_manager_id
+                    ? nombrePorId.get(confirmando.aliado.account_manager_id) || "Account Manager"
+                    : "Sin asignar"}
+                </span>
+                <span className="text-slate-400 shrink-0">→</span>
+                <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 font-bold truncate max-w-[42%]">
+                  {confirmando.amId ? nombrePorId.get(confirmando.amId) || "Account Manager" : "Mesa de dirección"}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                {impactoDe(confirmando.aliado).enCurso > 0 ? (
+                  <>
+                    Se llevará <strong>{impactoDe(confirmando.aliado).enCurso}</strong> proyecto(s) en curso.
+                  </>
+                ) : (
+                  <>Este aliado no tiene proyectos en curso.</>
+                )}
+                {impactoDe(confirmando.aliado).ventas > 0 && (
+                  <>
+                    {" "}
+                    Sus <strong>{impactoDe(confirmando.aliado).ventas}</strong> venta(s) se quedan con el
+                    Account Manager que las gestionó.
+                  </>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setConfirmando(null)}
+                disabled={confirmandoGuardar}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarFila}
+                disabled={confirmandoGuardar}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {confirmandoGuardar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                {confirmandoGuardar ? "Asignando…" : "Sí, asignar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación de que la acción se logró, arriba y a la vista */}
+      {toast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[calc(100%-2rem)]">
+          <div className="flex items-start gap-3 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/50 border-l-4 border-l-emerald-500 rounded-2xl shadow-2xl px-4 py-3.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Asignación exitosa</h4>
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">{toast}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
