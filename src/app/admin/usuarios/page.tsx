@@ -149,18 +149,12 @@ export default function GestionUsuarios() {
     ? profiles.filter((p) => p.role === "aliado" && p.id !== deleteTarget.id)
     : [];
 
-  // Cartera del usuario como ACCOUNT MANAGER. Desde 20260831000001 la cartera son
-  // ALIADOS y los proyectos van detrás, así que hay que preguntar por el destino
-  // aunque un aliado todavía no haya capturado nada: si no, se quedaría huérfano
-  // en silencio. Si no hay otro AM, todo vuelve a la mesa de dirección (estado
-  // válido, reasignable después desde Asignación AM).
+  // Proyectos donde el usuario es el ACCOUNT MANAGER (su cartera). Se transfiere
+  // a otro AM; si es el único AM, quedan sin AM (estado válido, reasignable luego).
   const deleteTargetAmProjectCount = deleteTarget
     ? prospects.filter((p) => p.account_manager_id === deleteTarget.id).length
     : 0;
-  const deleteTargetAmAllyCount = deleteTarget
-    ? profiles.filter((p) => p.role === "aliado" && p.account_manager_id === deleteTarget.id).length
-    : 0;
-  const deleteAmNeedsReassign = deleteTargetAmProjectCount > 0 || deleteTargetAmAllyCount > 0;
+  const deleteAmNeedsReassign = deleteTargetAmProjectCount > 0;
   const reassignableAms = deleteTarget
     ? profiles.filter((p) => p.role === "account_manager" && p.id !== deleteTarget.id)
     : [];
@@ -322,10 +316,9 @@ export default function GestionUsuarios() {
           role: rolEfectivo,
           is_active: isActive,
           password_provisional: passwordProvisional || undefined,
-          // El Account Manager NO se fija aquí: lo asigna la Dirección desde el
-          // módulo "Asignación AM" (20260831000001), que es la única puerta. El
-          // alta la puede hacer un AM o un closer, y ninguno de los dos reparte
-          // cartera.
+          // El Account Manager NO se fija aquí: se sortea automáticamente entre los
+          // AM que están en la ruleta de asignación (aun cuando lo crea un AM). Ya
+          // no hay reasignación manual de AM por parte del director.
           //
           // El CLOSER sí: queda grabado en el alta, junto con la fecha de
           // incorporación, y es el que da el mérito de la captación (§4).
@@ -1779,11 +1772,10 @@ export default function GestionUsuarios() {
             {deleteAmNeedsReassign && (
               <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 p-3.5 space-y-2">
                 <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                  Este Account Manager tiene <strong>{deleteTargetAmAllyCount}</strong> aliado(s) y{" "}
-                  <strong>{deleteTargetAmProjectCount}</strong> proyecto(s) en su cartera.
+                  Este Account Manager tiene <strong>{deleteTargetAmProjectCount}</strong> proyecto(s) en su cartera.
                   {reassignableAms.length > 0
                     ? " Elige a qué Account Manager se transfieren antes de eliminarlo."
-                    : " No hay otro Account Manager disponible: al eliminarlo, esos aliados y sus proyectos vuelven a la mesa de dirección (podrás reasignarlos después en Asignación AM)."}
+                    : " No hay otro Account Manager disponible: al eliminarlo, esos proyectos quedarán sin AM (podrás reasignarlos después)."}
                 </p>
                 {reassignableAms.length > 0 && (
                   <>

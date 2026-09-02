@@ -79,10 +79,8 @@ export async function PATCH(
       return NextResponse.json({ error: "No se encontró el perfil del aliado a modificar" }, { status: 404 });
     }
 
-    // (Sin gate de cartera: cualquier AM puede cambiar el tipo. Desde el
-    // 2026-08-31 el AM volvió a tener cartera de aliados (20260831000001), pero este gate
-    // sigue siendo deliberadamente amplio: la estructura de líderes y empresas
-    // es del sistema, no de una cartera, y acotarla dejaría huecos sin dueño.)
+    // (Sin gate de cartera: cualquier AM puede cambiar el tipo — la "cartera"
+    // del AM ya no existe, el AM se asigna por PROYECTO.)
 
     // Validation RT-4 rule 3: No permitir cambiar de "lider" a "aliado" si tiene aliados asignados
     if (allyProfile.aliado_tipo === "lider" && aliado_tipo === "aliado") {

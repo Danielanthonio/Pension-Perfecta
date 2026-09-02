@@ -169,13 +169,11 @@ function DashboardContent() {
     }
   }, [user, profiles, prospects, isDemoMode]);
 
-  // El AM del aliado vuelve a ser uno: el de su CARTERA (20260831000001). Se pone
-  // primero y se le suman los AMs derivados de sus proyectos, que en la práctica
-  // solo aportan algo si arrastra una venta vieja gestionada por otro AM.
+  // El AM ya no se asigna al aliado sino a cada PROYECTO: se derivan los
+  // account_manager_id distintos (no nulos) de los proyectos del usuario y se
+  // resuelven a perfil (exposedProfiles ya incluye a los AMs de sus proyectos).
   const projectAmIds = Array.from(
-    new Set(
-      [user?.account_manager_id, ...activeProspects.map((p) => p.account_manager_id)].filter((id) => !!id)
-    )
+    new Set(activeProspects.map((p) => p.account_manager_id).filter((id) => !!id))
   ) as string[];
   const projectAMs = projectAmIds.flatMap((id) => {
     const am = profiles.find((p) => p.id === id);
@@ -474,11 +472,9 @@ function DashboardContent() {
             )}
           </div>
 
-          {/* Section 2: el Account Manager de su cartera (y los de sus proyectos) */}
+          {/* Section 2: Account Managers de los proyectos (el AM se asigna por PROYECTO) */}
           <div className="space-y-3 lg:pl-6">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">
-              {projectAMs.length > 1 ? "Tus Account Managers" : "Tu Account Manager"}
-            </span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider block">Account Managers de tus Proyectos</span>
 
             {projectAMs.length === 1 ? (
               <div className="flex items-center gap-3">
@@ -523,8 +519,8 @@ function DashboardContent() {
               {projectAMs.length === 1
                 ? `${projectAMs[0].full_name} atiende tus proyectos. Contáctale para dudas de clientes o liberación de dictámenes Ley 73.`
                 : projectAMs.length > 1
-                ? "Tu Account Manager atiende tus proyectos; alguno anterior sigue apareciendo en los que ya se cerraron con él."
-                : "Todavía no tienes Account Manager: tus proyectos los evalúa directamente el Director de Operaciones."}
+                ? "Estos Account Managers atienden tus proyectos; cada proyecto muestra el suyo en su detalle."
+                : "Tus proyectos aún no tienen AM: serán evaluados directamente por el Director de Operaciones."}
             </div>
           </div>
 

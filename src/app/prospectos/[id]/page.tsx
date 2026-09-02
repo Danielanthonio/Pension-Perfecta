@@ -471,9 +471,8 @@ export default function ProspectoDetalle() {
           return;
         }
 
-        // El AM solo abre SUS proyectos. `account_manager_id` es el espejo del AM
-        // del aliado dueño (20260831000001), así que esto es su cartera; sin AM
-        // (null) el proyecto es de gestión directa de Dirección.
+        // El AM solo abre SUS proyectos (account_manager_id del PROYECTO). Los
+        // proyectos sin AM (null) son de gestión directa de Dirección.
         if (user?.role === "account_manager" && found.account_manager_id !== user.id) {
           router.push("/admin");
           return;
@@ -2058,7 +2057,7 @@ export default function ProspectoDetalle() {
                 }`}>
                   {user.role === "director" ? "Director" : user.role === "account_manager" ? "Account Manager" : "Aliado"}
                 </span>
-                {/* AM que gestiona: el del aliado dueño. Sin AM = mesa de dirección */}
+                {/* AM del PROYECTO (no del perfil): sin AM = mesa de dirección */}
                 <span className="block text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">
                   AM: {prospect.account_manager_id
                     ? (profiles?.find((p) => p.id === prospect.account_manager_id)?.full_name || "Asignado")
@@ -2323,7 +2322,7 @@ export default function ProspectoDetalle() {
             El cliente ya aparece arriba, así que no se repite aquí. */}
         {(() => {
           const aliadoProfile = profiles.find((p) => p.id === prospect.aliado_id);
-          // AM que gestiona el proyecto = el del aliado dueño; null = gestión directa.
+          // AM del PROYECTO (no del perfil del aliado); null = gestión directa.
           const amId = prospect.account_manager_id || null;
           const amProfile = amId ? profiles.find((p) => p.id === amId) : null;
           // amId presente pero perfil no visible (p. ej. un líder viendo un proyecto

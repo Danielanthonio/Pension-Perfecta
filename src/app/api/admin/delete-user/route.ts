@@ -233,18 +233,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // --- 6b. Cartera de este usuario como ACCOUNT MANAGER ---
-  // Desde 20260831000001 la cartera es de ALIADOS: `profiles.account_manager_id`
-  // manda y los proyectos son su espejo. Ambas FK son ON DELETE SET NULL, así
-  // que al borrar la cuenta los aliados volverían a la mesa de dirección y sus
-  // proyectos se vaciarían por la cascada. Si el director indicó un AM destino,
-  // se transfiere ANTES de borrar, y en este orden:
-  //   1. los ALIADOS  → dispara `cascada_am_de_aliado`, que mueve sus proyectos
-  //      en curso y deja al AM saliente sin nadie apuntándole;
-  //   2. los PROYECTOS que queden  → las ventas, que la cascada no toca a
-  //      propósito. Aquí sí se mueven: su AM está a punto de desaparecer y
-  //      dejarlas sin dueño sería peor que reatribuirlas.
-  // Si se hiciera al revés, el SET NULL del borrado desharía el paso 2.
+  // --- 6b. Proyectos donde este usuario es el ACCOUNT MANAGER ---
+  // La FK `prospects.account_manager_id` es ON DELETE SET NULL, así que al
+  // borrar la cuenta esos proyectos quedarían SIN AM. Si el director indicó un
+  // AM destino, transferimos la cartera a ese AM antes de borrar.
   if (reassignToAmId) {
     if (reassignToAmId === userId) {
       return NextResponse.json(
@@ -266,18 +258,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const { error: alliesReassignErr } = await admin
-      .from("profiles")
-      .update({ account_manager_id: reassignToAmId })
-      .eq("account_manager_id", userId)
-      .eq("role", "aliado");
-    if (alliesReassignErr) {
-      return NextResponse.json(
-        { error: "No se pudo transferir la cartera de aliados: " + alliesReassignErr.message },
-        { status: 500 }
-      );
-    }
-
     const { error: amReassignErr } = await admin
       .from("prospects")
       .update({ account_manager_id: reassignToAmId, updated_at: new Date().toISOString() })
@@ -289,9 +269,8 @@ export async function POST(request: Request) {
       );
     }
   }
-  // Si no se indicó reassignToAmId, las FK ON DELETE SET NULL devuelven sus
-  // aliados a la mesa de dirección y vacían el AM de sus proyectos (estado
-  // válido: salen marcados como "sin asignar" en Asignación AM).
+  // Si no se indicó reassignToAmId, la FK ON DELETE SET NULL deja sus proyectos
+  // sin AM automáticamente al eliminar la cuenta (estado válido).
 
   // --- 7. Desligar códigos de invitación (created_by / used_by → NULL) ---
   // Ambas columnas son nullable; sin esto la FK bloquea el borrado del perfil.

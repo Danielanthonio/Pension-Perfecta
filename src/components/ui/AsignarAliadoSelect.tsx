@@ -49,13 +49,6 @@ export function AsignarAliadoSelect({
 
   const selectedAlly = value ? profiles.find((p) => p.id === value) : null;
 
-  // El Account Manager de cada aliado. Se enseña porque desde 20260831000001 el
-  // proyecto es del AM del ALIADO: quien captura elige aquí, sin saberlo, a quién
-  // le queda la gestión. Un aliado sin AM manda el proyecto a la mesa de dirección.
-  const nombrePorId = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name])), [profiles]);
-  const amDe = (a: UserProfile): string | null =>
-    a.account_manager_id ? nombrePorId.get(a.account_manager_id) || "Account Manager" : null;
-
   const q = query.trim().toLowerCase();
   const filtered = q ? allies.filter((a) => a.full_name.toLowerCase().includes(q)) : allies;
 
@@ -83,9 +76,6 @@ export function AsignarAliadoSelect({
         {selectedAlly ? (
           <span className="min-w-0 flex-1 text-left">
             <span className="block truncate text-slate-800 dark:text-white">{selectedAlly.full_name}</span>
-            <span className="block truncate text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              {amDe(selectedAlly) ? `Lo gestiona ${amDe(selectedAlly)}` : "Sin Account Manager · mesa de dirección"}
-            </span>
           </span>
         ) : (
           <span className="flex-1 text-left text-slate-400 dark:text-slate-500">{placeholder}</span>
@@ -132,9 +122,6 @@ export function AsignarAliadoSelect({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{ally.full_name}</span>
-                      <span className="block truncate text-[10px] font-medium text-slate-400 dark:text-slate-500">
-                        {amDe(ally) || "Sin Account Manager"}
-                      </span>
                     </span>
                   </button>
                 );

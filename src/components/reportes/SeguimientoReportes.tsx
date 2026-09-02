@@ -274,10 +274,9 @@ export function SeguimientoReportes({
   }, [filas]);
 
   // ── Agregado por Account Manager ───────────────────────────────────────────
-  // El AM del proyecto se lee de `prospects.account_manager_id`, espejo del AM del
-  // ALIADO dueño (20260831000001). Un proyecto sin AM es de un aliado sin asignar
-  // (mesa de dirección) y se cuenta como una columna más: esconderlo haría que las
-  // barras no sumaran.
+  // El AM del proyecto vive en `prospects.account_manager_id` (ver
+  // [[project-am-por-proyecto]]). Un proyecto sin AM es mesa de dirección y se
+  // cuenta como una columna más: esconderlo haría que las barras no sumaran.
   interface FilaAm {
     id: string;
     nombre: string;

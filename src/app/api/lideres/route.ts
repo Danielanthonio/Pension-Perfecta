@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // (Se eliminó el filtro ?account_manager_id=: los líderes no pertenecen a la
-    // cartera de un AM ni siquiera ahora que el aliado sí, ver 20260831000001.)
+    // (Se eliminó el filtro ?account_manager_id=: el AM se asigna por PROYECTO
+    // y los líderes ya no pertenecen a la cartera de un AM.)
     const { data: dbLideres, error } = await supabase
       .from("profiles")
       .select("id, full_name, lider_grupo")

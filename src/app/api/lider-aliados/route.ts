@@ -57,9 +57,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Solo se pueden asignar aliados de tipo 'aliado' a un Líder" }, { status: 400 });
     }
 
-    // (Cualquier AM puede gestionar asignaciones. Desde el 2026-08-31 el AM volvió a tener cartera de aliados (20260831000001), pero este gate
-    // sigue siendo deliberadamente amplio: la estructura de líderes y empresas
-    // es del sistema, no de una cartera, y acotarla dejaría huecos sin dueño.)
+    // (Cualquier AM puede gestionar asignaciones: la "cartera" del AM ya no
+    // existe — el AM se asigna por PROYECTO, no por aliado.)
 
     // Fetch all requested leader profiles
     let leaders: any[] = [];

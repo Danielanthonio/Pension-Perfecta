@@ -12,10 +12,9 @@
 //   7. Sub estados           — panel compartido con la pestaña ALIADOS.
 //   8. Actividad             — tiempo dentro de la plataforma y qué hace ahí.
 //
-// El AM del proyecto se lee de `prospects.account_manager_id`, que desde
-// 20260831000001 es el espejo del AM del ALIADO dueño. Un proyecto sin AM es de un
-// aliado sin asignar (mesa de dirección) y se cuenta como una columna más:
-// esconderlo haría que las barras no sumaran el total.
+// El AM del proyecto vive en `prospects.account_manager_id`, no en el aliado
+// (ver [[project-am-por-proyecto]]): un proyecto sin AM es mesa de dirección y se
+// cuenta como una columna más. Esconderlo haría que las barras no sumaran el total.
 
 import React, { useMemo, useState } from "react";
 import {
