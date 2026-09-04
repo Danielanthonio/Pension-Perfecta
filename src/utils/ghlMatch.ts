@@ -12,8 +12,13 @@
 //
 //   3 de 3 → verde   · verificado, es el mismo cliente sin discusión
 //   2 de 3 → azul    · casi seguro, pero un dato no cuadra
-//   1 de 3 → amarillo· posible, hay que mirarlo a ojo
+//   1 de 3 → amarillo· posible, hay que mirarlo a ojo. Si lo que cuadra es el
+//                      nombre COMPLETO, se dice aparte («Nombre exacto»), pero
+//                      sigue siendo un solo dato: tampoco se copia nada.
 //   0 de 3 → sin sello, no se enseña nada
+//
+// Copiar notas es otra decisión, más estricta que pintar un sello: solo se
+// copian con DOS datos cuadrados. Ver `alcanzaParaCopiar`.
 //
 // La comparación NO es literal en ningún campo: se normaliza primero, porque si
 // se comparara el texto crudo casi nada casaría y el sello verde no saldría
@@ -182,13 +187,16 @@ export function mismoNombre(a: string | null | undefined, b: string | null | und
  * Por qué hace falta como señal aparte: en esta cartera el correo y el teléfono
  * son basura en buena parte de los expedientes (rellenos como `@` o
  * `1111111111` que alguien tecleó para pasar el formulario). Para esos clientes
- * el nombre es el ÚNICO dato real que hay, y exigir «2 de 3» los condena a no
- * cruzarse nunca, aunque en GHL esté el mismo señor con las tres palabras
- * idénticas.
+ * el nombre es el ÚNICO dato real que hay, y decir «solo cuadra un dato» sin
+ * más los mete en el mismo montón que un teléfono reciclado, cuando no es lo
+ * mismo: aquí hay un candidato con nombre y los dos apellidos idénticos.
  *
- * El riesgo que se acepta a cambio: dos personas distintas con el nombre y LOS
- * DOS apellidos iguales. Existe, pero es raro, y por eso este caso lleva sello
- * propio en vez de disfrazarse de coincidencia verificada.
+ * Lo que NO hace: abrir la puerta a copiar notas. Dos personas distintas con el
+ * nombre y los dos apellidos iguales existen, y meter la conversación de otra
+ * persona en un expediente no se deshace a ojo. El sello sirve para señalar a
+ * quién hay que arreglarle el correo o el teléfono —y en cuanto se arregle uno
+ * subirá a «Probable» y las notas entrarán solas—, no para saltarse el listón.
+ * También desempata en `mejorCoincidencia`.
  */
 export function mismoNombreExacto(a: string | null | undefined, b: string | null | undefined): boolean {
   const pa = palabrasNombre(a);
@@ -242,16 +250,21 @@ export function cotejarContacto(local: DatosCotejo, ghl: DatosCotejo): Resultado
 /**
  * ¿Hay bastante para traerse sus notas a la bitácora?
  *
- * Dos puertas, y una sola respuesta: dos de tres datos, O el nombre completo
- * idéntico. Con menos que eso no se copia nada — un homónimo parcial o un
- * teléfono reciclado metería la conversación de otra persona en el expediente,
- * y una vez dentro ya no se distingue a simple vista.
+ * Una sola puerta: DOS de los tres datos. Con un dato suelto el contacto es una
+ * conjetura —un homónimo, un teléfono reciclado— y traerse sus notas metería la
+ * conversación de otra persona en el expediente; una vez dentro ya no se
+ * distingue a simple vista.
+ *
+ * El nombre completo idéntico NO abre esta puerta, aunque tenga sello propio:
+ * dos personas con el mismo nombre y los mismos dos apellidos existen, y el
+ * precio de equivocarse (notas ajenas, con fecha y autor, imborrables a ojo) es
+ * mucho más caro que el de esperar a que alguien corrija un correo.
  *
  * Vive aquí, junto a la regla de cotejo, y no en la ruta: es la misma decisión
  * que pinta el sello y no puede contarse de dos maneras distintas.
  */
 export function alcanzaParaCopiar(cotejo: ResultadoCotejo): boolean {
-  return cotejo.nivel >= 2 || cotejo.nombreExacto;
+  return cotejo.nivel >= 2;
 }
 
 /**
@@ -297,18 +310,36 @@ export interface SelloCoincidencia {
   badge: string;
   /** El punto de color. */
   punto: string;
+  /**
+   * El color del sello en TEXTO, para cuando lo que se pinta es una cifra y no
+   * un chip: el recuento de una tarjeta, el rótulo de una leyenda. Va aquí y no
+   * en el informe por lo mismo que el resto: el verde de «Verificado» tiene que
+   * ser un solo verde en toda la aplicación.
+   */
+  texto: string;
   /** ¿Este sello implica que las notas de GHL se copiaron a la bitácora? */
   copia: boolean;
+  /**
+   * Qué tiene que hacer quien lleva GoHighLevel para que este expediente empiece
+   * a traer notas. Vive junto al sello y no en el informe porque es la MISMA
+   * decisión: si mañana «Probable» dejara de copiar, el texto tendría que
+   * cambiar aquí y no en cada pantalla que lo cuente.
+   */
+  accion: string;
 }
 
 /**
  * Los cuatro desenlaces posibles. Son cuatro y no tres porque hay cuatro cosas
  * distintas que decir, y meter dos en el mismo color sería mentir:
  *
- *   verificado → cuadra todo
- *   probable   → cuadran dos de tres          } de aquí para arriba SE COPIAN
- *   nombre     → cuadra el nombre completo    } las notas de GHL
- *   revisar    → cuadra un dato suelto, y con eso no se copia nada
+ *   verificado → cuadra todo                  } de aquí para arriba SE COPIAN
+ *   probable   → cuadran dos de tres          } las notas de GHL
+ *   nombre     → cuadra el nombre completo, pero es UN solo dato: no se copia
+ *   revisar    → cuadra un dato suelto, y con eso tampoco se copia nada
+ *
+ * Los dos últimos van en amarillo por lo mismo: son avisos de expediente con
+ * los datos de contacto mal capturados, no cotejos buenos. Se distinguen por el
+ * rótulo, que es lo que dice qué hacer con cada uno.
  */
 export type ClaveSello = "verificado" | "probable" | "nombre" | "revisar";
 
@@ -320,7 +351,9 @@ export const SELLOS: Record<ClaveSello, SelloCoincidencia> = {
     badge:
       "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
     punto: "bg-emerald-500",
+    texto: "text-emerald-600 dark:text-emerald-400",
     copia: true,
+    accion: "Nada: las notas entran solas.",
   },
   probable: {
     clave: "probable",
@@ -328,16 +361,21 @@ export const SELLOS: Record<ClaveSello, SelloCoincidencia> = {
     ayuda: "Coinciden dos de los tres datos con el contacto de GoHighLevel. Falta uno por cuadrar.",
     badge: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
     punto: "bg-blue-500",
+    texto: "text-blue-600 dark:text-blue-400",
     copia: true,
+    accion: "Nada urgente: cuadrar el dato que falta lo sube a Verificado.",
   },
   nombre: {
     clave: "nombre",
     label: "Nombre exacto",
     ayuda:
-      "El nombre completo es idéntico —nombre y los dos apellidos— pero el correo y el teléfono del expediente no sirven para cotejar. Se traen sus notas porque un nombre completo repetido entero es un identificador fuerte; aun así, conviene aprovechar y corregir aquí el dato de contacto que falte.",
-    badge: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900",
-    punto: "bg-teal-500",
-    copia: true,
+      "El nombre completo es idéntico —nombre y los dos apellidos— pero el correo y el teléfono del expediente no sirven para cotejar. NO se traen sus notas: con un solo dato podría ser un homónimo, y serían las de otra persona. Corrige aquí el correo o el teléfono y en el siguiente sincronizado subirá a Probable y las notas entrarán solas.",
+    badge:
+      "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900",
+    punto: "bg-yellow-500",
+    texto: "text-yellow-600 dark:text-yellow-400",
+    copia: false,
+    accion: "Cuadrar el correo o el teléfono con el contacto que ya existe allá.",
   },
   revisar: {
     clave: "revisar",
@@ -346,17 +384,87 @@ export const SELLOS: Record<ClaveSello, SelloCoincidencia> = {
       "Solo coincide un dato suelto con el contacto de GoHighLevel. No se traen sus notas: podría ser un homónimo o un teléfono reciclado, y serían las de otra persona.",
     badge: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
     punto: "bg-amber-500",
+    texto: "text-amber-600 dark:text-amber-400",
     copia: false,
+    accion: "Confirmar si es el mismo cliente y corregir lo que no cuadra.",
   },
 };
+
+// ---------------------------------------------------------------------------
+// Los dos renglones que no son un sello
+// ---------------------------------------------------------------------------
+//
+// Un informe de cotejo tiene SEIS renglones, no cuatro: a los cuatro sellos hay
+// que sumarles «se buscó y no está en GoHighLevel» y «todavía no se ha buscado».
+// No son sellos —no hay contacto al otro lado del que hablar— pero se cuentan y
+// se pintan al lado de ellos, así que su color vive aquí, con los demás, y no
+// suelto en cada pantalla que los enseñe.
+
+export type ClaveCotejo = ClaveSello | "no_creado" | "nunca";
+
+export interface EstiloCotejo extends Omit<SelloCoincidencia, "clave"> {
+  clave: ClaveCotejo;
+}
+
+/**
+ * ROJO, y a propósito. Que un cliente no exista en GoHighLevel no es una
+ * ausencia neutra que anotar: es trabajo pendiente —sin contacto allá no se le
+ * puede agendar ni dar seguimiento— y tiene que saltar a la vista como salta un
+ * error. Es el mismo chip que ya pinta el listado de clientes.
+ */
+export const COTEJO_NO_CREADO: EstiloCotejo = {
+  clave: "no_creado",
+  label: "No creado",
+  ayuda:
+    "Se buscó en GoHighLevel y NINGÚN contacto coincide con el expediente: ni el correo, ni el teléfono, ni el nombre. El cliente no está creado allá.",
+  badge: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
+  punto: "bg-red-500",
+  texto: "text-red-600 dark:text-red-400",
+  copia: false,
+  accion: "Crear el contacto en GoHighLevel con el correo y el teléfono del expediente.",
+};
+
+/**
+ * Gris, y también a propósito: no dice nada del cliente ni de GoHighLevel, solo
+ * que el barrido todavía no ha pasado por él (se dio de alta después). Pintarlo
+ * del color de un problema sería inventarse uno.
+ */
+export const COTEJO_NUNCA: EstiloCotejo = {
+  clave: "nunca",
+  label: "Sin cotejar",
+  ayuda:
+    "Todavía no se ha buscado este expediente en GoHighLevel. Suele ser un alta posterior al último barrido; el de esta madrugada lo sellará.",
+  badge:
+    "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+  punto: "bg-slate-400",
+  texto: "text-slate-500 dark:text-slate-400",
+  copia: false,
+  accion: "Nada: se sella solo en el próximo barrido.",
+};
+
+/** Los seis renglones del informe de cotejo, en el orden en que se leen. */
+export const ESTILOS_COTEJO: Record<ClaveCotejo, EstiloCotejo> = {
+  ...SELLOS,
+  no_creado: COTEJO_NO_CREADO,
+  nunca: COTEJO_NUNCA,
+};
+
+/**
+ * El orden en que se LEE el informe: del cotejo más firme al más flojo, y al
+ * final los dos que no son un sello. No es el orden en que se TRABAJA —para eso
+ * manda lo urgente, que es el rojo— pero una tabla que empieza por lo peor se
+ * lee como una queja en vez de como un reparto.
+ */
+export const ORDEN_COTEJO: ClaveCotejo[] = ["verificado", "probable", "nombre", "revisar", "no_creado", "nunca"];
 
 /** Qué sello le toca a este cotejo. `null` = no coincide en nada, no se pinta. */
 export function selloDe(cotejo: ResultadoCotejo): SelloCoincidencia | null {
   if (cotejo.nivel === 3) return SELLOS.verificado;
   if (cotejo.nivel === 2) return SELLOS.probable;
-  // El orden importa: un 1 de 3 con el nombre completo idéntico es «nombre»,
-  // no «revisar». Si se comprobara al revés, el sello diría que no se copió
-  // nada mientras las notas ya estarían dentro.
+  // El orden importa: un 1 de 3 con el nombre completo idéntico es «nombre», no
+  // «revisar». Ninguno de los dos copia notas, pero no piden lo mismo: en
+  // «nombre» hay un candidato con nombre y apellidos idénticos esperando a que
+  // se le corrija un dato de contacto; en «revisar» ni siquiera eso.
   if (cotejo.nombreExacto) return SELLOS.nombre;
   if (cotejo.nivel === 1) return SELLOS.revisar;
   return null;

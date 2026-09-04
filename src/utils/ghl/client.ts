@@ -195,9 +195,9 @@ async function detalleDelError(r: Response): Promise<string> {
  *   · GHL nos rechaza (4xx)    → `GhlAccesoError`, que TAMBIÉN revienta.
  *
  * Los dos últimos casos tienen que reventar, y por la misma razón: si se
- * devolvieran como `null`, el cliente aparecería en pantalla como «Sin GHL»
- * —una afirmación falsa y creíble— cuando lo cierto es que no se llegó a
- * preguntar. Vale mil veces más un aviso de «vuelve a intentarlo» que un sello
+ * devolvieran como `null`, el cliente aparecería en pantalla en rojo, como «No
+ * creado» —una afirmación falsa y creíble— cuando lo cierto es que no se llegó
+ * a preguntar. Vale mil veces más un aviso de «vuelve a intentarlo» que un sello
  * equivocado. Ya pasó: ver `GhlAccesoError`.
  *
  * Un fallo de red o un 5xx se reintentan un par de veces antes de rendirse a
@@ -405,11 +405,10 @@ export async function citasDeContacto(contactoId: string): Promise<CitaGhl[]> {
  * se devuelve un sello gris de «no encontrado»: el listado ya tiene bastante
  * ruido y una ausencia no es un dato.
  *
- * Las notas y las citas solo se piden si el cotejo ALCANZA: dos de tres datos, o
- * el nombre completo idéntico (ver `alcanzaParaCopiar`). Con una coincidencia
- * suelta el contacto es una CONJETURA —un homónimo parcial, un teléfono
- * reciclado— y traerse las notas de otra persona a la ficha de este cliente es
- * peor que no traer nada.
+ * Las notas y las citas solo se piden si el cotejo ALCANZA: dos de tres datos
+ * (ver `alcanzaParaCopiar`). Con una coincidencia suelta —aunque sea el nombre
+ * completo idéntico— el contacto es una CONJETURA, y traerse las notas de otra
+ * persona a la ficha de este cliente es peor que no traer nada.
  */
 export async function cotejarCliente(local: DatosCotejo): Promise<CotejoGhl | null> {
   if (!ghlConfigurado()) return null;

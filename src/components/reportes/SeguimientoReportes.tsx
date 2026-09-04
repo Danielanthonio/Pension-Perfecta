@@ -15,7 +15,13 @@
 //   4. GoHighLevel            — qué nivel de seguimiento sostiene GHL por su
 //                               cuenta, y en cuántos expedientes es lo ÚNICO
 //                               que hay.
-//   5. Cartera sin tocar      — la lista para ir a trabajarla hoy.
+//   5. Sellos de cotejo       — cómo cuadra la cartera con los contactos de
+//                               GoHighLevel, y la lista de los expedientes de
+//                               los que NO se traen notas porque el cotejo no
+//                               alcanza. Ese renglón no lo arregla el account
+//                               manager: es el trabajo de quien lleva GHL, y
+//                               por eso sale en su propio panel y con su CSV.
+//   6. Cartera sin tocar      — la lista para ir a trabajarla hoy.
 //
 // LA SEPARACIÓN QUE LO SOSTIENE TODO
 // Una nota traída de GoHighLevel es contacto con el cliente, pero NO es
@@ -36,6 +42,7 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BadgeCheck,
   BarChart3,
   Download,
   Flame,
@@ -50,7 +57,15 @@ import { StatCard } from "@/components/ui/StatCard";
 import { NotasDrawer } from "@/components/ui/notasSeguimiento";
 import { FIN_OTORGADO_STAGE } from "@/app/admin/_pipelineBuckets";
 import { STEP_DEFS, getActiveStageIndex } from "@/components/ui/projectStepper";
-import { SELLOS, type ClaveSello } from "@/utils/ghlMatch";
+import {
+  ESTILOS_COTEJO,
+  ORDEN_COTEJO,
+  normalizarCorreo,
+  normalizarTelefono,
+  type ClaveCotejo,
+  type ClaveSello,
+  type EstiloCotejo,
+} from "@/utils/ghlMatch";
 import { diasDesde, etiquetaDias, fechaCortaLocal } from "@/utils/notas";
 import {
   Donut,
@@ -155,6 +170,70 @@ function descargaCsv(nombre: string, filas: (string | number)[][]) {
   URL.revokeObjectURL(url);
 }
 
+// ── El cotejo con GoHighLevel, para las tablas ───────────────────────────────
+//
+// Los seis renglones del informe se pintan con los colores de `ESTILOS_COTEJO`,
+// que son los MISMOS del chip del listado de clientes. No es cosmética: este
+// panel existe para poder decirle a quien lleva GoHighLevel «los rojos» y que
+// los dos estemos mirando lo mismo, así que el color tiene que ser el color, no
+// uno parecido elegido aquí.
+
+/** El orden en que se TRABAJA: primero lo que nadie puede arreglar solo. */
+const ORDEN_TRABAJO: ClaveCotejo[] = ["no_creado", "revisar", "nombre", "nunca"];
+
+function ChipCotejo({ estilo, className = "" }: { estilo: EstiloCotejo; className?: string }) {
+  return (
+    <span
+      title={`${estilo.ayuda}\n\nQué hacer: ${estilo.accion}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border whitespace-nowrap ${estilo.badge} ${className}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${estilo.punto}`} />
+      {estilo.label}
+    </span>
+  );
+}
+
+// Se cotejan con las MISMAS normalizaciones que usa el barrido para sellar
+// (`@/utils/ghlMatch`) y no con una comparación de cadenas hecha aquí: si esta
+// tabla dijera «cuadra» de algo que el cotejo considera distinto, el operador
+// iría a mirar un campo que ya está bien. `null` = el dato no sirve para
+// cotejar (vacío, o de relleno: `aa@`, `0000000000`), que es un problema
+// distinto de «no coincide» y se dice con todas las letras.
+const cuadran = (a: string | null, b: string | null) => !!a && a === b;
+
+/** Una línea de dato de contacto: gris si cuadra, ámbar si no, y por qué. */
+function Dato({
+  valor,
+  normal,
+  otro,
+  etiqueta,
+}: {
+  valor: string | null | undefined;
+  normal: string | null;
+  otro: string | null;
+  etiqueta: string;
+}) {
+  const ok = cuadran(normal, otro);
+  const inservible = !normal;
+  return (
+    <span
+      title={
+        ok
+          ? `${etiqueta}: cuadra con GoHighLevel.`
+          : inservible
+            ? `${etiqueta}: vacío o de relleno, no sirve para cotejar. Mientras siga así, este expediente no puede subir de sello.`
+            : `${etiqueta}: no cuadra con el de GoHighLevel.`
+      }
+      className={`block truncate ${
+        ok ? "text-slate-500 dark:text-slate-400" : "text-amber-600 dark:text-amber-400 font-semibold"
+      }`}
+    >
+      {valor || "—"}
+      {inservible && <span className="ml-1 text-[9px] font-bold uppercase opacity-70">sin dato útil</span>}
+    </span>
+  );
+}
+
 type OrdenRanking = "cartera" | "cobertura" | "riesgo";
 
 const ORDEN_LABEL: Record<OrdenRanking, string> = {
@@ -204,6 +283,8 @@ export function SeguimientoReportes({
   const [soloActivos, setSoloActivos] = useState(true);
   const [orden, setOrden] = useState<OrdenRanking>("riesgo");
   const [ocultas, setOcultas] = useState<Set<string>>(new Set());
+  /** Qué renglón del cotejo se está mirando en la lista de trabajo de GoHighLevel. */
+  const [selloFiltro, setSelloFiltro] = useState<ClaveCotejo | "todos">("todos");
 
   const perfilPorId = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
   const nombreAm = (id: string) => (id === SIN_AM ? "Mesa de dirección" : perfilPorId.get(id)?.full_name || "Account Manager");
@@ -438,43 +519,80 @@ export function SeguimientoReportes({
   // tienen nota de GHL» sino «de los que SÍ existen allá, en cuántos hay
   // seguimiento». Un proyecto que no está en GoHighLevel no puede tener notas y
   // contarlo como fallo de GHL sería injusto con el dato.
-  const CLAVES_SELLO: ClaveSello[] = ["verificado", "probable", "nombre", "revisar"];
-
-  const porSello = useMemo(() => {
-    const base = new Map<string, { label: string; proyectos: number; conNotas: number; notas: number; copia: boolean }>();
-    const meter = (clave: string, label: string, copia: boolean, f: FilaProyecto) => {
-      const fila = base.get(clave) || { label, proyectos: 0, conNotas: 0, notas: 0, copia };
-      fila.proyectos++;
-      if (f.seg && f.seg.notasGhl > 0) {
-        fila.conNotas++;
-        fila.notas += f.seg.notasGhl;
-      }
-      base.set(clave, fila);
-    };
+  // En qué renglón del cotejo cae cada expediente. Son SEIS y no cuatro: los
+  // cuatro sellos, más «se buscó y no está en GoHighLevel» (rojo) y «todavía no
+  // se ha buscado» (gris). Los dos últimos no son un sello —no hay contacto al
+  // otro lado— pero sin ellos la tabla no sumaría la cartera, y una tabla que no
+  // suma invita a buscar el error donde no está.
+  const grupos = useMemo(() => {
+    const base = new Map<ClaveCotejo, FilaProyecto[]>();
     filas.forEach((f) => {
       const cotejo = cotejos[f.p.id];
-      if (!cotejo) return meter("__nunca__", "Nunca cotejado", false, f);
-      if (!cotejo.sello) return meter("__fuera__", "No está en GoHighLevel", false, f);
-      const sello = SELLOS[cotejo.sello as ClaveSello];
-      meter(cotejo.sello, sello?.label || cotejo.sello, sello?.copia ?? false, f);
+      const clave: ClaveCotejo = !cotejo ? "nunca" : !cotejo.sello ? "no_creado" : (cotejo.sello as ClaveSello);
+      const lista = base.get(clave);
+      if (lista) lista.push(f);
+      else base.set(clave, [f]);
     });
-    const orden = [...CLAVES_SELLO, "__fuera__", "__nunca__"];
-    return orden
-      .map((clave) => ({ clave, ...(base.get(clave) as any) }))
-      .filter((f) => f.proyectos > 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return ORDEN_COTEJO.map((clave) => {
+      const grupo = base.get(clave) || [];
+      const conNotas = grupo.filter((f) => (f.seg?.notasGhl ?? 0) > 0);
+      return {
+        clave,
+        estilo: ESTILOS_COTEJO[clave],
+        filas: grupo,
+        proyectos: grupo.length,
+        conNotas: conNotas.length,
+        notas: conNotas.reduce((a, f) => a + (f.seg?.notasGhl || 0), 0),
+      };
+    });
   }, [filas, cotejos]);
+
+  /** Para la tabla de cobertura: los renglones que no tienen ni un proyecto sobran. */
+  const porSello = useMemo(() => grupos.filter((g) => g.proyectos > 0), [grupos]);
 
   /** Están en GoHighLevel con un cotejo que SÍ copia notas, y aun así no hay ni una. */
   const cotejadosSinNota = useMemo(
-    () =>
-      filas.filter((f) => {
-        const cotejo = cotejos[f.p.id];
-        if (!cotejo?.sello) return false;
-        if (!SELLOS[cotejo.sello as ClaveSello]?.copia) return false;
-        return !f.seg || f.seg.notasGhl === 0;
-      }).length,
-    [filas, cotejos]
+    () => grupos.filter((g) => g.estilo.copia).reduce((a, g) => a + (g.proyectos - g.conNotas), 0),
+    [grupos]
+  );
+
+  // ── Lo que no trae notas por falta de coincidencia ─────────────────────────
+  //
+  // Este es el reporte que se le manda a quien lleva GoHighLevel. La cuenta no
+  // es «cuántos expedientes van mal»: es que de CADA UNO de estos no se está
+  // copiando el seguimiento, y nadie de este lado puede arreglarlo escribiendo
+  // más notas. Se ordena por lo que más cuesta arreglar —crear un contacto que
+  // no existe— y no alfabéticamente, para que la lista se pueda trabajar de
+  // arriba abajo.
+  const sinImportacion = useMemo(() => {
+    const out: { f: FilaProyecto; clave: ClaveCotejo; estilo: EstiloCotejo }[] = [];
+    ORDEN_TRABAJO.forEach((clave) => {
+      const grupo = grupos.find((g) => g.clave === clave);
+      if (!grupo) return;
+      [...grupo.filas]
+        .sort((a, b) => a.p.full_name.localeCompare(b.p.full_name, "es"))
+        .forEach((f) => out.push({ f, clave, estilo: grupo.estilo }));
+    });
+    return out;
+  }, [grupos]);
+
+  // Lo que se está mirando. Por defecto, los cuatro renglones que no traen notas
+  // —que es el trabajo—, pero pinchando una tarjeta se ve CUALQUIERA de los seis:
+  // la pregunta «¿y quiénes son los 280 verificados?» tiene que contestarse en el
+  // mismo informe y no obligando a irse a Gestión de Clientes a filtrar a mano.
+  const sinImportacionVista = useMemo(() => {
+    if (selloFiltro === "todos") return sinImportacion;
+    const grupo = grupos.find((g) => g.clave === selloFiltro);
+    if (!grupo) return [];
+    return [...grupo.filas]
+      .sort((a, b) => a.p.full_name.localeCompare(b.p.full_name, "es"))
+      .map((f) => ({ f, clave: grupo.clave, estilo: grupo.estilo }));
+  }, [sinImportacion, grupos, selloFiltro]);
+
+  /** El renglón que se está mirando, para los rótulos y el nombre del CSV. */
+  const grupoActivo = useMemo(
+    () => (selloFiltro === "todos" ? null : grupos.find((g) => g.clave === selloFiltro) || null),
+    [grupos, selloFiltro]
   );
 
   const comparativaGhl = useMemo(() => {
@@ -547,6 +665,49 @@ export function SeguimientoReportes({
         f.seg?.notasGhl ?? 0,
         f.seg?.ultimaGhlAt ? fechaCortaLocal(f.seg.ultimaGhlAt) : "",
       ]),
+    ]);
+
+  // El CSV que se manda fuera. Lleva los dos lados de cada dato —el del
+  // expediente y el de GoHighLevel— porque el operador no tiene acceso a esta
+  // pantalla: sin las dos columnas juntas, «corrige el correo» es una orden que
+  // no se puede cumplir. Va la lista ENTERA, no los 60 que se pintan.
+  const exportSinImportacion = () =>
+    descargaCsv(grupoActivo ? `cotejo-ghl-${grupoActivo.clave}.csv` : "cotejo-ghl-sin-notas.csv", [
+      [
+        "Cliente",
+        "NSS",
+        "Sello",
+        "Qué hacer",
+        "Correo del expediente",
+        "Correo en GoHighLevel",
+        "Teléfono del expediente",
+        "Teléfono en GoHighLevel",
+        "Contacto en GoHighLevel",
+        "Notas de GoHighLevel",
+        "Aliado",
+        "Account Manager",
+        "Etapa",
+        "Cotejado el",
+      ],
+      ...sinImportacionVista.map(({ f, estilo }) => {
+        const cotejo = cotejos[f.p.id];
+        return [
+          f.p.full_name,
+          f.p.nss,
+          estilo.label,
+          estilo.accion,
+          f.p.email || "",
+          cotejo?.contactoCorreo || "",
+          f.p.phone || "",
+          cotejo?.contactoTelefono || "",
+          cotejo?.contactoNombre || "",
+          f.seg?.notasGhl ?? 0,
+          f.p.aliado_name || "",
+          nombreAm(f.amId),
+          STEP_DEFS[getActiveStageIndex(f.p.status)]?.label || "",
+          cotejo?.cotejadoAt ? fechaCortaLocal(cotejo.cotejadoAt) : "",
+        ];
+      }),
     ]);
 
   // ── Selección de AM ────────────────────────────────────────────────────────
@@ -957,9 +1118,9 @@ export function SeguimientoReportes({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
               {porSello.map((f) => (
                 <tr key={f.clave} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
-                  <td className="px-3 py-2.5 font-semibold text-slate-700 dark:text-slate-300">
-                    {f.label}
-                    {!f.copia && (
+                  <td className="px-3 py-2.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <ChipCotejo estilo={f.estilo} />
+                    {!f.estilo.copia && (
                       <span
                         className="ml-1.5 text-[10px] font-medium text-slate-400 dark:text-slate-500"
                         title="De estos expedientes no se traen notas: o no están en GoHighLevel, o el cotejo es demasiado flojo para asegurar que es la misma persona."
@@ -1003,7 +1164,261 @@ export function SeguimientoReportes({
         </p>
       </div>
 
-      {/* ── 5 · Cartera sin tocar ─────────────────────────────────────────── */}
+      {/* ── 5 · Sellos de cotejo ──────────────────────────────────────────── */}
+      <div className={tarjeta}>
+        <PanelHeader
+          icon={BadgeCheck}
+          tone="indigo"
+          title="Sellos de cotejo con GoHighLevel"
+          subtitle={
+            <>
+              Con qué firmeza cuadra cada expediente con su contacto de allá, en los mismos colores que
+              pinta el listado de clientes. <strong className="font-bold">Pincha un sello</strong> y sus
+              clientes salen aquí abajo. De los cuatro últimos NO se traen notas: eso no lo arregla el
+              account manager escribiendo más seguimiento, se arregla en GoHighLevel.
+            </>
+          }
+        >
+          {sinImportacionVista.length > 0 && (
+            <button
+              onClick={exportSinImportacion}
+              title="Descarga la lista completa —no solo lo que se pinta— con el dato del expediente y el de GoHighLevel uno al lado del otro, que es lo que necesita quien lo va a corregir."
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all active:scale-95"
+            >
+              <Download className="h-3.5 w-3.5" strokeWidth={2.4} />{" "}
+              {grupoActivo ? `CSV · ${grupoActivo.estilo.label}` : "CSV para GoHighLevel"}
+            </button>
+          )}
+        </PanelHeader>
+
+        {/* Las seis tarjetas SON el filtro. Pinchar una enseña esos clientes en la
+            tabla de abajo —sin salir del informe— y volver a pincharla vuelve a
+            la lista de trabajo. La barra de color de arriba es la del sello: a
+            un metro de la pantalla, el panel se lee por color. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {grupos.map((g) => {
+            const activa = selloFiltro === g.clave;
+            return (
+              <button
+                key={g.clave}
+                type="button"
+                disabled={g.proyectos === 0}
+                onClick={() => setSelloFiltro(activa ? "todos" : g.clave)}
+                title={
+                  g.proyectos === 0
+                    ? `${g.estilo.ayuda}\n\nNo hay ningún expediente en este renglón.`
+                    : `${g.estilo.ayuda}\n\nQué hacer: ${g.estilo.accion}\n\nClic para ver los ${g.proyectos} clientes aquí abajo.`
+                }
+                className={`group relative overflow-hidden text-left rounded-xl border bg-white dark:bg-slate-900 p-3 pt-3.5 space-y-1.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  activa
+                    ? "border-slate-300 dark:border-slate-600 ring-2 ring-inset ring-slate-300/60 dark:ring-slate-600/60 shadow-md"
+                    : "border-slate-200/70 dark:border-slate-800 shadow-sm shadow-slate-200/40 dark:shadow-none enabled:hover:-translate-y-0.5 enabled:hover:shadow-md"
+                }`}
+              >
+                <span className={`absolute inset-x-0 top-0 h-1 ${g.estilo.punto}`} />
+                <ChipCotejo estilo={g.estilo} />
+                <div className="flex items-end justify-between gap-2">
+                  <span className={`text-2xl font-bold tabular-nums tracking-tight leading-none ${g.estilo.texto}`}>
+                    {g.proyectos}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 pb-0.5">
+                    {fmtPct(pct(g.proyectos, total), 0)}
+                  </span>
+                </div>
+                <p className="text-[10px] font-semibold leading-tight text-slate-400 dark:text-slate-500">
+                  {g.estilo.copia ? `${g.conNotas} con notas traídas` : "no se traen notas"}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
+            {grupoActivo
+              ? `${grupoActivo.estilo.label} · ${grupoActivo.proyectos} ${
+                  grupoActivo.proyectos === 1 ? "cliente" : "clientes"
+                }`
+              : `Sin notas por falta de coincidencia · ${sinImportacion.length} de ${total}`}
+            {sinImportacionVista.length > TOPE_LISTA ? ` · se listan los ${TOPE_LISTA} primeros` : ""}
+          </h4>
+          <div className={segmented}>
+            <button
+              type="button"
+              onClick={() => setSelloFiltro("todos")}
+              title="Los cuatro renglones de los que NO se traen notas, que es la lista de trabajo."
+              className={pill(selloFiltro === "todos")}
+            >
+              Sin notas <span className="tabular-nums opacity-60">{sinImportacion.length}</span>
+            </button>
+            {grupoActivo && (
+              <span className={pill(true)}>
+                {grupoActivo.estilo.label} <span className="tabular-nums opacity-60">{grupoActivo.proyectos}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {sinImportacionVista.length === 0 ? (
+          <Vacio>
+            {selloFiltro === "todos"
+              ? "Toda la cartera cotejada trae sus notas de GoHighLevel. Este panel vacío es la buena noticia."
+              : "Ningún expediente en este renglón."}
+          </Vacio>
+        ) : (
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-xs min-w-[1100px]">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-left">
+                  <th className={th}>Cliente</th>
+                  <th className={th}>Sello</th>
+                  <th className={th}>Correo y teléfono del expediente</th>
+                  <th className={th}>Lo que hay en GoHighLevel</th>
+                  <th className={`${th} text-right`}>Notas</th>
+                  <th className={th}>Aliado · Account Manager</th>
+                  <th className={`${th} text-right`}>Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                {sinImportacionVista.slice(0, TOPE_LISTA).map(({ f, clave, estilo }, i, lista) => {
+                  const cotejo = cotejos[f.p.id];
+                  // La lista viene agrupada por sello, así que el «qué hacer» se
+                  // dice UNA vez por bloque y no en cada renglón: repetir la
+                  // misma frase sesenta veces no informa, solo estorba a la
+                  // lectura de lo que sí cambia de una fila a otra.
+                  const abreGrupo = i === 0 || lista[i - 1].clave !== clave;
+                  const nCorreo = normalizarCorreo(f.p.email);
+                  const nCorreoGhl = normalizarCorreo(cotejo?.contactoCorreo);
+                  const nTel = normalizarTelefono(f.p.phone);
+                  const nTelGhl = normalizarTelefono(cotejo?.contactoTelefono);
+                  return (
+                    <React.Fragment key={f.p.id}>
+                      {abreGrupo && (
+                        <tr className="bg-slate-50/80 dark:bg-slate-800/30">
+                          <td colSpan={7} className="px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <ChipCotejo estilo={estilo} />
+                              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 tabular-nums">
+                                {grupos.find((g) => g.clave === clave)?.proyectos ?? 0}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                {estilo.accion}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/20 transition-colors">
+                      <td className="px-3 py-2.5">
+                        <Link
+                          href={`/prospectos/${f.p.id}`}
+                          className="font-bold text-slate-800 dark:text-slate-200 hover:underline truncate block max-w-[200px]"
+                        >
+                          {f.p.full_name}
+                        </Link>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">{f.p.nss}</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <ChipCotejo estilo={estilo} />
+                        {cotejo && (
+                          <span className="block mt-0.5 text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                            {fechaCortaLocal(cotejo.cotejadoAt)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 max-w-[220px] text-[11px] leading-snug">
+                        <Dato valor={f.p.email} normal={nCorreo} otro={nCorreoGhl} etiqueta="Correo" />
+                        <Dato valor={f.p.phone} normal={nTel} otro={nTelGhl} etiqueta="Teléfono" />
+                      </td>
+                      <td className="px-3 py-2.5 max-w-[220px] text-[11px] leading-snug">
+                        {cotejo?.contactoNombre ? (
+                          <>
+                            <span className="block truncate font-bold text-slate-600 dark:text-slate-300">
+                              {cotejo.contactoNombre}
+                            </span>
+                            <Dato
+                              valor={cotejo.contactoCorreo}
+                              normal={nCorreoGhl}
+                              otro={nCorreo}
+                              etiqueta="Correo de GoHighLevel"
+                            />
+                            <Dato
+                              valor={cotejo.contactoTelefono}
+                              normal={nTelGhl}
+                              otro={nTel}
+                              etiqueta="Teléfono de GoHighLevel"
+                            />
+                          </>
+                        ) : (
+                          <span
+                            className="text-[11px] font-semibold text-red-600 dark:text-red-400"
+                            title={estilo.ayuda}
+                          >
+                            {estilo.clave === "nunca" ? "Todavía sin buscar" : "Ningún contacto coincide"}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className="px-3 py-2.5 text-right tabular-nums text-[11px]"
+                        title={
+                          (f.seg?.notasGhl ?? 0) > 0
+                            ? `${f.seg?.notasGhl} nota(s) de GoHighLevel en la bitácora · última el ${fechaCortaLocal(
+                                f.seg?.ultimaGhlAt
+                              )}`
+                            : "Ninguna nota de GoHighLevel en la bitácora de este proyecto."
+                        }
+                      >
+                        {(f.seg?.notasGhl ?? 0) > 0 ? (
+                          <span className="font-bold text-blue-600 dark:text-blue-400">{f.seg?.notasGhl}</span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 max-w-[150px] text-[11px] leading-snug">
+                        <span className="block truncate font-semibold text-slate-600 dark:text-slate-400">
+                          {f.p.aliado_name || "Asesor Comercial"}
+                        </span>
+                        <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">
+                          {nombreAm(f.amId)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => abrirNotas(f.p)}
+                          title="Abre la bitácora con el cotejo del contacto: ahí se ve campo por campo qué no cuadra."
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 ring-1 ring-inset ring-transparent hover:ring-current transition-all active:scale-95"
+                        >
+                          Cotejo <StickyNote className="h-3 w-3 opacity-60" strokeWidth={2.4} />
+                        </button>
+                        <Link
+                          href={`/prospectos/${f.p.id}`}
+                          className="ml-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20 transition-all active:scale-95"
+                        >
+                          Abrir <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p className="text-[10px] leading-relaxed text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-3">
+          De un cotejo de un solo dato no se copian notas A PROPÓSITO: dos personas pueden compartir un
+          teléfono reciclado o un nombre, y meter la conversación de otro en un expediente no se
+          deshace a ojo. Por eso la salida no es bajar el listón, sino cuadrar el correo o el teléfono
+          en el sistema donde esté mal —o crear el contacto que falta— y dejar que el barrido de esta
+          madrugada suba el sello solo. «Sin dato útil» avisa de un correo o un teléfono de relleno
+          (<span className="font-mono">aa@</span>, dígitos repetidos): mientras siga así, ese
+          expediente no puede subir de sello por mucho que se corrija el otro lado.
+        </p>
+      </div>
+
+      {/* ── 6 · Cartera sin tocar ─────────────────────────────────────────── */}
       <div className={tarjeta}>
         <PanelHeader
           icon={Flame}

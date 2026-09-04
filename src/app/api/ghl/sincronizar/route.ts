@@ -11,9 +11,8 @@ import { guardarCotejo, traerNotasDeGhl } from "@/utils/ghl/importar";
 //
 //   1. COTEJA al cliente contra los contactos de GHL y devuelve con qué
 //      confianza es el mismo (3, 2 o 1 de 3 datos coincidiendo).
-//   2. Si la confianza alcanza —dos de tres datos, o el nombre completo
-//      idéntico— COPIA sus notas de GHL a `prospect_notas`, que es la bitácora
-//      que se lee en «Último seguimiento».
+//   2. Si la confianza alcanza —dos de tres datos— COPIA sus notas de GHL a
+//      `prospect_notas`, que es la bitácora que se lee en «Último seguimiento».
 //
 // El paso 2 es el que pidió el negocio: hasta ahora el expediente decía «Sin
 // notas» aunque en GHL hubiera once, y quien lo abría creía que nadie había
@@ -151,8 +150,8 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     // Que GHL nos frene NO se puede devolver como un lote de «no encontrados»:
-    // el usuario vería sellos de «Sin GHL» en clientes que sí están allá y se
-    // fiaría de ellos. Mejor no devolver ningún sello y decir qué pasó.
+    // el usuario vería sellos rojos de «No creado» en clientes que sí están allá
+    // y se fiaría de ellos. Mejor no devolver ningún sello y decir qué pasó.
     if (e instanceof GhlLimiteError) {
       return NextResponse.json({ error: e.message }, { status: 429 });
     }

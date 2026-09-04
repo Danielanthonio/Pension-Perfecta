@@ -15,8 +15,8 @@
 // expedientes tienen mal el correo o el teléfono.
 
 import React, { useCallback, useState } from "react";
-import { RefreshCw, ShieldQuestion } from "lucide-react";
-import { SELLOS, type ClaveSello } from "@/utils/ghlMatch";
+import { RefreshCw } from "lucide-react";
+import { COTEJO_NO_CREADO, SELLOS, type ClaveSello } from "@/utils/ghlMatch";
 import type { CotejoGhlResumen } from "@/utils/context/AppContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,8 +100,12 @@ function cuandoSeCotejo(iso: string): string {
  * Tres estados, y la diferencia entre los dos primeros importa:
  *   · `undefined`      → nunca se ha cotejado. No pinta NADA: un sello gris en
  *                        478 filas es ruido, no dato.
- *   · `sello: null`    → se buscó y no está en GoHighLevel. Eso sí se dice.
- *   · un sello         → verde / azul / teal / ámbar.
+ *   · `sello: null`    → se buscó y NO está creado en GoHighLevel. Chip ROJO,
+ *                        «No creado»: no es una ausencia neutra que anotar, es
+ *                        trabajo pendiente —un cliente que no existe allá no se
+ *                        puede agendar ni recibir seguimiento— y tiene que
+ *                        saltar a la vista como salta un error.
+ *   · un sello         → verde / azul / amarillo / ámbar.
  */
 export function GhlSello({
   resumen,
@@ -115,13 +119,15 @@ export function GhlSello({
   if (!resumen) return null;
 
   if (!resumen.sello) {
+    // El rojo sale de `COTEJO_NO_CREADO`, no de aquí: el reporte de sellos pinta
+    // este mismo renglón y los dos colores tienen que ser el mismo color.
     return (
       <span
-        title={`No hay ningún contacto en GoHighLevel que coincida con este expediente (${cuandoSeCotejo(resumen.cotejadoAt)}).`}
-        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 whitespace-nowrap ${className}`}
+        title={`Este cliente NO está creado en GoHighLevel: ningún contacto de allá coincide con el expediente (${cuandoSeCotejo(resumen.cotejadoAt)}). Créalo para poder agendarlo y darle seguimiento.`}
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide border ${COTEJO_NO_CREADO.badge} whitespace-nowrap ${className}`}
       >
-        <ShieldQuestion className="h-2.5 w-2.5" />
-        Sin GHL
+        <span className={`h-1.5 w-1.5 rounded-full ${COTEJO_NO_CREADO.punto}`} />
+        {COTEJO_NO_CREADO.label}
       </span>
     );
   }
@@ -221,8 +227,8 @@ export function CotejoGhlPanel({
     return (
       <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
         <GhlSello resumen={resumen} />
-        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-          Este cliente no aparece en GoHighLevel.
+        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">
+          Este cliente no está creado en GoHighLevel.
         </span>
       </div>
     );

@@ -6,6 +6,14 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // `src/utils` TAMBIÉN declara clases: los sellos de cotejo con GoHighLevel
+    // (`ghlMatch.ts`) y los colores de las notas (`notas.ts`) viven ahí porque
+    // son la regla, no la pintura. Sin esta línea Tailwind no los lee y las
+    // clases NO generan CSS: el chip sale sin fondo ni color y nadie ve un
+    // error, solo un sello descolorido. Los tonos que había funcionaban de pura
+    // suerte —los mismos `teal-*` aparecían en 18 componentes—, y el primer
+    // color que no se usara en otro sitio se habría perdido en silencio.
+    "./src/utils/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

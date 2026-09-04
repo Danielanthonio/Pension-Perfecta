@@ -2229,15 +2229,29 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from("prospect_ghl_cotejo")
-        .select("prospect_id, sello, nivel, contacto_nombre, contacto_correo, contacto_telefono, cotejado_at");
-      if (error) {
-        console.warn("No se pudo cargar el cotejo con GoHighLevel:", error.message);
-        return;
+      // ⚠️ Paginado a propósito: PostgREST corta en 1000 filas y NO avisa. Hay un
+      // sello por proyecto y la cartera crece cada día, así que el día que pase
+      // de mil los sellos que faltaran no se pintarían de gris —eso se ve— sino
+      // que el reporte los contaría como «sin cotejar», que es una afirmación
+      // falsa y creíble. Se pide de mil en mil hasta que una página venga corta.
+      const filas: any[] = [];
+      for (let pagina = 0; pagina < 60; pagina++) {
+        const desde = pagina * 1000;
+        const { data, error } = await supabase
+          .from("prospect_ghl_cotejo")
+          .select("prospect_id, sello, nivel, contacto_nombre, contacto_correo, contacto_telefono, cotejado_at")
+          .order("prospect_id", { ascending: true })
+          .range(desde, desde + 999);
+        if (error) {
+          console.warn("No se pudo cargar el cotejo con GoHighLevel:", error.message);
+          return;
+        }
+        const lote = data || [];
+        filas.push(...lote);
+        if (lote.length < 1000) break;
       }
       const mapa: Record<string, CotejoGhlResumen> = {};
-      (data || []).forEach((r: any) => {
+      filas.forEach((r: any) => {
         mapa[r.prospect_id] = {
           sello: r.sello ?? null,
           nivel: Number(r.nivel) || 0,

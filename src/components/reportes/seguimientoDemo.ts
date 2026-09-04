@@ -37,8 +37,8 @@ const instante = (dia: string): string => `${dia}T18:00:00.000Z`;
  * El sello de cotejo que le toca a un proyecto en modo demo.
  *
  * Vive aquí y no dentro de `cotejosDemo` porque las notas de GoHighLevel TIENEN
- * que respetarlo: de un cotejo «Por revisar» o de uno que no está en GHL no se
- * traen notas (`SELLOS[...].copia === false`). Si cada función inventara por su
+ * que respetarlo: de un cotejo «Nombre exacto», de uno «Por revisar» o de uno
+ * que no está en GHL no se traen notas (`SELLOS[...].copia === false`). Si cada función inventara por su
  * cuenta, la previsualización enseñaría un 75 % de cobertura en un renglón que
  * el propio informe marca como «sin importación», y quien la revisara pensaría
  * que la tabla está mal.
@@ -55,8 +55,8 @@ function selloDemo(id: string): { clave: "verificado" | "probable" | "nombre" | 
   return { clave: null, cotejado: true };
 }
 
-/** De estos tres sellos —y solo de estos— la importación copia notas. */
-const COPIA_NOTAS = new Set(["verificado", "probable", "nombre"]);
+/** De estos dos sellos —y solo de estos— la importación copia notas. */
+const COPIA_NOTAS = new Set(["verificado", "probable"]);
 
 export interface NotaDemo {
   prospectId: string;
@@ -222,6 +222,52 @@ function agregaDemo(notas: NotaDemo[]): {
  * cotejado» y no se vería si la tabla está bien. Mismo criterio y misma semilla
  * determinista que las notas de arriba.
  */
+/**
+ * Un correo con una errata, que es lo que de verdad separa a un expediente de su
+ * contacto: `escobedo@` contra `ecobedo@`. Se le quita la segunda letra.
+ */
+const correoConErrata = (correo: string): string => correo.replace(/^(.)./, "$1");
+
+/** El mismo teléfono con el último dígito cambiado. */
+const telefonoConErrata = (tel: string): string => {
+  const d = (tel || "").replace(/\D+/g, "");
+  if (d.length < 10) return tel;
+  return d.slice(0, -1) + String((Number(d.slice(-1)) + 1) % 10);
+};
+
+/** El nombre recortado: así se ve un contacto de GHL que NO es esta persona. */
+const nombreDistinto = (nombre: string): string => nombre.split(/\s+/).slice(0, 2).join(" ") || nombre;
+
+/**
+ * El contacto de GoHighLevel que le toca a cada sello.
+ *
+ * No basta con inventar el sello: el reporte enseña el correo y el teléfono de
+ * ALLÁ al lado de los de aquí, y si el de allá viniera vacío en todo lo que no
+ * es «Verificado», la previsualización enseñaría una columna en blanco justo en
+ * los renglones que ese panel existe para trabajar. Cada sello trae el contacto
+ * que lo justifica: en «Probable» cuadra uno de los dos datos, en «Nombre
+ * exacto» ninguno, y en «Por revisar» cuadra un dato suelto de alguien que se
+ * llama de otra manera.
+ */
+function contactoDemo(p: Prospect, sello: string | null, h: number) {
+  if (!sello) return { nombre: null, correo: null, telefono: null };
+  if (sello === "verificado") return { nombre: p.full_name, correo: p.email, telefono: p.phone };
+  if (sello === "probable") {
+    // Alterna cuál es el dato que no cuadra: si siempre fallara el correo, la
+    // tabla parecería un problema de correos y no lo es.
+    return h % 2 === 0
+      ? { nombre: p.full_name, correo: p.email, telefono: telefonoConErrata(p.phone) }
+      : { nombre: p.full_name, correo: correoConErrata(p.email), telefono: p.phone };
+  }
+  if (sello === "nombre") {
+    return { nombre: p.full_name, correo: correoConErrata(p.email), telefono: telefonoConErrata(p.phone) };
+  }
+  // «Por revisar»: cuadra un dato suelto y el nombre es de otro.
+  return h % 2 === 0
+    ? { nombre: nombreDistinto(p.full_name), correo: null, telefono: p.phone }
+    : { nombre: nombreDistinto(p.full_name), correo: p.email, telefono: null };
+}
+
 export function cotejosDemo(prospects: Prospect[]): Record<string, CotejoGhlResumen> {
   const out: Record<string, CotejoGhlResumen> = {};
   const hoy = new Date();
@@ -231,12 +277,13 @@ export function cotejosDemo(prospects: Prospect[]): Record<string, CotejoGhlResu
     // estar con `sello: null`, que significa «se buscó y no está allá».
     if (!cotejado) continue;
     const h = semilla(`${p.id}·sello`) % 100;
+    const contacto = contactoDemo(p, sello, h);
     out[p.id] = {
       sello,
       nivel: sello === "verificado" ? 3 : sello === "probable" ? 2 : sello ? 1 : 0,
-      contactoNombre: sello ? p.full_name : null,
-      contactoCorreo: sello === "verificado" ? p.email : null,
-      contactoTelefono: sello === "verificado" ? p.phone : null,
+      contactoNombre: contacto.nombre,
+      contactoCorreo: contacto.correo,
+      contactoTelefono: contacto.telefono,
       cotejadoAt: instante(diaMenos(hoy, h % 5)),
     };
   }
