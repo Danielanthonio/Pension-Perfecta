@@ -268,9 +268,27 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // Y la CARTERA DE ALIADOS, que es otra cosa: decide de quién serán los
+    // proyectos que capturen a partir de ahora (20260904000000). Su FK también
+    // es ON DELETE SET NULL, así que sin esto los aliados del AM borrado
+    // volverían en silencio a repartirse por la ruleta.
+    const { error: aliadosReassignErr } = await admin
+      .from("profiles")
+      .update({ account_manager_id: reassignToAmId })
+      .eq("account_manager_id", userId)
+      .eq("role", "aliado");
+    if (aliadosReassignErr) {
+      return NextResponse.json(
+        { error: "No se pudo reasignar la cartera de aliados: " + aliadosReassignErr.message },
+        { status: 500 }
+      );
+    }
   }
   // Si no se indicó reassignToAmId, la FK ON DELETE SET NULL deja sus proyectos
-  // sin AM automáticamente al eliminar la cuenta (estado válido).
+  // sin AM y sus aliados sin cartera al eliminar la cuenta: los proyectos van a
+  // la mesa de dirección y lo que capturen esos aliados pasa a repartirlo la
+  // ruleta. Es un estado válido, pero conviene saberlo.
 
   // --- 7. Desligar códigos de invitación (created_by / used_by → NULL) ---
   // Ambas columnas son nullable; sin esto la FK bloquea el borrado del perfil.

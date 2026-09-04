@@ -46,10 +46,17 @@ export interface UserProfile {
   email_pagos?: string | null;
   binance_id?: string | null;
   datos_bancarios_updated_at?: string | null;
-  // Solo para Account Managers: si está en `true`, el AM participa en la "ruleta"
-  // de asignación automática (recibe PROYECTOS nuevos al azar cuando un aliado
-  // captura lo suyo). Lo enciende/apaga el director en el módulo de Account Managers.
+  // Solo para Account Managers: si está en `true`, el AM participa en la "ruleta".
+  // Desde 20260904000000 la ruleta es la RED DE SEGURIDAD, no la vía principal:
+  // solo reparte los proyectos de los aliados que TODAVÍA no tienen Account
+  // Manager. Lo enciende/apaga el director en el módulo de Account Managers.
   auto_assign_enabled?: boolean;
+  // CARTERA (solo tiene sentido en perfiles con rol 'aliado'): el Account
+  // Manager al que pertenece este aliado. Desde 20260904000000 decide a quién
+  // le NACEN los proyectos que capture — y solo eso: los proyectos que ya
+  // existen conservan el AM que tienen, que sigue viviendo en
+  // `prospects.account_manager_id`. Lo reparte Dirección en /admin/asignacion-am.
+  account_manager_id?: string | null;
   // Atribución al CLOSER (solo tiene sentido en perfiles con rol 'aliado').
   // `closer_origen_id` es el mérito histórico —quién cerró a este aliado— y NO
   // cambia al reasignar: es la base de todas las métricas del módulo Closers.
@@ -379,7 +386,7 @@ export interface Prospect {
   // quien agenda. Es la que muestra el hito "Agenda de Asesoría": el historial
   // de estados solo sabe cuándo se capturó la cita, no cuándo es.
   asesoria_at?: string | null;
-  // Account Manager asignado al PROYECTO (no al aliado): lo sortea la ruleta al
+  // Account Manager asignado al PROYECTO: lo hereda del aliado al capturar, o lo sortea la ruleta al
   // capturar el aliado su propio proyecto; si lo captura un AM, queda de ese AM;
   // si lo captura Dirección, queda null (gestión directa / mesa de dirección).
   account_manager_id?: string | null;
@@ -521,6 +528,10 @@ interface AppContextType {
   ) => Promise<void>;
   reassignProspect: (id: string, newAliadoId: string) => Promise<void>;
   reassignAccountManager: (id: string, newAmId: string | null) => Promise<void>;
+  // Reparte la CARTERA: fija el Account Manager de uno o varios aliados. Decide
+  // a quién le nacen los proyectos que capturen a partir de ahora y NO toca los
+  // que ya existen. Devuelve cuántos aliados cambiaron de verdad.
+  assignAccountManager: (aliadoIds: string[], amId: string | null, motivo?: string | null) => Promise<number>;
   isProspectDeleted: (p: Prospect) => boolean;
   isProspectPurged: (p: Prospect) => boolean;
   getProspectDeletedAt: (p: Prospect) => Date | null;
@@ -950,6 +961,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       binance_id: dbProfile.binance_id || null,
       datos_bancarios_updated_at: dbProfile.datos_bancarios_updated_at || null,
       auto_assign_enabled: dbProfile.auto_assign_enabled === true,
+      account_manager_id: dbProfile.account_manager_id || null,
       // Atribución al closer. Si la migración 20260801000000 aún no está
       // aplicada, estas columnas llegan como undefined y quedan en null: el
       // aliado simplemente sale como "Sin atribución". Nada se rompe.
@@ -2794,12 +2806,14 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         ? assignedProfile.empresa_multialiado_id || null
         : user?.empresa_multialiado_id || null;
 
-      // Account Manager del PROYECTO (espejo del trigger `assign_am_to_prospect`):
-      // aliado capturando lo suyo → ruleta; un AM captura → el proyecto es suyo;
-      // Dirección captura → sin AM (gestión directa).
+      // Account Manager del PROYECTO (espejo del trigger `assign_am_to_prospect`,
+      // 20260904000000): aliado capturando lo suyo → el AM de SU cartera, y solo
+      // si no tiene, la ruleta; un AM captura → el proyecto es suyo; Dirección
+      // captura → sin AM (gestión directa).
       let projectAmId: string | null = null;
       if (user?.role === "aliado" && ownerId === creatorId) {
-        projectAmId = pickRandomAutoAssignAM(profiles);
+        const suAm = profiles.find((p) => p.id === user.account_manager_id && p.role === "account_manager");
+        projectAmId = suAm ? suAm.id : pickRandomAutoAssignAM(profiles);
       } else if (user?.role === "account_manager") {
         projectAmId = user.id;
       }
@@ -2850,9 +2864,10 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           created_at: new Date().toISOString(),
         });
       }
-      // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager le
-      // sorteó la ruleta (caso complementario al de "Proyecto Asignado 📁").
-      // En producción esta notificación la emite el trigger `notify_on_prospect_insert`.
+      // Aviso al aliado que capturó SU PROPIO proyecto: qué Account Manager lo
+      // atenderá —el de su cartera, o el que le sorteó la ruleta si no tiene—
+      // (caso complementario al de "Proyecto Asignado 📁"). En producción esta
+      // notificación la emite el trigger `notify_on_prospect_insert`.
       if (user?.role === "aliado" && ownerId === creatorId && newProspect.account_manager_id) {
         const amName = profiles.find((p) => p.id === newProspect.account_manager_id)?.full_name || "tu Account Manager";
         notifBatch.unshift({
@@ -3545,6 +3560,64 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
       console.error("Error reassigning account manager:", err);
       throw err;
     }
+  };
+
+  // Reparte la cartera de aliados entre los Account Managers (20260904000000).
+  //
+  // Ojo con lo que NO hace, que es justo lo que la diferencia del modelo que se
+  // revirtió el 2026-09-02: no arrastra proyectos. Mover a un aliado de AM solo
+  // cambia con quién nacerán sus PRÓXIMOS proyectos; los que ya existen siguen
+  // con el AM que los gestiona, y con ellos las métricas y las comisiones.
+  //
+  // En producción pasa entera por la RPC `asigna_am_a_aliado`, que valida que
+  // quien llama sea Dirección y deja rastro en `aliado_auditoria`; la base
+  // además guarda el valor anterior en `am_historial`.
+  const assignAccountManager = async (
+    aliadoIds: string[],
+    amId: string | null,
+    motivo?: string | null
+  ): Promise<number> => {
+    const ids = aliadoIds.filter(Boolean);
+    if (ids.length === 0) return 0;
+
+    if (amId && !profiles.some((p) => p.id === amId && p.role === "account_manager")) {
+      throw new Error("El Account Manager destino no existe.");
+    }
+
+    // Solo los que hoy tienen otro AM (o ninguno): repetir la asignación no es un
+    // movimiento y no debe generar una línea de auditoría.
+    const objetivo = ids.filter((id) => {
+      const a = profiles.find((p) => p.id === id);
+      return !!a && a.role === "aliado" && (a.account_manager_id || null) !== (amId || null);
+    });
+    if (objetivo.length === 0) return 0;
+
+    const aplicarLocal = () => {
+      const set = new Set(objetivo);
+      setProfiles((prev) => {
+        const next = prev.map((p) => (set.has(p.id) ? { ...p, account_manager_id: amId } : p));
+        saveToStorage("pensionflow_profiles", next);
+        return next;
+      });
+    };
+
+    if (isDemoMode || isProvisionalSession || !supabase) {
+      aplicarLocal();
+      return objetivo.length;
+    }
+
+    const { data, error } = await supabase.rpc("asigna_am_a_aliado", {
+      p_aliado_ids: objetivo,
+      p_am_id: amId,
+      p_motivo: motivo ?? null,
+    });
+    if (error) {
+      console.error("Error asignando Account Manager:", error);
+      throw new Error(error.message || "No se pudo asignar el Account Manager.");
+    }
+
+    aplicarLocal();
+    return typeof data === "number" ? data : objetivo.length;
   };
 
   const updateProspectStatus = async (
@@ -4514,8 +4587,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     const incorporadoAt = closerOrigenId ? new Date().toISOString() : null;
 
     if (isDemoMode || isProvisionalSession || !supabase) {
-      // El aliado nuevo ya NO lleva Account Manager: la ruleta reparte PROYECTOS
-      // (ver addProspect / trigger assign_am_to_prospect), no aliados.
+      // El aliado nuevo nace SIN Account Manager: se lo asigna Dirección a mano
+      // en /admin/asignacion-am. Mientras no lo tenga, lo que capture lo reparte
+      // la ruleta (ver addProspect / trigger assign_am_to_prospect).
       const newProfile: UserProfile = {
         ...profileData,
         id: `user-${Math.random().toString(36).substr(2, 9)}`,
@@ -4773,9 +4847,9 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
           });
         }
 
-        // La ruleta ya no reparte ALIADOS: el AM se sortea por PROYECTO al
-        // capturar (el aviso "Nuevo proyecto asignado 🎲" al AM lo emite el
-        // trigger `notify_on_prospect_insert` de la BD).
+        // El alta no asigna Account Manager: lo reparte Dirección en
+        // /admin/asignacion-am. El aviso al AM cuando llegue su primer proyecto
+        // lo emite el trigger `notify_on_prospect_insert` de la BD.
 
         triggerPushNotification(
           `👤 Registro Completo: Se registró el usuario ${newProfile.full_name} (${newProfile.role === "director" ? "Director" : "Aliado"}). Puede iniciar sesión con su correo: ${newProfile.email}`,
@@ -5846,6 +5920,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
         editProspectPersonalData,
         reassignProspect,
         reassignAccountManager,
+        assignAccountManager,
         isProspectDeleted,
         isProspectPurged,
         getProspectDeletedAt,

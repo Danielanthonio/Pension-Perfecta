@@ -47,6 +47,18 @@ export function AsignarAliadoSelect({
     [profiles]
   );
 
+  // Quién gestiona a cada aliado. Se enseña en la lista porque desde
+  // 20260904000000 elegir aliado es, sin decirlo, elegir Account Manager: el
+  // proyecto nace con el AM de ese aliado.
+  const amPorAliado = useMemo(() => {
+    const nombres = new Map(profiles.map((p) => [p.id, p.full_name]));
+    return new Map(
+      profiles
+        .filter((p) => p.role === "aliado")
+        .map((p) => [p.id, p.account_manager_id ? nombres.get(p.account_manager_id) || null : null])
+    );
+  }, [profiles]);
+
   const selectedAlly = value ? profiles.find((p) => p.id === value) : null;
 
   const q = query.trim().toLowerCase();
@@ -122,6 +134,11 @@ export function AsignarAliadoSelect({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{ally.full_name}</span>
+                      <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">
+                        {amPorAliado.get(ally.id)
+                          ? `Account Manager: ${amPorAliado.get(ally.id)}`
+                          : "Sin Account Manager · lo asigna la ruleta"}
+                      </span>
                     </span>
                   </button>
                 );

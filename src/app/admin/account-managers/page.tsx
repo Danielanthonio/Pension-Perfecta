@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useApp, Prospect } from "@/utils/context/AppContext";
 import {
   fueAprobado,
@@ -20,6 +21,7 @@ import {
   Briefcase,
   UserCheck,
   UserX,
+  UserCog,
   Shuffle,
 } from "lucide-react";
 
@@ -31,11 +33,11 @@ export default function GestionAccountManagers() {
   const allies = profiles.filter((p) => p.role === "aliado");
   const accountManagers = profiles.filter((p) => p.role === "account_manager");
 
-  // Interruptor de "ruleta" de asignación automática por AM. La ruleta reparte
-  // PROYECTOS: solo los AM encendidos reciben proyectos nuevos al azar cuando un
-  // aliado captura lo suyo; los apagados (p. ej. cuentas de prueba) quedan fuera
-  // del sorteo. La asignación real la ejecuta el trigger assign_am_to_prospect
-  // sobre prospects (el trigger sobre profiles se eliminó).
+  // Interruptor de "ruleta" por AM. Desde 20260904000000 la ruleta es la RED DE
+  // SEGURIDAD, no la vía principal: un proyecto nace con el Account Manager del
+  // aliado que lo captura, y solo si ese aliado todavía no tiene ninguno se
+  // sortea entre los AM encendidos. Los apagados (p. ej. cuentas de prueba)
+  // quedan fuera. Lo ejecuta el trigger assign_am_to_prospect sobre prospects.
   const [togglingId, setTogglingId] = useState<string | null>(null);
   // Cuenta solo los AM que realmente entran al sorteo: encendidos Y activos (mismo
   // criterio que `pickRandomAutoAssignAM` y el trigger de la BD). Un AM inactivo,
@@ -104,6 +106,10 @@ export default function GestionAccountManagers() {
         email: am.email,
         type: "account_manager" as const,
         autoAssign: am.auto_assign_enabled === true,
+        // Cartera: aliados asignados a este AM. Desde 20260904000000 es de donde
+        // salen sus proyectos NUEVOS, así que se lee junto a la ruleta: los dos
+        // números dicen por qué vías le va a entrar trabajo.
+        cartera: allies.filter((a) => a.account_manager_id === am.id).length,
         metrics: getMetricsForProspects(amProspects),
       };
     }),
@@ -113,6 +119,7 @@ export default function GestionAccountManagers() {
       email: "Operaciones Centrales",
       type: "director" as const,
       autoAssign: false,
+      cartera: 0,
       metrics: getMetricsForProspects(directProspects),
     },
   ];
@@ -163,12 +170,14 @@ export default function GestionAccountManagers() {
         <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/15 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
           <Shuffle className="h-4 w-4 text-indigo-500 shrink-0 mt-0.5" strokeWidth={2.2} />
           <span>
-            La asignación de proyectos a Account Manager es <strong className="text-slate-800 dark:text-slate-100">automática y al azar</strong> entre los AM que estén en la ruleta cuando un aliado captura su propio proyecto.
-            Enciende el interruptor de cada AM que deba participar; deja apagadas las cuentas de prueba.
+            Un proyecto nuevo nace con el Account Manager <strong className="text-slate-800 dark:text-slate-100">del aliado que lo captura</strong>: esa es la{" "}
+            <Link href="/admin/asignacion-am" className="underline font-semibold">cartera</Link>. La ruleta es la red de
+            seguridad, solo para los aliados que <strong className="text-slate-800 dark:text-slate-100">todavía no tienen</strong> Account Manager
+            asignado; enciende su interruptor en cada AM que deba recogerlos y deja apagadas las cuentas de prueba.
             {rouletteCount === 0 ? (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que los proyectos nuevos quedan sin AM (mesa del director).</span>
+              <span className="text-amber-600 dark:text-amber-400 font-semibold"> Ahora mismo no hay ningún AM en la ruleta, así que lo que capture un aliado sin cartera queda sin AM (mesa del director).</span>
             ) : (
-              <span className="font-semibold text-indigo-700 dark:text-indigo-400"> {rouletteCount} {rouletteCount === 1 ? "AM participa" : "AM participan"} en la ruleta.</span>
+              <span className="font-semibold text-indigo-700 dark:text-indigo-400"> {rouletteCount} {rouletteCount === 1 ? "AM recoge" : "AM recogen"} a los aliados sin asignar.</span>
             )}
           </span>
         </div>
@@ -225,7 +234,27 @@ export default function GestionAccountManagers() {
                   </div>
                 </div>
 
-                {/* Ruleta de asignación automática (solo AMs; editable por el director) */}
+                {/* Cartera de aliados: la vía principal por la que le entran
+                    proyectos nuevos desde 20260904000000. */}
+                {col.type === "account_manager" && (
+                  <Link
+                    href="/admin/asignacion-am"
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 hover:border-emerald-300 dark:hover:border-emerald-800/60 transition-colors"
+                    title="Aliados asignados a este Account Manager. Lo que capturen nace con él. Click para repartir la cartera."
+                  >
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      <UserCog className="h-3 w-3 text-slate-400 dark:text-slate-500" strokeWidth={2.4} />
+                      Cartera de aliados
+                    </span>
+                    <span className="text-[11px] font-black tabular-nums text-slate-700 dark:text-slate-200">
+                      {col.cartera}
+                    </span>
+                  </Link>
+                )}
+
+                {/* Ruleta de asignación automática (solo AMs; editable por el director).
+                    Ojo: ya NO es la vía principal. Solo recoge a los aliados que
+                    todavía no tienen Account Manager asignado. */}
                 {col.type === "account_manager" && (
                   <div className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border transition-colors ${
                     col.autoAssign
@@ -243,7 +272,7 @@ export default function GestionAccountManagers() {
                         aria-checked={col.autoAssign}
                         onClick={() => handleToggleRoulette(col.id, col.autoAssign)}
                         disabled={togglingId === col.id}
-                        title={col.autoAssign ? "Recibe proyectos nuevos al azar. Click para sacarlo del sorteo." : "Fuera del sorteo. Click para que reciba proyectos nuevos al azar."}
+                        title={col.autoAssign ? "Entra al sorteo de los proyectos de aliados que todavía NO tienen Account Manager. Click para sacarlo." : "Fuera del sorteo de los aliados sin Account Manager. Click para incluirlo."}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
                           col.autoAssign ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
                         } ${togglingId === col.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}

@@ -154,7 +154,13 @@ export default function GestionUsuarios() {
   const deleteTargetAmProjectCount = deleteTarget
     ? prospects.filter((p) => p.account_manager_id === deleteTarget.id).length
     : 0;
-  const deleteAmNeedsReassign = deleteTargetAmProjectCount > 0;
+  // Y su CARTERA DE ALIADOS, que es otra cosa: un AM puede no tener ni un
+  // proyecto y aun así ser el Account Manager de 40 aliados. Si no se pregunta
+  // también por ellos, al borrarlo esos aliados vuelven en silencio a la ruleta.
+  const deleteTargetAmAliadoCount = deleteTarget
+    ? profiles.filter((p) => p.role === "aliado" && p.account_manager_id === deleteTarget.id).length
+    : 0;
+  const deleteAmNeedsReassign = deleteTargetAmProjectCount > 0 || deleteTargetAmAliadoCount > 0;
   const reassignableAms = deleteTarget
     ? profiles.filter((p) => p.role === "account_manager" && p.id !== deleteTarget.id)
     : [];
@@ -1772,10 +1778,11 @@ export default function GestionUsuarios() {
             {deleteAmNeedsReassign && (
               <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 p-3.5 space-y-2">
                 <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                  Este Account Manager tiene <strong>{deleteTargetAmProjectCount}</strong> proyecto(s) en su cartera.
+                  Este Account Manager tiene <strong>{deleteTargetAmProjectCount}</strong> proyecto(s) y{" "}
+                  <strong>{deleteTargetAmAliadoCount}</strong> aliado(s) en su cartera.
                   {reassignableAms.length > 0
                     ? " Elige a qué Account Manager se transfieren antes de eliminarlo."
-                    : " No hay otro Account Manager disponible: al eliminarlo, esos proyectos quedarán sin AM (podrás reasignarlos después)."}
+                    : " No hay otro Account Manager disponible: al eliminarlo, esos proyectos quedarán sin AM y esos aliados volverán a la ruleta (podrás reasignarlos después)."}
                 </p>
                 {reassignableAms.length > 0 && (
                   <>

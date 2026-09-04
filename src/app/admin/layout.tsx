@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Target,
   Link2,
+  UserCog,
   Wallet,
 } from "lucide-react";
 import React, { useState, useEffect, Suspense } from "react";
@@ -51,6 +52,10 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
   // Aliados sin closer atribuido. Se pinta como contador en el menú porque la
   // regla es "todo aliado tiene closer": si el hueco no se ve, no se cierra.
   const sinCloserCount = assignmentProfiles.filter((p) => p.role === "aliado" && !p.closer_origen_id).length;
+  // Aliados sin Account Manager. Igual que el de arriba: mientras el hueco no
+  // se vea, no se cierra. No es una alarma —lo que capturen lo recoge la
+  // ruleta— pero sí trabajo pendiente de Dirección.
+  const sinAmCount = assignmentProfiles.filter((p) => p.role === "aliado" && !p.account_manager_id).length;
   const currentParamsString = searchParams.toString();
   const qs = currentParamsString ? `?${currentParamsString}` : "";
   const cleanPath = pathname.replace(/\/$/, "");
@@ -152,6 +157,17 @@ function SidebarLinks({ onLinkClick, collapsed }: { onLinkClick: () => void; col
       label: "Asignación Closer",
       badge: sinCloserCount,
     },
+    ...(!isAM
+      ? [
+          {
+            href: `/admin/asignacion-am${qs}`,
+            active: cleanPath === "/admin/asignacion-am",
+            Icon: UserCog,
+            label: "Asignación AM",
+            badge: sinAmCount,
+          },
+        ]
+      : []),
     { href: `/admin/asignacion${qs}`, active: cleanPath === "/admin/asignacion", Icon: ArrowRightLeft, label: "Asignación Multialiado" },
     { href: `/admin/empresas-multialiado${qs}`, active: cleanPath === "/admin/empresas-multialiado", Icon: Building2, label: "Empresas Multialiado" },
     ...(!isAM
@@ -620,6 +636,12 @@ export default function AdminLayout({
             title: "Finanzas y Comisiones",
             subtitle: "Revisa la producción, aprueba las comisiones y controla los pagos del equipo.",
           };
+    }
+    if (cleanPath === "/admin/asignacion-am") {
+      return {
+        title: "Asignación AM",
+        subtitle: "Reparte los aliados entre los Account Managers. Decide de quién serán los proyectos que capturen desde ahora.",
+      };
     }
     if (cleanPath === "/admin/asignacion-closer") {
       return {
